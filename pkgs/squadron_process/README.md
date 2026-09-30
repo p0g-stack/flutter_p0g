@@ -52,7 +52,7 @@ example/
 | Host | Rust core | Ops |
 |---|---|---|
 | AERA, Linux, Android | flutter_rust_bridge, in-process | in-process `Runner` |
-| WebUI, WebUI X | flutter_rust_bridge, sync web mode | root worker over `ksu.exec` (from `flutter-webui`) |
+| WebUI, WebUI X | flutter_rust_bridge, sync web mode | root worker over `ksu.spawn` (from `flutter-webui`): JSONL status on stdout, exit code terminal; `ksu.exec` polling only on hosts without `spawn` |
 | plain web | flutter_rust_bridge, sync web mode | none; `Cap.ops` absent |
 
 frb's sync web mode needs no cross-origin isolation. A spike proves its loader
