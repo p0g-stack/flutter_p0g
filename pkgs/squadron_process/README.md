@@ -72,4 +72,8 @@ startup and `surfaces doctor` refuses it in CI.
 
 ## License
 
-LGPL-3.0-or-later. Apps and their crates link without inheriting it.
+LGPL-3.0-or-later with the LGPL-3.0 linking exception
+(`LICENSE`, `LICENSE.exception`; SPDX `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception`).
+Apps may link this library statically or dynamically, private apps included,
+without releasing their own code or shipping relinking material. Changes to
+the library itself stay LGPL.
