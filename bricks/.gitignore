@@ -2,3 +2,4 @@
 mason-lock.json
 .dart_tool/
 packages/*/pubspec.lock
+bricks/*/hooks/build/

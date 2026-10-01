@@ -106,11 +106,12 @@ diff --git a/core/lib/src/service/partitions_service.dart b/core/lib/src/service
 index 665a73b..14822d2 100644
 --- a/core/lib/src/service/partitions_service.dart
 +++ b/core/lib/src/service/partitions_service.dart
-@@ -3,6 +3,8 @@ import 'dart:async';
+@@ -3,7 +3,9 @@ import 'dart:async';
  import 'package:logging/logging.dart';
  import 'package:squadron/squadron.dart';
  
 +import '../facts/facts.dart';
+ import '../log.dart';
 +import '../strategy/fetch_partition.dart';
  import 'partitions_service.activator.g.dart';
  
