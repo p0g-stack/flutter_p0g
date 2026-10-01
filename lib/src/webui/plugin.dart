@@ -127,16 +127,36 @@ Set<String> closureOf(Map<String, Object?> graph, String root) {
 /// implementing a plugin in [appClosure] that [appDirect] doesn't name.
 /// Flutter registers one web implementation per plugin, and a `*_webui` one
 /// wins over the stock `*_web` only as a direct dependency (webui-packages
-/// `docs/plugins.md`).
+/// `docs/plugins.md`). So does a `*_webui` package that another added one
+/// depends on (by [addedDependencies], e.g. url_launcher_webui through
+/// share_plus_webui), or else Flutter finds two web implementations of its
+/// plugin; repeated until nothing new comes in.
 @visibleForTesting
 List<String> webuiPackagesFor(
   Set<String> appClosure,
   Set<String> appDirect,
-  Map<String, String> implementations,
-) => [
-  for (final MapEntry(key: plugin, value: impl) in implementations.entries)
-    if (appClosure.contains(plugin) && !appDirect.contains(impl)) impl,
-]..sort();
+  Map<String, String> implementations, {
+  Map<String, List<String>> addedDependencies = const {},
+}) {
+  final closure = {...appClosure};
+  final picked = <String>{};
+  while (true) {
+    final next = {
+      for (final MapEntry(key: plugin, value: impl) in implementations.entries)
+        if ((closure.contains(plugin) || closure.contains(impl)) && !appDirect.contains(impl)) impl,
+    };
+    if (next.length == picked.length) break;
+    picked.addAll(next);
+    final queue = [...picked];
+    while (queue.isNotEmpty) {
+      final name = queue.removeLast();
+      for (final dep in addedDependencies[name] ?? const <String>[]) {
+        if (closure.add(dep)) queue.add(dep);
+      }
+    }
+  }
+  return picked.toList()..sort();
+}
 
 /// A `main()` that registers [kWebuiPlugin] and runs the app's [appImport].
 /// flutter_tools wraps it as it wraps any target, so the app's other web
@@ -218,6 +238,7 @@ Future<T> withWebuiPlugin<T>(
     closureOf(appGraph, appName),
     flutterProject.manifest.dependencies,
     webuiImplementations(),
+    addedDependencies: mergedDependencies(sources),
   );
   final overlay = overlayPackageConfig(_json(originals[appConfigFile]!), sources, [
     kWebuiPlugin,

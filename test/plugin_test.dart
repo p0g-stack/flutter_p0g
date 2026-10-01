@@ -182,6 +182,22 @@ void main() {
     );
   });
 
+  test('a plugin only an added package brings in gets its *_webui too', () {
+    expect(
+      webuiPackagesFor(
+        {'share_plus', 'flutter'},
+        const {},
+        {'share_plus': 'share_plus_webui', 'url_launcher': 'url_launcher_webui'},
+        addedDependencies: {
+          // As webui-packages resolves them: no edge to url_launcher itself.
+          'share_plus_webui': ['share_plus', 'url_launcher_web', 'url_launcher_webui'],
+          'url_launcher_webui': ['url_launcher_platform_interface', 'url_launcher_web'],
+        },
+      ),
+      ['share_plus_webui', 'url_launcher_webui'],
+    );
+  });
+
   test('entrypoint registers the plugin then runs the app', () {
     final code = webuiEntrypoint('package:counter/main.dart');
     expect(code, contains("import 'package:counter/main.dart' as app;"));
