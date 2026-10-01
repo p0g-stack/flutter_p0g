@@ -1,3 +1,8 @@
+# 0.6.5
+
+- flutter-webui 8deba51: Back from a pushed route no longer closes the whole
+  WebUI in KernelSU 3.3.0.
+
 # 0.6.4
 
 - `block_devices` was false everywhere, root included: dart:io's `File.open`
