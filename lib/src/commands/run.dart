@@ -12,6 +12,7 @@ import 'package:meta/meta.dart';
 
 import '../webui/module.dart';
 import '../webui/dev_proxy.dart';
+import '../squadron.dart';
 import '../webui/flutter_webui.dart';
 import '../webui/plugin.dart';
 import 'install.dart' show shellQuote;
@@ -86,6 +87,7 @@ class RunCommand extends fl.RunCommand {
   @override
   Future<FlutterCommandResult> runCommand() async {
     await precacheFlutterWebui();
+    await ensurePatchedSquadron(project.directory);
     _upstreamPort ??= await _freePort();
     final proxy = await WebUiDevProxy.start(
       port: _devPort,

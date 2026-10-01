@@ -1,0 +1,77 @@
+diff --git a/frb_dart/lib/src/generalized_frb_rust_binding/_web.dart b/frb_dart/lib/src/generalized_frb_rust_binding/_web.dart
+index e9c048a..becb062 100644
+--- a/frb_dart/lib/src/generalized_frb_rust_binding/_web.dart
++++ b/frb_dart/lib/src/generalized_frb_rust_binding/_web.dart
+@@ -5,7 +5,6 @@ import 'dart:js_interop_unsafe';
+ 
+ import 'package:flutter_rust_bridge/src/generalized_uint8list/generalized_uint8list.dart';
+ import 'package:flutter_rust_bridge/src/platform_types/_web.dart';
+-import 'package:web/web.dart' as web;
+ 
+ /// {@macro flutter_rust_bridge.only_for_generated_code}
+ class GeneralizedFrbRustBinding {
+@@ -99,7 +98,9 @@ class GeneralizedFrbRustBinding {
+ 
+   /// {@macro flutter_rust_bridge.only_for_generated_code}
+   _JSWasmBindgen get _wasmBindgen {
+-    final jsObject = web.window.getProperty(_wasmBindgenName.toJS) as JSObject;
++    // globalThis, not window: the binding also runs in Web Workers.
++    final jsObject =
++        globalContext.getProperty(_wasmBindgenName.toJS) as JSObject;
+     return _JSWasmBindgen(jsObject);
+   }
+ }
+diff --git a/frb_dart/lib/src/wasm_module/_web.dart b/frb_dart/lib/src/wasm_module/_web.dart
+index 82b1f57..28d6214 100644
+--- a/frb_dart/lib/src/wasm_module/_web.dart
++++ b/frb_dart/lib/src/wasm_module/_web.dart
+@@ -12,18 +12,32 @@ Future<void> initializeWasmModule({
+ }) async {
+   _ensureCrossOriginIsolated();
+ 
+-  final script = web.HTMLScriptElement()..src = '$root.js';
+-  web.document.head!.append(script);
+-
+-  await script.onLoad.first;
++  // A page loads the wasm-bindgen glue with a <script> tag. A Web Worker
++  // (a Squadron worker, say) has no document, so it uses importScripts,
++  // which resolves [root] against the worker script's URL. Either way the
++  // glue's `let wasm_bindgen` is a global binding; copy it onto globalThis
++  // so it can be read as a property in both.
++  if (globalContext.has('document')) {
++    final script = web.HTMLScriptElement()..src = '$root.js';
++    web.document.head!.append(script);
++    await script.onLoad.first;
++  } else {
++    _importScripts('$root.js'.toJS);
++  }
+ 
+-  jsEval('window.$wasmBindgenName = $wasmBindgenName');
++  jsEval('globalThis.$wasmBindgenName = $wasmBindgenName');
+ 
+-  final jsObject = web.window.getProperty(wasmBindgenName.toJS) as JSObject;
+-  final wasmBindgen = _JSWasmBindgen(jsObject);
+-  await wasmBindgen('${root}_bg.wasm'.toJS).toDart;
++  // Call the init function itself. `_JSWasmBindgen.call(x)` compiled to
++  // Function.prototype.call(x): no argument reached it, so it fell back to
++  // the URL of the <script> it was loaded from, which a worker does not have.
++  final init = globalContext.getProperty(wasmBindgenName.toJS) as JSFunction;
++  final url = '${root}_bg.wasm'.toJS;
++  await (init.callAsFunction(null, url) as JSPromise).toDart;
+ }
+ 
++@JS('importScripts')
++external void _importScripts(JSString url);
++
+ void _ensureCrossOriginIsolated() {
+   switch (crossOriginIsolated) {
+     case false:
+@@ -42,8 +56,3 @@ void _ensureCrossOriginIsolated() {
+       return;
+   }
+ }
+-
+-extension type _JSWasmBindgen(JSObject _) implements JSObject {
+-  @JS()
+-  external JSPromise call(JSAny? arg);
+-}

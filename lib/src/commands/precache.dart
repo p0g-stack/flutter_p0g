@@ -3,6 +3,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../aera/kit.dart';
 import '../frb/frb.dart';
+import '../squadron.dart';
 import '../webui/dart_android.dart';
 import '../webui/flutter_webui.dart';
 
@@ -23,6 +24,12 @@ class PrecacheCommand extends FlutterCommand {
       ..addFlag(
         'frb',
         help: 'Build flutter_rust_bridge with the patches in patches/frb (needs git and cargo).',
+      )
+      ..addFlag(
+        'squadron',
+        help:
+            "This project's patched Squadron: squadron_process's patch series, "
+            'materialized and pointed at by pubspec_overrides.yaml, then pub get.',
       )
       ..addFlag(
         'dart-android',
@@ -59,6 +66,9 @@ class PrecacheCommand extends FlutterCommand {
     }
     if (boolArg('webui')) await precacheFlutterWebui(force: argResults!.wasParsed('webui'));
     if (boolArg('frb')) await precacheFrb();
+    if (boolArg('squadron')) {
+      await ensurePatchedSquadron(globals.fs.currentDirectory, force: true);
+    }
     if (boolArg('dart-android') || argResults!.wasParsed('dart-android-kit')) {
       if (stringArg('dart-android-kit') case final kit?) {
         await precacheDartAndroid(source: kit, sha256Hex: stringArg('dart-android-sha256'));

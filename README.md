@@ -37,7 +37,7 @@ Gaps are listed here, not hidden.
 | `install` | `install`: adb + ksud / apd / magisk; activates on reboot | gap: no `.aerap` install path yet |
 | `devices` | gap (adb devices with a root manager probe) | gap |
 | `logs` | gap | gap |
-| `precache` | web SDK; Android Dart kit; frb | AERA runtime kit |
+| `precache` | web SDK; Android Dart kit; frb; patched Squadron (`--squadron`, also automatic in `build webui` and `run`) | AERA runtime kit |
 | `clean`, `doctor`, `test` | gap (stock `flutter test` works; no target tests) | gap |
 
 ## Commands
@@ -160,7 +160,7 @@ upstreamed until it has been tested on its own.
 |---|---|---|
 | `0001-build-web-no-threads` | `build-web --no-threads`, the `LocalKey` thread-pool stub, a clear error for plain fns | standalone-tested 2026-09-30 (Chromium, no COOP/COEP) |
 | `0002` JSPI | | planned |
-| `0003` worker init | | planned |
+| `0003-web-worker-init` | the wasm binding from `globalThis` (not `window`) and module init inside Web Workers, so a Squadron worker can load the crate | from the demo thread (page 3); applies after 0001, not yet standalone-tested |
 
 An app using frb points its Dart dependency at the patched copy (the build
 says so if it doesn't):

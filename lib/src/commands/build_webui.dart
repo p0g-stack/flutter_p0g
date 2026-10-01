@@ -8,6 +8,7 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../frb/frb.dart';
+import '../squadron.dart';
 import '../webui/cli_exe.dart';
 import '../webui/dart_android.dart';
 import '../webui/flutter_webui.dart';
@@ -31,6 +32,13 @@ class BuildWebUiCommand extends BuildWebCommand {
       help:
           'How cli/ ships: an AOT snapshot plus the Android Dart runtime kit, '
           'or a single executable (for a Dart SDK that can target Android).',
+    );
+    argParser.addFlag(
+      'device-rust',
+      defaultsTo: true,
+      help:
+          "Build rust/ for the device beside cli/ (cargo-ndk and the Android NDK). "
+          'Without it the root process runs without the crate.',
     );
   }
 
@@ -68,6 +76,8 @@ class BuildWebUiCommand extends BuildWebCommand {
     if (!webui.childFile('module.prop').existsSync()) {
       throwToolExit('No webui/module.prop. Run `flutter_p0g create .` first.');
     }
+    // squadron_process apps need its patched Squadron; set up on first use.
+    await ensurePatchedSquadron(app);
     final BuildInfo buildInfo = await getBuildInfo();
 
     if (usesFrb(app)) {
@@ -124,7 +134,9 @@ class BuildWebUiCommand extends BuildWebCommand {
       // cli/ and rust/ are one unit per ABI: the frb library sits beside
       // that ABI's snapshot and runtime. Rust never ships as its own binary.
       final rust = cli.dir.parent.childDirectory('rust');
-      if (rust.childFile('Cargo.toml').existsSync()) {
+      if (rust.childFile('Cargo.toml').existsSync() && !boolArg('device-rust')) {
+        globals.printWarning('--no-device-rust: the root process ships without rust/.');
+      } else if (rust.childFile('Cargo.toml').existsSync()) {
         final libs = await buildRustForCli(
           rust,
           out.childDirectory('jniLibs'),
