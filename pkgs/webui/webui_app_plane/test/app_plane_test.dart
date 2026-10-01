@@ -51,43 +51,54 @@ void main() {
   });
 
   group('AppPlane', () {
-    test('pre-checks with pm path once, then calls the launcher', () async {
-      final fake = FakeRootChannel(
-        handler: (run) => run.argv.contains('path')
-            ? const FakeProcessResult(
-                stdout: 'package:/system/product/app/WebuiTermuxApi/base.apk\n',
-              )
-            : FakeProcessResult(stdout: 'echo:${run.stdinText}'),
-      );
-      final plane = AppPlane(fake.root());
-      final r = await plane.call(
-        'Share',
-        extras: ['--es', 'action', 'send'],
-        input: 'hello'.codeUnits,
-      );
-      await plane.call('Toast', input: 'x'.codeUnits);
-      expect(r.text, 'echo:hello');
-      expect(fake.runs.map((r) => r.argv).toList(), [
-        ['/system/bin/pm', 'path', 'com.webui.termux.api'],
-        [
-          '/system/bin/sh',
-          '/data/adb/modules/demo/webui_app_plane/termux-api',
-          '--package',
-          'com.webui.termux.api',
+    test(
+      'pre-checks with pm path and grants the appop once, then calls',
+      () async {
+        final fake = FakeRootChannel(
+          handler: (run) => run.argv.contains('path')
+              ? const FakeProcessResult(
+                  stdout:
+                      'package:/system/product/app/WebuiTermuxApi/base.apk\n',
+                )
+              : FakeProcessResult(stdout: 'echo:${run.stdinText}'),
+        );
+        final plane = AppPlane(fake.root());
+        final r = await plane.call(
           'Share',
-          '--es',
-          'action',
-          'send',
-        ],
-        [
-          '/system/bin/sh',
-          '/data/adb/modules/demo/webui_app_plane/termux-api',
-          '--package',
-          'com.webui.termux.api',
-          'Toast',
-        ],
-      ]);
-    });
+          extras: ['--es', 'action', 'send'],
+          input: 'hello'.codeUnits,
+        );
+        await plane.call('Toast', input: 'x'.codeUnits);
+        expect(r.text, 'echo:hello');
+        expect(fake.runs.map((r) => r.argv).toList(), [
+          ['/system/bin/pm', 'path', 'com.webui.termux.api'],
+          [
+            '/system/bin/appops',
+            'set',
+            'com.webui.termux.api',
+            'SYSTEM_ALERT_WINDOW',
+            'allow',
+          ],
+          [
+            '/system/bin/sh',
+            '/data/adb/modules/demo/webui_app_plane/termux-api',
+            '--package',
+            'com.webui.termux.api',
+            'Share',
+            '--es',
+            'action',
+            'send',
+          ],
+          [
+            '/system/bin/sh',
+            '/data/adb/modules/demo/webui_app_plane/termux-api',
+            '--package',
+            'com.webui.termux.api',
+            'Toast',
+          ],
+        ]);
+      },
+    );
 
     test('a missing app is not-installed and is never called', () async {
       final fake = FakeRootChannel(

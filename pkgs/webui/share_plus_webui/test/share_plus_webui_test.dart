@@ -82,7 +82,7 @@ void main() {
         ],
       ),
     );
-    final write = fake.runs[1];
+    final write = fake.runs.firstWhere((r) => r.argv[1] == '-c');
     expect(write.argv.take(2), ['/system/bin/sh', '-c']);
     expect(write.shArgs, [
       '/data/data/com.webui.termux.api/files/demo',
@@ -111,7 +111,10 @@ void main() {
         fileNameOverrides: ['report.pdf'],
       ),
     );
-    expect(fake.runs[1].shArgs.last, endsWith('/report.pdf'));
+    expect(
+      fake.runs.firstWhere((r) => r.argv[1] == '-c').shArgs.last,
+      endsWith('/report.pdf'),
+    );
   });
 
   test('more than one file is refused', () async {

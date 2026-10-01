@@ -42,7 +42,11 @@ registers the `Link` platform view).
   (`run(argv, stdin)`, `sh(script, args)`; values are always argv, never
   spliced into a script).
 - `AppPlane`: webui-termux-api from the page. Pre-check `pm path
-  com.webui.termux.api` (once). A call runs
+  com.webui.termux.api` (once), which also runs `appops set
+  com.webui.termux.api SYSTEM_ALERT_WINDOW allow`: methods that open an
+  activity from the broadcast (Share's chooser) are otherwise blocked as
+  background activity starts on Android 10+ (devicelab: "Background activity
+  launch blocked!" without it, chooser shown with it). A call runs
   `<moddir>/webui_app_plane/termux-api [--package P] <Method> [extras]` as an
   attached root process; that launcher runs `bin/webui_termux_api.dart`, the
   Dart port of termux-api from termux-api-package 9e7f153 (`run_api_command`,
@@ -175,4 +179,7 @@ jailbreak mode; devicelab `lab-results`
   `/product/app` itself (Magisk-style rbind of a tmpfs) or a metamodule;
   that is flutter_p0g's module template.
 
-Open: `Share` end to end; reading a `chcon`ed file from the app.
+- `Share` works end to end (text, and one `chcon`ed file with targets
+  listed) once the appop is granted; the file passed ShareAPI's own
+  readability check as the app (devicelab
+  `runs/20261001T111144Z-avd-ksu-kernelsu-demo-0.9-final-2-36852361631`).
