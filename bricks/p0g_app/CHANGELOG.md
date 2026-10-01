@@ -1,3 +1,11 @@
+# 0.6.2
+
+- flutter-webui 9342a42: host detection survives a throwing
+  `ksu.moduleInfo()` (WebUI X v438).
+- `openProcessPlace` on the web catches anything host detection throws and
+  starts without a process place, so a host bridge can't block the first
+  frame.
+
 # 0.6.1
 
 - `rust`: a Squadron Web Worker loads the wasm from `../pkg/` (it runs from
@@ -35,7 +43,7 @@
 # 0.4.0
 
 - The WebUI launcher moves to `core/lib/src/places/webui_launcher.dart` and
-  depends on flutter-webui's `flutter_webui_client` (git, 3049dc9), plain
+  depends on flutter-webui's `flutter_webui_client` (git, pinned), plain
   Dart on a stock SDK. `WebUiRoot` and the `webUiRoot` global are gone: on
   web, `openProcessPlace` uses `WebUi.host.moduleDir` and
   `WebUi.connectRootChannel`; a closed channel is reopened on next use.
