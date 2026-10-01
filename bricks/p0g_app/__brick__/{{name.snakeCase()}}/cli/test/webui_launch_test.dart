@@ -56,9 +56,17 @@ void main() {
       moduleDir: module.path,
       app: '{{name.snakeCase()}}',
     );
-    final worker = place.bind(HelloServiceWorker(), service: 'hello');
+    final lines = <String>[];
+    addTearDown(logTo(lines.add, level: Level.ALL));
+    final worker = place.bind(
+      withLogs(HelloServiceWorker()),
+      service: 'hello',
+    );
     addTearDown(worker.terminate);
     expect(await worker.hello('webui'), 'Hello, webui!');
+    // The service's own log record, relayed from the host process.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(lines, contains(endsWith('FINE service.hello: hello webui')));
     expect(await worker.count(2).toList(), [1, 2]);
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

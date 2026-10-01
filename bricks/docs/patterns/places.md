@@ -36,8 +36,8 @@ never reaches the app's `logTo` on its own. The bricks wire two halves:
 - The caller wraps each worker in `withLogs(...)` before it starts. The
   panels do this, and so does `serve` for the services it hosts.
 
-A service made with `mason make service` gets both. Logs from the local
-place reach the app. Logs from services in the process place reach the
-CLI's log, which goes to stderr. Carrying them on to the page over the
-process link needs squadron_process to relay Squadron's log messages. Until
-it does, read them in the CLI's log.
+A service made with `mason make service` gets both. Records reach the app's
+log from every place, with their logger names and levels intact. That
+includes the process place, whose host relays them over the link
+(squadron_process 5d41a99). Records from services hosted by `serve` also
+reach the CLI's own log.

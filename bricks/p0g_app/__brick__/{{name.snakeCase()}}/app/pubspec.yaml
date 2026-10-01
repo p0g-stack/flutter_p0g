@@ -16,7 +16,7 @@ dependencies:
   squadron_process:
     git:
       url: https://github.com/p0g-stack/squadron_process
-      ref: d6c561bc60a72556fc6fa83bb90871fe8c978a4e
+      ref: 5d41a990abd60df81fcc4d7cd4841bd146e3f5d2
   flutter_webui_client:
     git:
       url: https://github.com/p0g-stack/flutter-webui

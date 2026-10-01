@@ -1,3 +1,9 @@
+# 0.8.1
+
+- squadron_process 5d41a99: the host relays service log records over the
+  process link, so `withLogs` workers bound to the process place log them on
+  the page too. The CLI's WebUI launch test checks it end to end.
+
 # 0.8.0
 
 - flutter-webui bebb1ec (root channel 0.2.0): `root start` prints the
