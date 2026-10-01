@@ -15,7 +15,7 @@ import 'dart_android.dart';
 /// `web_ui/` patch series builds the patched web SDK the build compiles
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
-const kFlutterWebuiCommit = '9ee7918d3ec1ab69e2cb415a079215e4224a12dd';
+const kFlutterWebuiCommit = '9c5c6318f4ec4d878d90a0def5ee0f514fcd6591';
 
 Directory flutterWebuiDir() => p0gCacheDir().childDirectory('flutter-webui');
 Directory flutterWebuiSource() => flutterWebuiDir().childDirectory('src');
@@ -42,30 +42,41 @@ const kBootstrapFiles = [
 ];
 
 /// Fetches flutter-webui at the pin and builds the patched web SDK with its
-/// own tool. Stamped by commit; [force] rebuilds.
+/// own tool. The source is stamped by commit; the SDK and fonts by the
+/// `web_ui/` tree they come from, so a pin bump that leaves `web_ui/` alone
+/// (plugin or bootstrap only) does not rebuild them. [force] redoes both.
 Future<void> precacheFlutterWebui({bool force = false}) async {
   final stamp = flutterWebuiDir().childFile('stamp');
-  if (!force &&
-      stamp.existsSync() &&
-      stamp.readAsStringSync() == kFlutterWebuiCommit &&
-      patchedWebSdk().childDirectory('kernel').existsSync() &&
-      fallbackFontsDir().existsSync()) {
-    return;
-  }
+  final sdkStamp = flutterWebuiDir().childFile('sdk-stamp');
   final src = flutterWebuiSource();
-  if (src.existsSync()) src.deleteSync(recursive: true);
-  src.createSync(recursive: true);
   Future<void> run(List<String> cmd, String cwd) async {
     final code = await globals.processUtils.stream(cmd, workingDirectory: cwd);
     if (code != 0) throwToolExit('${cmd.take(3).join(' ')} failed (exit $code).');
   }
 
-  globals.printStatus('Fetching flutter-webui ${kFlutterWebuiCommit.substring(0, 7)}...');
-  await run(['git', 'init', '-q'], src.path);
-  await run(['git', 'remote', 'add', 'origin', kFlutterWebuiRepo], src.path);
-  await run(['git', 'fetch', '-q', '--depth', '1', 'origin', kFlutterWebuiCommit], src.path);
-  await run(['git', 'checkout', '-q', 'FETCH_HEAD'], src.path);
+  final sourceCurrent =
+      !force && stamp.existsSync() && stamp.readAsStringSync() == kFlutterWebuiCommit;
+  if (!sourceCurrent) {
+    if (src.existsSync()) src.deleteSync(recursive: true);
+    src.createSync(recursive: true);
+    globals.printStatus('Fetching flutter-webui ${kFlutterWebuiCommit.substring(0, 7)}...');
+    await run(['git', 'init', '-q'], src.path);
+    await run(['git', 'remote', 'add', 'origin', kFlutterWebuiRepo], src.path);
+    await run(['git', 'fetch', '-q', '--depth', '1', 'origin', kFlutterWebuiCommit], src.path);
+    await run(['git', 'checkout', '-q', 'FETCH_HEAD'], src.path);
+    // The root channel and the plugin resolve against the source's workspace.
+    await run([dartBinary(), 'pub', 'get'], src.path);
+    stamp.writeAsStringSync(kFlutterWebuiCommit);
+  }
 
+  final tree = await webUiTree(src);
+  if (!force &&
+      sdkStamp.existsSync() &&
+      sdkStamp.readAsStringSync() == tree &&
+      patchedWebSdk().childDirectory('kernel').existsSync() &&
+      fallbackFontsDir().existsSync()) {
+    return;
+  }
   globals.printStatus('Building the patched web SDK (flutter-webui web_ui/tool)...');
   final webUi = src.childDirectory('web_ui').path;
   await run([dartBinary(), 'pub', 'get'], webUi);
@@ -73,8 +84,6 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
     dartBinary(), 'run', 'tool/build_web_sdk.dart', //
     '--flutter', Cache.flutterRoot!, '--out', patchedWebSdkRoot().path,
   ], webUi);
-  // The root channel and the plugin resolve against the source's workspace.
-  await run([dartBinary(), 'pub', 'get'], src.path);
 
   globals.printStatus("Fetching web_ui's fallback fonts...");
   final fonts = fallbackFontsDir();
@@ -84,7 +93,20 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
     '--flutter', Cache.flutterRoot!, '--out', fonts.path,
     '--cache', flutterWebuiDir().childDirectory('fonts-cache').path,
   ], webUi);
-  stamp.writeAsStringSync(kFlutterWebuiCommit);
+  sdkStamp.writeAsStringSync(tree);
+}
+
+/// The git tree id of [src]'s `web_ui/`: the patch series, its tool and the
+/// fallback font list.
+@visibleForTesting
+Future<String> webUiTree(Directory src) async {
+  final r = await globals.processUtils.run([
+    'git',
+    'rev-parse',
+    'HEAD:web_ui',
+  ], workingDirectory: src.path);
+  if (r.exitCode != 0) throwToolExit('git rev-parse HEAD:web_ui failed:\n${r.stderr}');
+  return r.stdout.trim();
 }
 
 /// flutter-webui's root channel for the module (`docs/root-channel.md`):
