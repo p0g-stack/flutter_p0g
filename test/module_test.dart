@@ -97,6 +97,25 @@ void main() {
       expect(isSigningSecret('webroot/keyboard.png'), isFalse);
     });
 
+    test('a module with the app plane warns when KernelSU 3.x has no metamodule', () {
+      String customize(Map<String, List<int>> extra) => utf8.decode(
+        assembleModule(
+          webBuild: const {},
+          webuiFolder: webui,
+          extra: extra,
+          buildName: '1',
+          buildNumber: '1',
+        ).firstWhere((f) => f.path == 'customize.sh').bytes,
+      );
+      expect(
+        customize({
+          'system/product/app/WebuiApi_demo/WebuiApi_demo.apk': [1],
+        }),
+        endsWith('$kMetamoduleCheck\n'),
+      );
+      expect(customize(const {}), isNot(contains('metamodule')));
+    });
+
     test('an invalid module id is refused before it reaches a script', () {
       expect(() => withDataFolder('', 'a b;rm'), throwsStateError);
     });

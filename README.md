@@ -144,9 +144,11 @@ root-process place reports itself unavailable. The same holds under
    it at `system/product/app/WebuiApi_<seg>/WebuiApi_<seg>.apk`. So Android's
    permission dialog names the module, and grants and data are per module.
    The app sits in the zip's `system/`, which the manager mounts. On KernelSU
-   3.x that is the job of a metamodule, and KernelSU 3.3.0 ships none:
-   **install a metamodule first** or the app never appears (KernelSU Next and
-   WebUI X mount `system/` themselves).
+   3.x and KernelSU Next 3.x (WebUI X installs through their ksud) that is the
+   job of a metamodule, and neither ships one: **install a metamodule first**
+   or the app never appears. Only pre-3.0 managers mounted `system/`
+   themselves. The generated `customize.sh` warns at install when KernelSU
+   3.x has no metamodule (`/data/adb/metamodule` absent).
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
    - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,

@@ -84,6 +84,10 @@ List<ModuleFile> assembleModule({
     final ownUninstall = files['uninstall.sh'] == null ? '' : utf8.decode(files['uninstall.sh']!);
     files['uninstall.sh'] = utf8.encode(withUninstall(ownUninstall));
   }
+  if (files.keys.any((f) => f.startsWith('system/product/app/WebuiApi_'))) {
+    final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
+    files['customize.sh'] = utf8.encode(withMetamoduleNotice(own));
+  }
   files['META-INF/com/google/android/update-binary'] = utf8.encode(kUpdateBinary);
   files['META-INF/com/google/android/updater-script'] = utf8.encode(kUpdaterScript);
   if (!files.containsKey('module.prop')) {
@@ -141,6 +145,29 @@ String withDataFolder(String customizeSh, String moduleId) {
       'KSU_MODULE=$moduleId /data/adb/ksud module config set $kInstallMarkerKey 1 ||'
       ' ui_print "! ksud module config failed: KernelSU 3.0+ or KernelSU Next 3.0+ is needed"',
     );
+  return b.toString();
+}
+
+/// The install-time check: KernelSU 3.x (and KernelSU Next 3.x, which sets
+/// the same variables) mounts a module's `system/` only through a
+/// metamodule, so without one the module's app never appears. `|| true`
+/// keeps the line's status 0 when there is nothing to say.
+const kMetamoduleCheck =
+    r'[ "$KSU" = true ] && [ "${KSU_VER%%.*}" -ge 3 ] 2>/dev/null && '
+    r'[ ! -e /data/adb/metamodule ] && '
+    r'ui_print "! No metamodule installed: this module'
+    "'"
+    's app needs one to be mounted (KernelSU 3.x)" || true';
+
+/// [customizeSh] followed by [kMetamoduleCheck].
+String withMetamoduleNotice(String customizeSh) {
+  final b = StringBuffer(customizeSh);
+  if (customizeSh.isNotEmpty && !customizeSh.endsWith('\n')) b.writeln();
+  b
+    ..writeln(
+      '# flutter_p0g: the app plane needs a metamodule on KernelSU 3.x (generated at build).',
+    )
+    ..writeln(kMetamoduleCheck);
   return b.toString();
 }
 
