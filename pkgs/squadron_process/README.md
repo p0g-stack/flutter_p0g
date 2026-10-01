@@ -1,74 +1,50 @@
-# surfaces
+# squadron_process
 
-What Flutter has no concept of: root, module storage, privileged jobs, and
-what an operation is allowed to touch. One Rust `Handler`, one wire protocol,
-one capability table; the same app code on KernelSU WebUI, WebUI X, plain web,
-AERA Recovery, Linux and Android.
+> This repo was `surfaces`; it is being renamed to `squadron_process`. The old
+> Rust crates, transports, CLI, templates and design package are gone: their
+> jobs moved to Squadron, the Mason bricks (`bricks`), `flutterp0g_tool` and
+> app code.
 
-Lifecycle, back, insets, clipboard, theme are Flutter's; the embedders
-(`flutter-aera`, `flutter-webui`) make them work per host. This repo starts
-where those stop.
+An unofficial extension for [Squadron](https://pub.dev/packages/squadron) that
+adds a third place to run a worker. Squadron runs a service in an **isolate**
+(native) or a **Web Worker** (web). This package adds **another process**,
+optionally elevated, reached over a socket:
+
+| Place | Where | Used for |
+|---|---|---|
+| isolate | in-process (Squadron) | AERA (already root), tests |
+| web worker | Web Worker (Squadron) | plain web |
+| process | the app's own Dart CLI in serve mode, hosting the same Squadron service | WebUI root work (started through flutter-webui's root channel); later desktop via `pkexec` |
+
+The same service class runs in all three; only the channel differs.
+
+## Facts
+
+Flutter's platform hints don't say what a place can do (WebUI reports web,
+AERA reports Linux, neither says "root"). Each place reports its own facts when
+it connects: `root`, `block_devices`, `usb.native`, `usb.web`, `process.spawn`,
+`fs.persistent`, `net`, ... Apps decide with these (`available(facts)`), never
+with `kIsWeb` / `Platform`.
+
+## Lifetime
+
+The process watches its client link. If the page goes away and doesn't come
+back within a short grace window (a reload on rotation), it cancels its tasks
+and exits: hidden keeps running, closed stops.
+
+## Squadron patch
+
+`Worker.start()` only opens Squadron's own channels. A pinned patch adds a
+pluggable channel factory; it lives in `third_party/squadron/patches/` until
+Squadron accepts it upstream.
 
 ## Scope
 
-In:
-- `surfaces` (Dart): `Cap`, the ops client, `OpsTransport` interface, fallbacks
-- `surfaces_ui` (Dart): shared design language
-- `surfaces-core` (Rust): protocol types, the `Effect` enum, codec; no I/O
-- `surfaces-ops` (Rust): `Handler`, `JobCtx`, effect gates, worker main, in-process `Runner`, backend selector
-- `tools/cli`: build webui|aera|linux|android, serve fake hosts, doctor
-- `example/`: one page per affordance; the integration test
-- `spec/`: the frozen contracts
+In: the process channel (client + serve host), launching (WebUI root channel,
+later `pkexec`), place facts, the Squadron patch.
 
-Out: embedders, app code, GPU code.
-
-## Proposed nest
-
-```
-spec/
-  protocol.md         Request/Envelope/JobStatus, error and state enums, limits, version handshake on every transport
-  capabilities.md     Cap id -> detection rule -> fallback; the one table, generates the Dart constants
-  effects.md          Effect::{Read, WriteAppData, WriteFs, Exec, Device}; plan-confirm-execute; receipts
-  layout.md           module layout, state dir ownership/mode, surfaces.yaml keys
-  fixtures/           JSON cases run by both Rust and Dart tests
-crates/
-  surfaces-core/
-  surfaces-ops/
-packages/
-  surfaces/
-  surfaces_ui/
-tools/
-  cli/
-docs/
-  hosts/              host reports exported from real devices by the example app; the support table is generated from them
-example/
-  lib/pages/          host, storage, files, ops, jobs, backends, core, ...
-  rust/               as template-app; backends/ shows the swappable-backend pattern with harmless backends
-  tool/e2e            drives every page under every fake host profile; fails on page errors
-```
-
-## Transports
-
-| Host | Rust core | Ops |
-|---|---|---|
-| AERA, Linux, Android | flutter_rust_bridge, in-process | in-process `Runner` |
-| WebUI, WebUI X | flutter_rust_bridge, sync web mode | root worker over `ksu.spawn` (from `flutter-webui`): JSONL status on stdout, exit code terminal; `ksu.exec` polling only on hosts without `spawn` |
-| plain web | flutter_rust_bridge, sync web mode | none; `Cap.ops` absent |
-
-frb's sync web mode needs no cross-origin isolation. A spike proves its loader
-inside the KernelSU and WebUI X webviews before `spec/protocol.md` is frozen;
-if it fails, a hand-written wasm ABI returns as `spec/core-abi.md`.
-
-## Dependency direction
-
-```
-app dart  -> flutter_webui -> surfaces
-app rust  -> surfaces-ops -> surfaces-core
-```
-
-`surfaces` imports no embedder. `surfaces-core` does no I/O. One commit of
-this repo pins both halves of an app; the handshake refuses a mismatch at
-startup and `surfaces doctor` refuses it in CI.
+Out: strategies, logging conventions and app shape (bricks), building and
+packaging (`flutterp0g_tool`), Rust (frb, per app).
 
 ## License
 
