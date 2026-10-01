@@ -23,11 +23,11 @@ dev_dependencies:
     git:
       url: https://github.com/p0g-stack/flutter-webui
       path: packages/flutter_webui_client
-      ref: 9ee7918d3ec1ab69e2cb415a079215e4224a12dd
+      ref: 9c5c6318f4ec4d878d90a0def5ee0f514fcd6591
   flutter_webui_root:
     git:
       url: https://github.com/p0g-stack/flutter-webui
       path: packages/flutter_webui_root
-      ref: 9ee7918d3ec1ab69e2cb415a079215e4224a12dd
+      ref: 9c5c6318f4ec4d878d90a0def5ee0f514fcd6591
   lints: ^6.1.0
   test: ^1.31.1

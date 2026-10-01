@@ -1,3 +1,9 @@
+# 0.7.3
+
+- flutter-webui 9c5c631: KernelSU brightness follows the manager's theme
+  colours, and the client carries the colour calls dynamic_color_webui
+  uses (flutter_p0g builds with them).
+
 # 0.7.2
 
 - The app takes the host's colours through the stock `dynamic_color`

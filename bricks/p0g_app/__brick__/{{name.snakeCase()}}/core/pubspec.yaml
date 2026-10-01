@@ -19,7 +19,7 @@ dependencies:
     git:
       url: https://github.com/p0g-stack/flutter-webui
       path: packages/flutter_webui_client
-      ref: 9ee7918d3ec1ab69e2cb415a079215e4224a12dd
+      ref: 9c5c6318f4ec4d878d90a0def5ee0f514fcd6591
 {{#rust}}  crypto: ^3.0.6
   # frb at flutter_p0g's base commit (master after 2.14.0-beta.2): the
   # bindings its codegen writes need it. tool/rust.sh overrides it with
