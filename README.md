@@ -25,12 +25,12 @@ flutter_p0g install --reboot  # adb + the device's ksud / apd / magisk
 
 | Command | What it does | State |
 |---|---|---|
-| `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json`) and `aera/` (plugin.json), like `flutter create --platforms` | works |
+| `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json`) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
-| `build aera` | `.aerap` | stub: waits on the layout and engine kits from flutter-aera |
+| `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works with a kit; the arm64 kit isn't released yet |
 | `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
 | `run` | dev loop with hot restart | stub: waits on flutter-webui's bootstrap |
-| `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` installs the Android Dart kit | web, frb and kit install work; the kit release, `--aera`, `--app-plane` wait on CI |
+| `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits | works; the kit releases and `--app-plane` wait on CI |
 
 ### `build webui`
 
@@ -72,6 +72,25 @@ swaps in another source with the same layout (`VERSION`, `gen_snapshot`,
 `dartaotruntime`). The pipeline is checked end to end with a host-arch kit;
 the Android kit itself is not built yet. `--cli-format=exe` is kept for a Dart
 SDK that can compile Android executables directly.
+
+### `build aera`
+
+Follows flutter-aera's `spec/aerap.md`. `flutter build bundle` for
+`linux-arm64` (any `build bundle` flag works); debug keeps
+`kernel_blob.bin` for a debug (JIT) engine, profile and release add
+`usr/lib/libapp.so` from the SDK's frontend server plus the kit's
+`gen_snapshot`. The app's `flutter_assets` and the runtime kit's tree become
+AERA's runtime stream, xz-compressed with CRC32 and the ARM64 BCJ filter
+(XZ Utils 5.4+), and `plugin.json` is the app's `aera/plugin.json` plus the
+packer's fixed and computed fields. Output: `build/aera/<id>-<version>.aerap`
+and a copy of `plugin.json`.
+
+The kit (`precache --aera-kit=<path|url>`) is a `.tar.gz` with `VERSION`
+(engine revision, must match the pinned Flutter), `TARGET`, `MODE`,
+`payload/` and, for profile/release, `host/gen_snapshot`. Checked: a debug
+`.aerap` of the counter app, built against a linux-x64 kit of the pinned
+debug engine, expands and runs in flutter-aera's `aera-host-sim` (taps
+count).
 
 ## frb patches
 

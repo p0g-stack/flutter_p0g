@@ -74,10 +74,17 @@ fi
       '${const JsonEncoder.withIndent('  ').convert({'title': app.name, 'killShellWhenBackground': false})}\n',
 };
 
-/// Files of `aera/`. Provisional until flutter-aera fixes the `.aerap` layout.
+/// AERA plugin ids: lowercase letters, digits, `-` and `.`.
+String aeraIdFor(String moduleId) {
+  final id = moduleId.toLowerCase().replaceAll(RegExp(r'[^a-z0-9.-]'), '-');
+  return id == 'browser' ? 'browser-app' : id;
+}
+
+/// Files of `aera/`: the app's part of `plugin.json` (flutter-aera
+/// `spec/aerap.md`); the packer adds the fixed and computed fields.
 Map<String, String> aeraTemplate(AppInfo app) => {
   'plugin.json':
-      '${const JsonEncoder.withIndent('  ').convert({'schema': 1, 'id': app.id, 'name': app.name, 'version': kBuildNameVar, 'description': app.description})}\n',
+      '${const JsonEncoder.withIndent('  ').convert({'id': aeraIdFor(app.id), 'name': app.name, 'version': kBuildNameVar, 'description': app.description, 'permissions': <String>[]})}\n',
 };
 
 /// Replaces the build variables in a template file.

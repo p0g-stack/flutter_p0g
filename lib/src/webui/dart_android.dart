@@ -1,5 +1,3 @@
-import 'dart:io' as io;
-
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_tools/src/base/common.dart';
@@ -81,17 +79,12 @@ Future<void> precacheDartAndroid({String? source, String? sha256Hex}) async {
     return;
   }
   source ??= defaultKitUrl(version);
-  final List<int> bytes;
-  if (source.startsWith('https://')) {
-    bytes = await _download(source);
-  } else {
-    bytes = globals.fs.file(source).readAsBytesSync();
-  }
+  final bytes = await fetchBytes(source);
   final digest = sha256.convert(bytes).toString();
   if (sha256Hex != null && sha256Hex != digest) {
     throwToolExit('Kit sha256 is $digest, expected $sha256Hex.');
   }
-  final archive = TarDecoder().decodeBytes(GZipDecoder().decodeBytes(bytes));
+  final archive = decodeTarGz(bytes);
   final problem = validateKitArchive(archive, version);
   if (problem != null) throwToolExit('Dart Android kit: $problem.');
   if (kit.dir.existsSync()) kit.dir.deleteSync(recursive: true);
@@ -101,27 +94,6 @@ Future<void> precacheDartAndroid({String? source, String? sha256Hex}) async {
     if (f.name != 'VERSION') globals.os.chmod(out, '755');
   }
   globals.printStatus('Dart $version Android kit installed (sha256 $digest).');
-}
-
-Future<List<int>> _download(String url) async {
-  final client = io.HttpClient();
-  try {
-    final request = await client.getUrl(Uri.parse(url));
-    final token = globals.platform.environment['GITHUB_TOKEN'];
-    if (token != null && url.startsWith('https://github.com/')) {
-      request.headers.set('Authorization', 'Bearer $token');
-    }
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      throwToolExit(
-        'GET $url: HTTP ${response.statusCode}. '
-        'Pass --dart-android-kit=<path or url> to use another kit.',
-      );
-    }
-    return [for (final chunk in await response.toList()) ...chunk];
-  } finally {
-    client.close();
-  }
 }
 
 /// The module's `bin/<name>`: starts the snapshot for the device's ABI

@@ -1,6 +1,7 @@
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
+import '../aera/kit.dart';
 import '../frb/frb.dart';
 import '../webui/dart_android.dart';
 
@@ -23,7 +24,11 @@ class PrecacheCommand extends FlutterCommand {
       )
       ..addOption('dart-android-kit', help: 'Kit .tar.gz path or https URL (default: the release).')
       ..addOption('dart-android-sha256', help: 'Expected sha256 of the kit archive.')
-      ..addFlag('aera', help: 'AERA engine and runtime kits (not released yet).')
+      ..addOption(
+        'aera-kit',
+        help: 'Install a flutter-aera runtime kit .tar.gz (path or https URL).',
+      )
+      ..addOption('aera-kit-sha256', help: 'Expected sha256 of the AERA kit archive.')
       ..addFlag('app-plane', help: 'The webui-termux-api APK (not released yet).');
   }
 
@@ -45,7 +50,9 @@ class PrecacheCommand extends FlutterCommand {
         sha256Hex: stringArg('dart-android-sha256'),
       );
     }
-    if (boolArg('aera')) globals.printWarning('AERA kits: no release yet (flutter-aera CI).');
+    if (stringArg('aera-kit') case final kit?) {
+      await precacheAeraKit(kit, sha256Hex: stringArg('aera-kit-sha256'));
+    }
     if (boolArg('app-plane')) globals.printWarning('webui-termux-api: no release yet.');
     return FlutterCommandResult.success();
   }
