@@ -1,3 +1,8 @@
+# 0.8.3
+
+- flutter-webui 7985489, the commit flutter_p0g builds with. It only adds
+  the `WebUiClipboard` seam to the web plugin, so nothing changes for the app.
+
 # 0.8.2
 
 - squadron_process 28c37ce: each service log record reaches a page once,
