@@ -1,3 +1,14 @@
+# 0.5.0
+
+- `rust`: a working crate end to end. `sha256_hex` (the `sha2` crate) behind
+  the `digest` objective: a Rust strategy that requires the new `native` fact
+  and a Dart fallback (`package:crypto`). `loadNative()` loads the library per
+  place (env, beside the executable as flutter_p0g packs `bin/<abi>/`, a
+  Linux bundle's `lib/`, `rust/target/`; frb's wasm on the web). Used by the
+  hello service (`sha256`), a CLI `digest` command and an app button; tested
+  in core, in an isolate, in the serve process and in a compiled CLI.
+- Bootstrap runs frb codegen and `cargo build` when `rust` is on.
+
 # 0.4.0
 
 - The WebUI launcher moves to `core/lib/src/places/webui_launcher.dart` and

@@ -4,7 +4,8 @@ import 'package:logging/logging.dart';
 import 'package:squadron/squadron.dart';
 
 import '../facts/facts.dart';
-import 'hello_service.activator.g.dart';
+{{#rust}}import '../strategy/digest.dart';
+{{/rust}}import 'hello_service.activator.g.dart';
 
 part 'hello_service.worker.g.dart';
 
@@ -37,4 +38,13 @@ base class HelloService {
   @squadronMethod
   Future<Map<String, Object?>> facts() async =>
       (await PlaceInfo.current()).facts.toMap();
-}
+{{#rust}}
+  /// SHA-256 of [text] by the `digest` objective in this place: `strategy`
+  /// says whether Rust or Dart computed `sha256`.
+  @squadronMethod
+  Future<Map<String, String>> sha256(String text) async {
+    final place = await PlaceInfo.current();
+    final strategy = digest.selectRead(place).chosen?.name ?? 'none';
+    return {'sha256': await digest.run(text, place), 'strategy': strategy};
+  }
+{{/rust}}}

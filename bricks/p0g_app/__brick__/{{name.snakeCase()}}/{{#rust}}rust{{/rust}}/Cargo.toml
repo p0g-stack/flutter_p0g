@@ -13,3 +13,4 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 # Must match the Dart package version in core/pubspec.yaml. flutter_p0g
 # applies its frb patch series (single-threaded web) on top of this pin.
 flutter_rust_bridge = "=2.14.0-beta.2"
+sha2 = "0.10"

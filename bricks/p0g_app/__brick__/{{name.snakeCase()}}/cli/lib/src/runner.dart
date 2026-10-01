@@ -4,7 +4,8 @@ import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 
-import 'commands/facts_command.dart';
+{{#rust}}import 'commands/digest_command.dart';
+{{/rust}}import 'commands/facts_command.dart';
 import 'commands/hello_command.dart';
 import 'commands/serve_command.dart';
 // p0g:imports (bricks insert imports above this line)
@@ -15,7 +16,8 @@ class AppRunner extends CommandRunner<int> {
     argParser
       ..addFlag('verbose', abbr: 'v', help: 'Log everything.')
       ..addFlag('json', help: 'Log records as JSON lines.');
-    addCommand(FactsCommand());
+{{#rust}}    addCommand(DigestCommand());
+{{/rust}}    addCommand(FactsCommand());
     addCommand(HelloCommand());
     addCommand(ServeCommand());
     // p0g:commands (bricks insert commands above this line)

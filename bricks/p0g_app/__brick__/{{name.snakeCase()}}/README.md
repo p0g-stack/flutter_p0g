@@ -55,9 +55,13 @@ P0G_CLI=$PWD/build/{{name.snakeCase()}} flutter run -d linux -t app/lib/main.dar
   host's stderr), so the app also logs at the call site.
 - **Adding code.** `mason make service` and `mason make strategy` from this
   folder; they insert themselves at the `// p0g:` markers.
-{{#rust}}- **Rust.** `flutter_rust_bridge_codegen generate` writes bindings to
-  `core/lib/src/rust/`. Bindings are sync (`default_dart_async: false`):
-  Squadron owns threads, so a call runs inside whichever worker makes it.
+{{#rust}}- **Rust.** `rust/` is a library used through frb, never a binary.
+  Bootstrap runs `flutter_rust_bridge_codegen generate` (bindings in
+  `core/lib/src/rust/`) and `cargo build`. Bindings are sync
+  (`default_dart_async: false`): Squadron owns threads, so a call runs inside
+  whichever worker makes it. Each place loads the library itself
+  (`loadNative()`), and whether it did is the `native` fact: a strategy that
+  calls Rust requires it and has a Dart fallback (see `digest`).
 {{/rust}}- **Patched Squadron.** squadron_process needs Squadron with its
   channel-factory patch; bootstrap runs `squadron_process:squadron_patch`,
   which puts it under `.dart_tool/` and writes `pubspec_overrides.yaml`.

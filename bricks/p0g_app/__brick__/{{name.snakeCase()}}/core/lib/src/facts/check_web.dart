@@ -3,7 +3,8 @@ import 'dart:js_interop_unsafe';
 
 import 'package:web/web.dart' as web;
 
-import 'facts.dart';
+{{#rust}}import '../native/native.dart';
+{{/rust}}import 'facts.dart';
 
 /// Checks the facts of the current browser context (page or Web Worker).
 ///
@@ -19,7 +20,8 @@ Future<Map<String, Object?>> checkFacts() async {
     Fact.processSpawn: false,
     Fact.fsPersistent: await _persisted(nav),
     Fact.net: nav != null && (nav['onLine'] as JSBoolean?)?.toDart == true,
-  };
+{{#rust}}    Fact.native: await loadNative(),
+{{/rust}}  };
 }
 
 Future<bool> _persisted(JSObject? nav) async {

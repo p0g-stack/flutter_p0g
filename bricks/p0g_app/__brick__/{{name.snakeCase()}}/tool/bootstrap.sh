@@ -9,6 +9,14 @@ cd "$(dirname "$0")/.."
 flutter pub get
 (cd cli && dart run squadron_process:squadron_patch ..)
 flutter pub get
+{{#rust}}
+# rust/: Dart bindings (flutter_rust_bridge_codegen 2.14.0-beta.2, from
+# `cargo install flutter_rust_bridge_codegen --version 2.14.0-beta.2`), and
+# the library for this machine's `dart run`, `dart test` and `flutter test`.
+# flutter_p0g builds it per ABI for a device.
+flutter_rust_bridge_codegen generate
+(cd rust && cargo build)
+{{/rust}}
 (cd core && dart run build_runner build --delete-conflicting-outputs)
 
 # Stock platform folders; `flutter_p0g create .` adds webui/ and aera/.

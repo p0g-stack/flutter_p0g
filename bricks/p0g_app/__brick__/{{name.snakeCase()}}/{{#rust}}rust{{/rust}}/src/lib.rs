@@ -2,3 +2,4 @@
 //! places and lifetimes belong to Squadron, so calls here can be
 //! `#[frb(sync)]` and run inside whichever worker calls them.
 pub mod api;
+mod frb_generated;

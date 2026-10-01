@@ -49,8 +49,9 @@ mason_cli 0.1.4.
 write) to it, bootstraps it, and
 runs the generated workspace's analyzer, unit and widget tests (including a
 service running in the CLI as a process place), the CLI executable, and the
-web and Linux builds; the `rust` variant runs
-`cargo test`. No e2e. `.github/workflows/ci.yaml` runs it on every push.
+web and Linux builds; the `rust` variant does the same plus `cargo test`,
+and checks that the CLI executable loads the library beside it and hashes
+with Rust. No e2e. `.github/workflows/ci.yaml` runs it on every push.
 
 ## License
 

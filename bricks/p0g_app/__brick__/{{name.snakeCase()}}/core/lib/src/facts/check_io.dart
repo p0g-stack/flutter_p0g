@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'facts.dart';
+{{#rust}}import '../native/native.dart';
+{{/rust}}import 'facts.dart';
 
 /// Checks the facts of the current Dart VM process.
 ///
@@ -16,7 +17,8 @@ Future<Map<String, Object?>> checkFacts() async {
     Fact.processSpawn: await _canSpawn(),
     Fact.fsPersistent: await _canWriteWorkingDir(),
     Fact.net: await _hasNetwork(),
-  };
+{{#rust}}    Fact.native: await loadNative(),
+{{/rust}}  };
 }
 
 Future<bool> _isRoot() async {

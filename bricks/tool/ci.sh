@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Generate each brick into a scratch folder and build and test what it made.
 # Usage: tool/ci.sh [out-dir]. Needs flutter (3.47.5) and mason on PATH;
-# the rust variant also needs cargo.
+# the rust variant also needs cargo, cargo-expand and
+# flutter_rust_bridge_codegen 2.14.0-beta.2.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$(mktemp -d)}"
@@ -44,10 +45,19 @@ echo "::group::p0g_app (rust)"
 make_app ci_rust true
 (
   cd "$out/ci_rust"
-  flutter pub get
-  (cd cli && dart run squadron_process:squadron_patch ..)
-  flutter pub get
+  bash tool/bootstrap.sh
+  dart format --output=none --set-exit-if-changed core cli app/lib app/test
+  dart analyze --fatal-infos
   (cd rust && cargo test)
+  (cd core && dart test)
+  (cd cli && dart test)
+  (cd app && flutter test)
+  # As flutter_p0g packs it: the library beside the CLI. Run from outside the
+  # workspace so only that copy can be found.
+  mkdir -p build
+  dart compile exe cli/bin/ci_rust.dart -o build/ci_rust
+  cp rust/target/debug/libci_rust_native.so build/
+  (cd / && "$out/ci_rust/build/ci_rust" digest abc | grep -q rust_sha2)
+  (cd app && flutter build web)
 )
 echo "::endgroup::"
-

@@ -54,5 +54,18 @@ and ABI (`dart compile exe` on desktops, an AOT snapshot plus
 through frb inside that CLI and the app; the `rust/` crate is a library and
 never ships its own binary or CLI.
 
+With `rust`, the crate is a working example: `sha256_hex` through the `sha2`
+crate, called by the `digest` objective (`core/lib/src/strategy/digest.dart`),
+whose Rust strategy requires the `native` fact and whose Dart strategy is the
+fallback. `loadNative()` (`core/lib/src/native/`) loads the library once per
+isolate, Web Worker or process: `P0G_NATIVE_LIB`, then beside the executable
+(`bin/<abi>/` where flutter_p0g packs it, or beside a `dart compile exe`
+binary), then a Linux bundle's `lib/`, then `rust/target/` in the workspace.
+On the web it is frb's wasm under `pkg/`, which `flutter_p0g build webui`
+builds; a plain `flutter build web` has none, and the Dart strategy runs.
+The hello service's `sha256`, the CLI's `digest` command and the app's
+SHA-256 button go through it. Bootstrap needs `flutter_rust_bridge_codegen`
+2.14.0-beta.2 (`cargo install`) and cargo-expand.
+
 Generated code (`*.g.dart`, compiled workers) is not committed; bootstrap
 regenerates it.

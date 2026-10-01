@@ -6,5 +6,8 @@ pubspec_overrides.yaml
 # Squadron codegen and compiled workers; tool/bootstrap.sh regenerates them.
 *.g.dart
 app/web/workers/
-{{#rust}}rust/target/
+{{#rust}}# flutter_rust_bridge codegen (tool/bootstrap.sh).
+core/lib/src/rust/
+rust/src/frb_generated.rs
+rust/target/
 {{/rust}}

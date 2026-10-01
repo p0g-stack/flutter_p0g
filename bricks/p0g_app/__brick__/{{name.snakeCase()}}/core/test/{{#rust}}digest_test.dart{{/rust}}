@@ -1,0 +1,35 @@
+@TestOn('vm')
+library;
+
+import 'dart:convert';
+
+import 'package:test/test.dart';
+import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
+
+const abc = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+
+void main() {
+  test('Rust loads here (rust/target from tool/bootstrap.sh)', () async {
+    expect(await loadNative(), isTrue);
+    expect(sha256Hex(data: utf8.encode('abc')), abc);
+  });
+
+  test('digest picks Rust where the native fact holds, else Dart', () async {
+    final withRust = PlaceInfo('test', Facts({Fact.native: true}));
+    const without = PlaceInfo('test', Facts.none());
+    await loadNative();
+    expect(digest.selectRead(withRust).chosen, isA<RustSha256>());
+    expect(digest.selectRead(without).chosen, isA<DartSha256>());
+    expect(await digest.run('abc', withRust), abc);
+    expect(await digest.run('abc', without), abc);
+  });
+
+  test('the hello service hashes with Rust inside its isolate', () async {
+    final worker = HelloServiceWorker();
+    addTearDown(worker.terminate);
+    expect(await worker.sha256('abc'), {
+      'sha256': abc,
+      'strategy': 'rust_sha2',
+    });
+  });
+}

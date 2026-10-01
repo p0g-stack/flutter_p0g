@@ -30,6 +30,10 @@ abstract final class Fact {
 
   /// The place has a network interface other than loopback that is up.
   static const net = 'net';
+{{#rust}}
+  /// The app's Rust library (`rust/`) is loaded in this place.
+  static const native = 'native';
+{{/rust}}
 
   static const all = [
     root,
@@ -39,7 +43,8 @@ abstract final class Fact {
     processSpawn,
     fsPersistent,
     net,
-  ];
+{{#rust}}    native,
+{{/rust}}  ];
 }
 
 /// What a place has checked it can do.
