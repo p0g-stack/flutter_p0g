@@ -58,7 +58,9 @@ Future<void> compileWorkers(
   required bool release,
 }) async {
   for (final w in workers) {
-    final out = webRoot.childFile(w.output)..parent.createSync(recursive: true);
+    // Absolute: the compiler runs in the worker's source directory, so a
+    // relative `--output` would land the worker beside its source.
+    final out = webRoot.childFile(w.output).absolute..parent.createSync(recursive: true);
     final wasm = w.output.endsWith('.wasm');
     globals.printStatus('Compiling worker ${w.output}...');
     final r = await globals.processUtils.run([
