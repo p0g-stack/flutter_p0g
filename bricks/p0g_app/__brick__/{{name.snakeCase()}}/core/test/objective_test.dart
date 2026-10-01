@@ -6,9 +6,9 @@ final class OnDevice extends ReadStrategy<String, String> {
   @override
   String get name => 'on_device';
   @override
-  bool available(Facts facts) => facts.has(Fact.root);
+  Set<String> get requires => const {Fact.root};
   @override
-  Future<String> run(String input, Place place) async => 'device:$input';
+  Future<String> run(String input, PlaceInfo place) async => 'device:$input';
 }
 
 final class FromHost extends ReadStrategy<String, String> {
@@ -16,9 +16,9 @@ final class FromHost extends ReadStrategy<String, String> {
   @override
   String get name => 'from_host';
   @override
-  bool available(Facts facts) => facts.has(Fact.usbNative);
+  Set<String> get requires => const {Fact.usbNative};
   @override
-  Future<String> run(String input, Place place) async => 'host:$input';
+  Future<String> run(String input, PlaceInfo place) async => 'host:$input';
 }
 
 final class Flash extends WriteStrategy<String, int> {
@@ -26,13 +26,13 @@ final class Flash extends WriteStrategy<String, int> {
   @override
   String get name => 'flash';
   @override
-  bool available(Facts facts) => facts.has(Fact.blockDevices);
+  Set<String> get requires => const {Fact.blockDevices};
   @override
-  Future<List<String>> plan(String input, Place place) async => [
+  Future<List<String>> plan(String input, PlaceInfo place) async => [
     'write $input',
   ];
   @override
-  Future<int> write(String input, Place place) async {
+  Future<int> write(String input, PlaceInfo place) async {
     written.add(input);
     return input.length;
   }
@@ -46,9 +46,10 @@ void main() {
   });
   Logger.root.onRecord.listen(records.add);
 
-  const root = Place('process', Facts({Fact.root: true}));
-  const host = Place('cli', Facts({Fact.usbNative: true}));
-  const page = Place('main');
+  final root = PlaceInfo('process', Facts({Fact.root: true}));
+  final host = PlaceInfo('cli', Facts({Fact.usbNative: true}));
+  const page = PlaceInfo('web_worker', Facts.none());
+  final blocks = PlaceInfo('process', Facts({Fact.blockDevices: true}));
 
   group('Objective.run', () {
     final fetch = Objective<String, String>('fetch', const [
@@ -61,19 +62,27 @@ void main() {
       expect(await fetch.run('boot', host), 'host:boot');
     });
 
-    test('logs which strategy ran, where, with which facts', () async {
-      await fetch.run('boot', root);
+    test('logs which strategy ran, where, with which facts, and why', () async {
+      await fetch.run('boot', host);
       final run = records.map((r) => r.object).whereType<StrategyRun>().single;
-      expect(run.strategy, 'on_device');
-      expect(run.place, 'process');
-      expect(run.facts, [Fact.root]);
+      expect(run.strategy, 'from_host');
+      expect(run.place, 'cli');
+      expect(run.facts, [Fact.usbNative]);
+      expect(run.why, 'on_device skipped (missing root); from_host chosen');
       expect(run.outcome, 'ok');
     });
 
-    test('throws when nothing is available', () {
+    test('says why nothing fits', () {
       expect(
         () => fetch.run('boot', page),
-        throwsA(isA<NoStrategyAvailable>()),
+        throwsA(
+          isA<NoStrategyAvailable>().having(
+            (e) => e.why,
+            'why',
+            'nothing fits: on_device skipped (missing root); '
+                'from_host skipped (missing usb.native)',
+          ),
+        ),
       );
     });
   });
@@ -82,9 +91,8 @@ void main() {
     test('plan, then confirm, then receipt', () async {
       final flash = Flash();
       final objective = Objective<String, int>('flash', [flash]);
-      const place = Place('process', Facts({Fact.blockDevices: true}));
 
-      final plan = await objective.plan('boot.img', place);
+      final plan = await objective.plan('boot.img', blocks);
       expect(flash.written, isEmpty, reason: 'planning writes nothing');
       expect(plan.steps, ['write boot.img']);
 
@@ -96,17 +104,15 @@ void main() {
 
     test('a confirmation is only good for its own plan', () async {
       final objective = Objective<String, int>('flash', [Flash()]);
-      const place = Place('process', Facts({Fact.blockDevices: true}));
-      final a = await objective.plan('a', place);
-      final b = await objective.plan('b', place);
+      final a = await objective.plan('a', blocks);
+      final b = await objective.plan('b', blocks);
       expect(() => objective.apply(b, Confirmation.of(a)), throwsStateError);
     });
 
     test('run never picks a write strategy', () {
       final objective = Objective<String, int>('flash', [Flash()]);
-      const place = Place('process', Facts({Fact.blockDevices: true}));
       expect(
-        () => objective.run('a', place),
+        () => objective.run('a', blocks),
         throwsA(isA<NoStrategyAvailable>()),
       );
     });

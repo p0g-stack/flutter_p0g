@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:args/command_runner.dart';
 
-import '../probe.dart';
+import '../runner.dart';
 
 /// Prints the facts of the place the CLI runs in.
 class FactsCommand extends Command<int> {
@@ -15,7 +15,7 @@ class FactsCommand extends Command<int> {
   @override
   Future<int> run() async {
     final place = await cliPlace();
-    print(const JsonEncoder.withIndent('  ').convert(place.facts.toJson()));
+    print(const JsonEncoder.withIndent('  ').convert(place.facts.toMap()));
     return 0;
   }
 }

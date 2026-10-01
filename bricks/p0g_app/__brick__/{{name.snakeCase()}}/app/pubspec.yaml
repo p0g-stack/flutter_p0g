@@ -1,23 +1,22 @@
-name: {{name.snakeCase()}}_app
+name: {{name.snakeCase()}}
 description: The {{name.snakeCase()}} GUI. Flutter on top of the core.
 publish_to: none
 version: 0.1.0+1
 resolution: workspace
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
     sdk: flutter
   squadron: ^7.4.4
-  {{name.snakeCase()}}_core: any
-{{#process_place}}  squadron_process:
+  squadron_process:
     git:
       url: https://github.com/p0g-stack/squadron_process
-      # Pin a full commit SHA once squadron_process has a release point.
-      ref: main
-{{/process_place}}
+      ref: daf4a21b5cfcefb40afafb14bcaa7bc41d079545
+  {{name.snakeCase()}}_core: any
+
 dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:

@@ -18,6 +18,8 @@ Self-contained; no external base file.
   `p0g_app` and every brick that uses it.
 - Generated code (`*.g.dart`, compiled web workers) is never committed in a
   generated workspace; bootstrap regenerates it.
-- The only files that touch `squadron_process` are the `process_place`
-  variants of `cli/lib/src/commands/serve_command.dart` and
-  `app/lib/places.dart`. Keep that seam that small.
+- squadron_process is generic: the fact keys and checks, the WebUI launcher
+  and its contract (`docs/webui-launch.md`) are ours. Its API is used only in
+  `cli/.../serve_command.dart`, `app/lib/places/` and
+  `core/lib/src/facts/facts.dart`; keep that seam that small. Bump its pinned
+  commit in all three pubspecs and `tool/squadron.sh` together.

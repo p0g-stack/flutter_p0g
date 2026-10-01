@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:squadron/squadron.dart';
 
+import '../facts/facts.dart';
 import 'hello_service.activator.g.dart';
 
 part 'hello_service.worker.g.dart';
 
-/// An example Squadron service. It runs wherever the app puts it: an isolate,
-/// a Web Worker, or the CLI's `serve` mode in another process.
+/// An example Squadron service. The same class runs in every place: an
+/// isolate, a Web Worker, or the CLI's `serve` mode in another process.
 ///
 /// Add more with `mason make service`.
 @SquadronService(
@@ -31,4 +32,9 @@ base class HelloService {
       yield i;
     }
   }
+
+  /// The facts of the place this service is running in, as it checks them.
+  @squadronMethod
+  Future<Map<String, Object?>> facts() async =>
+      (await PlaceInfo.current()).facts.toMap();
 }

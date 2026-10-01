@@ -13,5 +13,7 @@ void main() {
     addTearDown(worker.terminate);
     expect(await worker.hello('worker'), 'Hello, worker!');
     expect(await worker.count(3).toList(), [1, 2, 3]);
+    final facts = Facts.fromMap(await worker.facts());
+    expect(facts[Fact.processSpawn], isA<bool>());
   }, testOn: 'vm');
 }

@@ -1,24 +1,23 @@
 name: {{name.snakeCase()}}_cli
-description: The {{name.snakeCase()}} command line. Plain Dart; also the root process in serve mode.
+description: The {{name.snakeCase()}} command line. On WebUI it is also the root process (serve).
 publish_to: none
 resolution: workspace
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.13.0
 
 executables:
   {{name.snakeCase()}}: {{name.snakeCase()}}
 
 dependencies:
   args: ^2.7.0
-  logging: ^1.3.0
+  squadron: ^7.4.4
   {{name.snakeCase()}}_core: any
-{{#process_place}}  squadron_process:
+  squadron_process:
     git:
       url: https://github.com/p0g-stack/squadron_process
-      # Pin a full commit SHA once squadron_process has a release point.
-      ref: main
-{{/process_place}}
+      ref: daf4a21b5cfcefb40afafb14bcaa7bc41d079545
+
 dev_dependencies:
   lints: ^6.1.0
   test: ^1.31.1

@@ -1,7 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
+import 'package:squadron_process/squadron_process.dart' show PlaceKind;
+
+import 'panels/panels.dart';
+import 'places/places.dart';
 
 /// The last log lines, for the log panel.
 class LogLines extends ValueNotifier<List<String>> {
@@ -18,93 +19,50 @@ class LogLines extends ValueNotifier<List<String>> {
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
-    required this.place,
-    required this.hello,
+    required this.places,
     required this.lines,
+    this.panels = defaultPanels,
   });
 
-  final Place place;
-  final HelloService hello;
+  final Places places;
   final LogLines lines;
+  final List<PanelBuilder> panels;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  // Records logged inside a worker stay in that worker; log at the call site
-  // so the page shows what ran where.
-  static final _log = Logger('ui.home');
-  final _who = TextEditingController(text: 'world');
-  String? _greeting;
-  final _counted = <int>[];
-  StreamSubscription<int>? _count;
-
-  Future<void> _sayHello() async {
-    final greeting = await widget.hello.hello(_who.text);
-    _log.info('hello ran in ${widget.place}');
-    if (mounted) setState(() => _greeting = greeting);
-  }
-
-  void _countToFive() {
-    _count?.cancel();
-    setState(_counted.clear);
-    _count = widget.hello
-        .count(5)
-        .listen((i) => setState(() => _counted.add(i)));
-  }
-
-  @override
-  void dispose() {
-    _count?.cancel();
-    _who.dispose();
-    super.dispose();
-  }
+  static const _local = 'local';
+  var _kind = _local;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final facts = widget.place.facts.present;
+    final canLaunch = widget.places.hasProcess;
     return Scaffold(
       appBar: AppBar(title: const Text('{{name.titleCase()}}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            'Services run in: ${widget.place.name}',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (facts.isEmpty) const Chip(label: Text('no facts checked')),
-              for (final f in facts) Chip(label: Text(f)),
-            ],
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _who,
-            decoration: const InputDecoration(labelText: 'Who'),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              FilledButton(
-                onPressed: _sayHello,
-                child: const Text('Say hello'),
-              ),
-              OutlinedButton(
-                onPressed: _countToFive,
-                child: const Text('Count to 5'),
+          SegmentedButton<String>(
+            segments: [
+              const ButtonSegment(value: _local, label: Text('Squadron')),
+              ButtonSegment(
+                value: PlaceKind.process,
+                label: const Text('Process'),
+                enabled: canLaunch,
+                tooltip: canLaunch ? null : 'No launcher on this platform',
               ),
             ],
+            selected: {_kind},
+            onSelectionChanged: (s) => setState(() => _kind = s.single),
           ),
-          const SizedBox(height: 8),
-          if (_greeting != null) Text(_greeting!),
-          if (_counted.isNotEmpty) Text('Counted: ${_counted.join(', ')}'),
+          for (final build in widget.panels)
+            KeyedSubtree(
+              key: ValueKey('$_kind-${widget.panels.indexOf(build)}'),
+              child: build(widget.places, _kind),
+            ),
           const SizedBox(height: 24),
           Text('Log', style: theme.textTheme.titleMedium),
           ValueListenableBuilder(

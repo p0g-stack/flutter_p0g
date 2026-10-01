@@ -29,15 +29,17 @@ README lists its variables; `bricks/<brick>/CHANGELOG.md` its versions.
 
 ## Pins
 
-Flutter 3.47.5 (Dart 3.13), Squadron 7.4.4 with squadron_builder 9.3.2,
+Flutter 3.47.5 (Dart 3.13), Squadron 7.4.4 (patched, via squadron_process)
+with squadron_builder 9.3.2, squadron_process by commit,
 flutter_rust_bridge 2.14.0-beta.2 (the base of flutter_p0g's frb patches),
 mason_cli 0.1.4.
 
 ## CI
 
 `tool/ci.sh` generates every brick into a scratch folder, bootstraps it, and
-runs the generated workspace's analyzer, unit and widget tests, the CLI
-executable, and the web and Linux builds; the `rust` variant runs
+runs the generated workspace's analyzer, unit and widget tests (including a
+service running in the CLI as a process place), the CLI executable, and the
+web and Linux builds; the `rust` variant runs
 `cargo test`. No e2e. `.github/workflows/ci.yaml` runs it on every push.
 
 ## License

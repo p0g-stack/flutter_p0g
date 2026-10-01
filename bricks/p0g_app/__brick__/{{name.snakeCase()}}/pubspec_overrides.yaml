@@ -1,0 +1,9 @@
+# squadron_process needs Squadron with its channel-factory patch. Bootstrap
+# (tool/squadron.sh) checks out squadron_process at the pinned commit into
+# .p0g/ and builds the patched Squadron there; flutter_p0g takes this over
+# later. Pub workspaces read overrides only from the root.
+dependency_overrides:
+  squadron:
+    path: .p0g/squadron_process/third_party/squadron/src
+  squadron_process:
+    path: .p0g/squadron_process

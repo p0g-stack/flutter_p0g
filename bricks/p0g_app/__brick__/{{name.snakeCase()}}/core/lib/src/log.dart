@@ -6,7 +6,7 @@ import 'package:logging/logging.dart';
 ///
 /// Every objective logs one [StrategyRun] per run on the `objective.<name>`
 /// logger, as the record's `object`, so sinks can say "fetched via dd in the
-/// root process" instead of guessing. Services and commands log to loggers
+/// root process, fastboot skipped (missing usb.native)" instead of guessing. Services and commands log to loggers
 /// named after themselves (`service.hello`, `cli.serve`).
 final class StrategyRun {
   const StrategyRun({
@@ -15,6 +15,7 @@ final class StrategyRun {
     required this.place,
     required this.facts,
     required this.write,
+    required this.why,
     required this.outcome,
     required this.elapsed,
   });
@@ -29,6 +30,9 @@ final class StrategyRun {
   /// Whether it was a confirmed device write.
   final bool write;
 
+  /// Which strategies were skipped and why.
+  final String why;
+
   /// `ok` or `error`.
   final String outcome;
   final Duration elapsed;
@@ -39,6 +43,7 @@ final class StrategyRun {
     'place': place,
     'facts': facts,
     'write': write,
+    'why': why,
     'outcome': outcome,
     'elapsed_ms': elapsed.inMilliseconds,
   };

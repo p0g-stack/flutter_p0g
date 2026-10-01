@@ -1,14 +1,19 @@
 name: {{name.snakeCase()}}_core
-description: The logic of {{name.snakeCase()}}. Pure Dart; never imports package:flutter.
+description: The logic of {{name.snakeCase()}}. Pure Dart (no package:flutter); runs in the app, its workers and the CLI.
 publish_to: none
 resolution: workspace
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.13.0
 
 dependencies:
   logging: ^1.3.0
   squadron: ^7.4.4
+  web: ^1.1.0
+  squadron_process:
+    git:
+      url: https://github.com/p0g-stack/squadron_process
+      ref: daf4a21b5cfcefb40afafb14bcaa7bc41d079545
 {{#rust}}  flutter_rust_bridge: 2.14.0-beta.2
 {{/rust}}
 dev_dependencies:

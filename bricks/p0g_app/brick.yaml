@@ -1,6 +1,6 @@
 name: p0g_app
 description: A p0g-stack app as a pub workspace - pure Dart core, Flutter app and Dart CLI, wired for Squadron places, strategies and logging.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/p0g-stack/bricks/tree/main/bricks/p0g_app
 
 environment:
@@ -27,8 +27,3 @@ vars:
     description: Add a Rust crate bound through flutter_rust_bridge (FFI only).
     default: false
     prompt: Add a Rust crate through flutter_rust_bridge?
-  process_place:
-    type: boolean
-    description: Wire squadron_process so services can run in the app's CLI as a root process (git dependency until it publishes).
-    default: false
-    prompt: Wire squadron_process (the root process place)?

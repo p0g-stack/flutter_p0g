@@ -11,9 +11,13 @@ void main() {
     expect(await AppRunner().run(['nope']), 64);
   });
 
-  test('facts are checked, and process.spawn is among them', () async {
-    final facts = await probeFacts();
-    expect(facts[Fact.processSpawn], isNotNull);
-    expect(facts[Fact.root], isA<bool>());
-  }, testOn: 'linux || mac-os');
+  test('serve needs a known service', () async {
+    expect(await AppRunner().run(['serve', 'nope']), 64);
+  });
+
+  test('the CLI checks its own facts', () async {
+    final place = await cliPlace();
+    expect(place.kind, 'cli');
+    expect(place.facts[Fact.processSpawn], isA<bool>());
+  });
 }
