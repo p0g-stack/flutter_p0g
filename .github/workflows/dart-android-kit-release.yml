@@ -30,3 +30,13 @@ jobs:
           tag_name: dart-android-${{ inputs.dart_version }}
           target_commitish: ${{ github.sha }}
           files: kits/dart-android-*.tar.gz*
+      # A git copy for sessions that can reach GitHub only through git
+      # (precache --dart-android-kit=<checkout>/<file>).
+      - run: |
+          cd kits
+          git init -q -b kits
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add dart-android-*.tar.gz*
+          git commit -qm "dart-android ${{ inputs.dart_version }} from run ${{ inputs.run_id }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" kits:kits
