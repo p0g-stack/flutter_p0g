@@ -24,6 +24,7 @@ dependencies:
   path: ^1.9.0
   unified_analytics: any
   yaml: ^3.1.0
+  pointycastle: ^4.0.0
 
 dev_dependencies:
   lints: ^5.0.0

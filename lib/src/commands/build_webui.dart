@@ -165,7 +165,17 @@ class BuildWebUiCommand extends BuildWebCommand {
     extra.addAll(await rootChannelFiles(kits, out.childDirectory('flutter_webui')));
     if (packages.contains(kAppPlanePackage)) {
       globals.printStatus('Adding the app plane (webui-termux-api $kAppPlaneTag)...');
-      extra.addAll(await appPlaneFiles(kits, out.childDirectory('webui_app_plane')));
+      final moduleId = readProp(moduleProp, 'id') ?? project.manifest.appName;
+      extra.addAll(
+        await appPlaneFiles(
+          kits,
+          out.childDirectory('webui_app_plane'),
+          moduleId: moduleId,
+          title: readProp(moduleProp, 'name') ?? project.manifest.appName,
+          key: appPlaneSigningKey(app),
+        ),
+      );
+      globals.printStatus('App plane APK: ${appPlanePackageName(moduleId)}.');
     }
 
     final cli = CliPackage.find(app);
