@@ -10,6 +10,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 import '../frb/frb.dart';
 import '../webui/cli_exe.dart';
 import '../webui/dart_android.dart';
+import '../webui/flutter_webui.dart';
 import '../webui/module.dart';
 import '../webui/workers.dart';
 
@@ -66,12 +67,23 @@ class BuildWebUiCommand extends BuildWebCommand {
       await frbBuildWeb(app, release: buildInfo.isRelease);
     }
 
+    // flutter-webui's bootstrap and patched web SDK (fetched and built on
+    // first use, like flutter's own artifacts).
+    await precacheFlutterWebui();
+
     final result = await super.runCommand();
 
     final fs = globals.fs;
     final Directory web = fs.directory(
       stringArg('output') ?? fs.path.join(app.path, getWebBuildDirectory()),
     );
+    final moduleProp = utf8.decode(webui.childFile('module.prop').readAsBytesSync());
+    applyBootstrap(
+      web,
+      moduleId: readProp(moduleProp, 'id') ?? project.manifest.appName,
+      title: readProp(moduleProp, 'name') ?? project.manifest.appName,
+    );
+
     final workers = findWorkers(app, wasm: boolArg(FlutterOptions.kWebWasmFlag));
     await compileWorkers(workers, web, release: buildInfo.isRelease);
 

@@ -4,6 +4,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 import '../aera/kit.dart';
 import '../frb/frb.dart';
 import '../webui/dart_android.dart';
+import '../webui/flutter_webui.dart';
 
 /// Fetches or builds what the p0g targets need beyond stock Flutter.
 class PrecacheCommand extends FlutterCommand {
@@ -12,7 +13,12 @@ class PrecacheCommand extends FlutterCommand {
       ..addFlag(
         'web',
         defaultsTo: true,
-        help: "Flutter's web SDK (stock until flutter-webui releases patched web_ui).",
+        help: "Flutter's stock web SDK (the base the patched one is built from).",
+      )
+      ..addFlag(
+        'webui',
+        defaultsTo: true,
+        help: 'flutter-webui at its pin: the bootstrap and the patched web SDK.',
       )
       ..addFlag(
         'frb',
@@ -49,6 +55,7 @@ class PrecacheCommand extends FlutterCommand {
     if (boolArg('web')) {
       await globals.cache.updateAll({DevelopmentArtifact.web, DevelopmentArtifact.universal});
     }
+    if (boolArg('webui')) await precacheFlutterWebui(force: argResults!.wasParsed('webui'));
     if (boolArg('frb')) await precacheFrb();
     if (boolArg('dart-android') || argResults!.wasParsed('dart-android-kit')) {
       if (stringArg('dart-android-kit') case final kit?) {

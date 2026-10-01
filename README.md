@@ -44,7 +44,7 @@ Gaps are listed here, not hidden.
 
 | Command | What it does | State |
 |---|---|---|
-| `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json`) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
+| `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json` with flutter-webui's `docs/hosts.md` settings) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
 | `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works with a kit; the arm64 kit isn't released yet |
 | `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
@@ -55,17 +55,23 @@ Gaps are listed here, not hidden.
 
 1. If the app has `flutter_rust_bridge.yaml`: the patched frb's
    `build-web --no-threads` (single-threaded wasm, runs without COOP/COEP).
-2. `flutter build web`, defaulting to `--no-web-resources-cdn` (CanvasKit and
+2. flutter-webui at its pin (`precache --webui`, run on first use):
+   `flutter build web` compiles against its patched web SDK (pointed to
+   through flutter_tools' artifacts, so `bin/cache` stays stock) and its
+   bootstrap replaces the page (`index.html` with the module id and name,
+   `flutter_bootstrap.js` filled with the build config, `flutter_webui.js`,
+   `flutter_webui.css`).
+3. `flutter build web`, defaulting to `--no-web-resources-cdn` (CanvasKit and
    fonts bundled; managers can't rely on a CDN) and no service worker.
-3. Prunes what a manager never loads: `*.symbols`, the service worker,
+4. Prunes what a manager never loads: `*.symbols`, the service worker,
    `webparagraph/`, `wimp.*`, and Skwasm unless `--wasm`.
-4. Squadron Web Workers: every generated `*.web.g.dart` in the app or its
+5. Squadron Web Workers: every generated `*.web.g.dart` in the app or its
    workspace packages is compiled (`dart compile js`, `wasm` with `--wasm`)
    to the `~/workers/...` path its activator loads, inside `webroot/`.
-5. If the app or its workspace root has `cli/` (the bricks layout): compiles it
+6. If the app or its workspace root has `cli/` (the bricks layout): compiles it
    for the device into `bin/`, with the frb `.so` from `rust/` beside it.
    See "The root process" below.
-6. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
+7. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
    the build), Magisk's installer stub in `META-INF/`. `module.prop`'s
    `$(FLUTTER_BUILD_NAME)` and `$(FLUTTER_BUILD_NUMBER)` come from the pubspec
    version or `--build-name` / `--build-number`, as on iOS.

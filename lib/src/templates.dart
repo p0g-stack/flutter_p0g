@@ -68,10 +68,11 @@ if [ -d "$MODPATH/bin" ]; then
   set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
 fi
 ''',
-  // WebUI X reads webroot/config.json. Hidden keeps running, closed stops:
-  // the root shell must survive Home.
+  // WebUI X reads webroot/config.json; values from flutter-webui docs/hosts.md.
+  // Back goes to the page, closing at the root is closing a tab (no prompt),
+  // and hidden keeps running: the root shell must survive Home.
   'webroot/config.json':
-      '${const JsonEncoder.withIndent('  ').convert({'title': app.name, 'killShellWhenBackground': false})}\n',
+      '${const JsonEncoder.withIndent('  ').convert({'title': app.name, 'backInterceptor': 'javascript', 'exitConfirm': false, 'killShellWhenBackground': false, 'pullToRefresh': false})}\n',
 };
 
 /// AERA plugin ids: lowercase letters, digits, `-` and `.`.

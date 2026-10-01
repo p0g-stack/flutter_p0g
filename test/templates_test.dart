@@ -29,6 +29,8 @@ void main() {
     expect(prop, contains('author=Yuv\n'));
     final config = jsonDecode(files['webroot/config.json']!) as Map;
     expect(config['killShellWhenBackground'], false);
+    expect(config['backInterceptor'], 'javascript');
+    expect(config['exitConfirm'], false);
     expect(config['title'], 'Counter');
   });
 

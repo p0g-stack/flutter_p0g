@@ -1,0 +1,25 @@
+import 'package:flutter_p0g/src/webui/flutter_webui.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('extracts the build config block flutter_tools writes', () {
+    const block =
+        'if (!window._flutter) {\n  window._flutter = {};\n}\n'
+        '_flutter.buildConfig = {"engineRevision":"x","builds":[]};\n';
+    const built = '/* flutter.js */\n$block\n_flutter.loader.load();\n';
+    expect(extractBuildConfig(built), block);
+    expect(extractBuildConfig('_flutter.loader.load();'), isNull);
+  });
+
+  test('fills module id and title, escaped', () {
+    const html = '<meta name="webui-module-id" content="">\n<title>Flutter</title>';
+    final out = fillIndexHtml(html, moduleId: 'demo', title: 'A & <B>');
+    expect(out, contains('<meta name="webui-module-id" content="demo">'));
+    expect(out, contains('<title>A &amp; &lt;B></title>'));
+  });
+
+  test('the release page uses the bootstrap without dev.html', () {
+    expect(kBootstrapFiles, isNot(contains('dev.html')));
+    expect(kBootstrapFiles, containsAll(['index.html', 'flutter_bootstrap.js']));
+  });
+}
