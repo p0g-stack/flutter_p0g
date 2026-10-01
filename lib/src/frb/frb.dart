@@ -4,10 +4,13 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
+import 'package:meta/meta.dart';
 import 'package:package_config/package_config.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import '../p0g_cache.dart';
+import '../squadron.dart' show workspaceRoot;
 
 /// flutter_rust_bridge, pinned. The patch series in `patches/frb/` is made
 /// against this commit (master after v2.14.0-beta.2; the patches do not
@@ -18,7 +21,31 @@ const kFrbCommit = '848e438c561491adcc16cbf8b33bb61e541bd475';
 /// frb's own marker for an app that uses it.
 const kFrbConfigFile = 'flutter_rust_bridge.yaml';
 
-bool usesFrb(Directory project) => project.childFile(kFrbConfigFile).existsSync();
+bool usesFrb(Directory project) => frbConfigDir(project) != null;
+
+/// Where the app's `flutter_rust_bridge.yaml` is: the app, or its workspace
+/// root (the bricks layout keeps it beside `rust/`).
+Directory? frbConfigDir(Directory project) {
+  for (final dir in [project, workspaceRoot(project)]) {
+    if (dir.childFile(kFrbConfigFile).existsSync()) return dir;
+  }
+  return null;
+}
+
+/// The Dart package holding the bindings (`dart_output`): the nearest
+/// directory with a pubspec at or above it, inside [configDir].
+@visibleForTesting
+Directory frbDartRoot(Directory configDir, String configYaml) {
+  final doc = loadYaml(configYaml);
+  final out = doc is YamlMap ? doc['dart_output'] : null;
+  if (out is! String) return configDir;
+  var dir = configDir.childDirectory(out);
+  while (dir.path.startsWith(configDir.path) && dir.path != configDir.path) {
+    if (dir.childFile('pubspec.yaml').existsSync()) return dir;
+    dir = dir.parent;
+  }
+  return configDir;
+}
 
 Directory frbCacheDir() => p0gCacheDir().childDirectory('frb');
 Directory frbSourceDir() => frbCacheDir().childDirectory('src');
@@ -101,12 +128,67 @@ Future<void> frbBuildWeb(Directory project, {required bool release}) async {
   if (config == null) throwToolExit('Run `flutter pub get` first.');
   final problem = checkPatchedDartSide(config, frbSourceDir().childDirectory('frb_dart').path);
   if (problem != null) throwToolExit(problem);
-  await _run([
-    frbCodegenBinary().path, 'build-web', '--no-threads', if (release) '--release', //
-  ], project.path);
+  final binaryen = await _wasmOptVersion();
+  Map<String, String>? env;
+  if (binaryen == null || binaryen < kMinWasmOpt) {
+    // wasm-pack runs wasm-opt from PATH (or downloads one). Binaryen before
+    // $kMinWasmOpt mangles rustc's default wasm features (reference types):
+    // the module compiles but `Table.grow` fails at init. Unoptimized
+    // output is correct, so a pass-through wasm-opt goes first on PATH.
+    globals.printWarning(
+      binaryen == null
+          ? 'No wasm-opt: the frb wasm ships unoptimized.'
+          : 'wasm-opt $binaryen is older than $kMinWasmOpt and breaks the frb wasm; '
+                'it ships unoptimized. Install binaryen $kMinWasmOpt+ to optimize.',
+    );
+    final shim = frbCacheDir().childDirectory('wasm-opt-passthrough')..createSync(recursive: true);
+    globals.os.chmod(shim.childFile('wasm-opt')..writeAsStringSync(kWasmOptPassthrough), '755');
+    env = {'PATH': '${shim.path}:${io.Platform.environment['PATH'] ?? ''}'};
+  }
+  final configDir = frbConfigDir(project)!;
+  final dartRoot = frbDartRoot(configDir, configDir.childFile(kFrbConfigFile).readAsStringSync());
+  await _run(
+    [
+      frbCodegenBinary().path, 'build-web', '--no-threads', if (release) '--release', //
+      '--dart-root', dartRoot.path, '-o', project.childDirectory('web').path,
+    ],
+    configDir.path,
+    env: env,
+  );
 }
 
-Future<void> _run(List<String> cmd, String cwd) async {
-  final code = await globals.processUtils.stream(cmd, workingDirectory: cwd);
+/// Binaryen versions below this are treated as too old for rustc's default
+/// wasm features (108 is verified broken; the demo's CI builds a working module with 117).
+const kMinWasmOpt = 117;
+
+/// wasm-opt that copies its input to `-o` (wasm-pack's call:
+/// `wasm-opt <in> -o <out> <passes...>`).
+const kWasmOptPassthrough = r'''#!/bin/sh
+# flutter_p0g: pass-through wasm-opt (the system one is missing or too old).
+in=; out=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    --version) echo "wasm-opt version passthrough"; exit 0 ;;
+    -*) shift ;;
+    *) [ -z "$in" ] && in=$1; shift ;;
+  esac
+done
+[ -n "$in" ] && [ -n "$out" ] || exit 0
+[ "$in" = "$out" ] || cp "$in" "$out"
+''';
+
+Future<int?> _wasmOptVersion() async {
+  try {
+    final r = await globals.processUtils.run(['wasm-opt', '--version']);
+    if (r.exitCode != 0) return null;
+    return int.tryParse(RegExp(r'version (\d+)').firstMatch(r.stdout)?.group(1) ?? '');
+  } on Object {
+    return null;
+  }
+}
+
+Future<void> _run(List<String> cmd, String cwd, {Map<String, String>? env}) async {
+  final code = await globals.processUtils.stream(cmd, workingDirectory: cwd, environment: env);
   if (code != 0) throwToolExit('${cmd.take(2).join(' ')} failed (exit $code).', exitCode: code);
 }

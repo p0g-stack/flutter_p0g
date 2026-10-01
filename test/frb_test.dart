@@ -63,4 +63,31 @@ void main() {
       expect(checkPatchedDartSide(PackageConfig([]), patched), contains('does not depend'));
     });
   });
+
+  test('the bindings package is the nearest pubspec above dart_output', () {
+    final tmp = io.Directory.systemTemp.createTempSync('frb_root');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    io.Directory('${tmp.path}/core/lib/src/rust').createSync(recursive: true);
+    io.File('${tmp.path}/core/pubspec.yaml').writeAsStringSync('name: core');
+    final root = const LocalFileSystem().directory(tmp.path);
+    expect(frbDartRoot(root, 'dart_output: core/lib/src/rust').path, '${tmp.path}/core');
+    expect(frbDartRoot(root, 'rust_root: rust/').path, tmp.path);
+  });
+
+  test('the pass-through wasm-opt copies its input to -o', () async {
+    final tmp = io.Directory.systemTemp.createTempSync('wasm_opt');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    final shim = io.File('${tmp.path}/wasm-opt')..writeAsStringSync(kWasmOptPassthrough);
+    io.File('${tmp.path}/in.wasm').writeAsBytesSync([0, 97, 115, 109]);
+    final r = await io.Process.run('sh', [
+      shim.path,
+      '${tmp.path}/in.wasm',
+      '-o',
+      '${tmp.path}/out.wasm',
+      '-O',
+      '--enable-reference-types',
+    ]);
+    expect(r.exitCode, 0);
+    expect(io.File('${tmp.path}/out.wasm').readAsBytesSync(), [0, 97, 115, 109]);
+  });
 }
