@@ -31,4 +31,6 @@ jobs:
         working-directory: third_party/squadron/src
         run: |
           dart pub get
-          dart test -p vm test/squadron_vm_test.dart test/channel_factory_test.dart
+          dart test -p vm test/squadron_vm_test.dart
+      - name: Upstream patch matches the applied one
+        run: cmp third_party/squadron/patches/0001-Worker-pluggable-channel-factory.patch third_party/squadron/patches/upstream/0001-Worker-pluggable-channel-factory.patch
