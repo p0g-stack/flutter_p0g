@@ -22,13 +22,16 @@ Future<ExternalLibrary?> openNativeLibrary(String stem) async =>
 @JS('fetch')
 external JSPromise<web.Response> _fetch(String url, web.RequestInit init);
 
-/// Whether the wasm is there, without downloading or instantiating it.
+/// Whether the wasm is there, without downloading or instantiating it. Asks
+/// for the small JS glue built beside it, not the wasm: manager WebViews
+/// answer a HEAD with the whole file.
 Future<bool> nativeShipped(String stem) async {
   try {
     final r = await _fetch(
-      '$_prefix${stem}_bg.wasm',
+      '$_prefix$stem.js',
       web.RequestInit(method: 'HEAD'),
     ).toDart;
+    r.body?.cancel();
     return r.ok;
   } on Object {
     return false;

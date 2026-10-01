@@ -1,3 +1,9 @@
+# 0.7.4
+
+- `rust` on the web: the `native` fact asks for the small JS glue
+  (`pkg/<stem>.js`), not the wasm. Manager WebViews answer a HEAD with the
+  whole file, so the old check downloaded the wasm at start anyway.
+
 # 0.7.3
 
 - flutter-webui 9c5c631: KernelSU brightness follows the manager's theme

@@ -10,7 +10,7 @@ export '../rust/api/digest.dart' show sha256Hex;
 
 /// Whether this place has the app's Rust library, without loading it where
 /// loading is expensive. The `native` fact. On the web it asks whether the
-/// wasm is there (a HEAD request) and leaves instantiating it to the first
+/// wasm was built (its JS glue is there) and leaves loading it to the first
 /// call; natively it loads the library, which is cheap.
 Future<bool> nativeShipped() => platform.nativeShipped(_stem);
 
