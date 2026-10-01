@@ -12,7 +12,9 @@ import 'package:path/path.dart' as p;
 
 import 'commands/build.dart';
 import 'commands/create.dart';
+import 'commands/devices.dart';
 import 'commands/install.dart';
+import 'commands/logs.dart';
 import 'commands/precache.dart';
 import 'commands/run.dart';
 import 'context.dart';
@@ -23,7 +25,9 @@ P0gCommandRunner createRunner({bool verboseHelp = false}) {
   return P0gCommandRunner(verboseHelp: verboseHelp)
     ..addCommand(CreateCommand())
     ..addCommand(P0gBuildCommand(verboseHelp: verboseHelp))
+    ..addCommand(DevicesCommand())
     ..addCommand(InstallCommand())
+    ..addCommand(LogsCommand())
     ..addCommand(RunCommand(verboseHelp: verboseHelp))
     ..addCommand(PrecacheCommand());
 }

@@ -19,6 +19,11 @@ cd my_app
 flutter_p0g create .          # adds webui/ and aera/ (and web/ if missing)
 flutter_p0g build webui       # build/webui/<id>-v<version>.zip
 flutter_p0g install --reboot  # adb + the device's ksud / apd / magisk
+flutter_p0g logs              # the module's root process and page console
+
+flutter_p0g build aera        # build/aera/<id>-<version>.aerap
+adb reboot recovery
+flutter_p0g install --open    # into AERA recovery's plugin store, then open it
 ```
 
 ## Parity
@@ -34,9 +39,9 @@ Gaps are listed here, not hidden.
 | `build <target>` (all flags) | `build webui`: every `build web` flag | `build aera`: every `build bundle` flag; debug, profile, release |
 | `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` (needs its no-`<base>` fix); device path (adb reverse, page swap) not yet run on a device | gap: needs flutter-aera's debug engine with the VM service URL in its log |
 | `attach` | gap | gap (follows the debug engine) |
-| `install` | `install`: adb + ksud / apd / magisk; activates on reboot | gap: no `.aerap` install path yet |
-| `devices` | gap (adb devices with a root manager probe) | gap |
-| `logs` | gap | gap |
+| `install` | `install`: adb + ksud / apd / magisk; activates on reboot | `install`: into AERA's plugin store as its Plugin Manager does, `--open` over AERA's RPC; not yet run on a device |
+| `devices` | `devices`: adb devices with the root manager probe `install` uses | `devices`: recovery with AERA's RPC channel |
+| `logs` | `logs`: the root channel and root process logs plus the page console (logcat `chromium`) | `logs`: AERA's `/tmp/recovery.log` |
 | `precache` | web SDK; Android Dart kit; frb; patched Squadron (`--squadron`, also automatic in `build webui` and `run`) | AERA runtime kit |
 | `clean`, `doctor`, `test` | gap (stock `flutter test` works; no target tests) | gap |
 
@@ -47,7 +52,9 @@ Gaps are listed here, not hidden.
 | `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json` with flutter-webui's `docs/hosts.md` settings) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
 | `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works; debug against the released arm64 kit (kit-3.47.5) |
-| `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
+| `install [zip\|aerap]` | Module zip: `adb push`, then the first installer present on the device (`ksud`, `apd`, `magisk`). `.aerap` (device in recovery): see below | works against a fake adb; not yet run on a device |
+| `devices` | `adb devices -l`, each probed for a root manager (booted) or AERA's RPC channel (recovery) | works against a fake adb |
+| `logs` | Booted: `tail -F` of the module's `webroot/.run/root.log` and newest `proc/*.log` (flutter-webui `docs/root-channel.md`) plus `logcat chromium:V`. Recovery: `/tmp/recovery.log` | not yet run on a device |
 | `run` | `flutter run -d web-server` (DDC, hot reload/restart, debug service) with the patched SDK and the flutter_webui plugin, behind a dev proxy; with adb, reverses the port and points the installed module's page at it | works in Chromium; device path not yet run |
 | `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits | works; the kit releases and `--app-plane` wait on CI |
 
@@ -147,6 +154,24 @@ payload, as does `host/gen_snapshot`, which profile and release kits need
 debug engine, expands and runs in flutter-aera's `aera-host-sim` (taps
 count).
 
+### `install` for AERA
+
+With the device in AERA recovery (adb runs as root there), `install` does
+what AERA's Plugin Manager does for a local `.aerap` (`InstallLocal()` in
+`aeraui/features/plugins/plugin_manager.cpp` at `abf3316`). It checks the
+package as `OpenLocalBundle()` does, then pushes `plugin.json`,
+`runtime.xz` and the signature, if there is one. On the device it stages
+them, checks the payload's sha256, makes the files 0444, and renames the
+staging directory to `/sdcard/AERA/plugins/<id>`, or to
+`/tmp/aera/plugins/<id>` with `--ram`. A previous install is kept until
+that rename succeeds. Installing this way skips the Plugin Manager's
+"unofficial plugin" prompt, as `adb install` skips Android's.
+
+`--open` sends `{"v":1,"op":"plugin","args":{"action":"open","id":…}}` to
+AERA's RPC FIFOs (`/system/bin/aerain`, `/system/bin/aeraout`). The
+`plugin` operation comes from flutter-aera's Host API 3 patch 0008; stock
+AERA answers `unsupported_operation`.
+
 ## frb patches
 
 `patches/frb/` holds the series applied to
@@ -176,23 +201,27 @@ and its crate at `frb_rust` (`[patch.crates-io]`) with
 rust-async, user-utils, wasm-start`. Exports must be `#[frb(sync)]` or
 `async fn`, or set `default_dart_async: false`.
 
-## Squadron patches (planned)
+## Squadron patches
 
-`squadron_process` needs Squadron 7.4.4 with a `Worker.channelFactory` patch.
-Its series will live in `patches/squadron/` and be applied and cached like
-frb's; until then the app overrides the dependency itself.
+`squadron_process` owns its Squadron series (`third_party/squadron/`) and the
+tool that applies it (`squadron_process:squadron_patch`, which writes the
+workspace's `pubspec_overrides.yaml`). `build webui`, `run` and
+`precache --squadron` run that tool in the workspace member that depends on
+`squadron_process`, then `pub get`, unless something already overrides
+`squadron`.
 
 ## Layout
 
 ```
 bin/flutter_p0g.dart       entrypoint
 lib/src/executable.dart    runner inside flutter_tools' context
-lib/src/commands/          create, build (webui, aera), install, run, precache
+lib/src/commands/          create, build (webui, aera), install, run, devices, logs, precache
+lib/src/adb.dart           adb helpers
+lib/src/aera/              .aerap packer, AERA install and RPC
 lib/src/webui/             module assembly and zip, cli/ compile
 lib/src/frb/               pinned frb, patch apply, build-web
 lib/src/templates.dart     webui/ and aera/ platform folders
 patches/frb/               the frb series
-patches/squadron/          the Squadron series (planned)
 test/                      unit tests (no e2e)
 ```
 
