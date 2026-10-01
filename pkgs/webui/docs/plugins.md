@@ -217,10 +217,29 @@ once:
 - APatch, KernelSU Next, KsuWebUIStandalone: not checked; a missing or empty
   stylesheet answers `null`.
 
-Primary keeps its hue with chroma at least 48 (as Material's `CorePalette`);
-secondary and tertiary keep the host's own hue and chroma; neutrals use
-`surfaceVariant`'s hue with chroma 4 and 8. Missing roles fall back to
-`CorePalette.of(primary)`.
+Both managers serve **one** scheme, the manager's current light or dark one,
+with every Compose Material 3 role (36 roles, no fixed roles; table in the
+project research note `research/webuix-enhancements.md`). The CorePalette is
+rebuilt per family: the key role's hue and the highest chroma among the
+family's roles (`primary`, `primaryContainer`, `onPrimaryContainer`,
+`inversePrimary`; the same for secondary and tertiary; neutrals from
+`inverseSurface`, `onSurface`, `inverseOnSurface`; neutral variant from
+`onSurfaceVariant`, `outline`, `outlineVariant`, `surfaceVariant`). From a
+full Tonal Spot set, the scheme rebuilt for the *other* brightness lands
+within a few HCT units of the real one (tests, four seeds). KernelSU's MIUIX
+UI mode fills some roles with other colours (`tertiary` is a container
+variant, `surfaceDim` is `surface`, ...); that shape is detected and those
+roles are ignored.
+
+Through the stock API every role is derived from the palette, as on Android
+(`CorePaletteToColorScheme`), so light and dark are both complete and the
+app picks one by its own brightness. Beyond the stock API,
+`DynamicColorWebUi.hostColorScheme(brightness)` returns a Flutter
+`ColorScheme` with the manager's exact colours for every role it serves when
+the stylesheet has that brightness (tone of `background`), the rest derived.
+The other brightness is fully derived, so a page whose brightness differs
+from the manager's (KernelSU's forced dark on a light system) never gets the
+wrong set.
 
 Checked in headless Chromium with a stub `window.ksu` and a served
 `internal/colors.css`: `DynamicColorBuilder` got primary `#4a6800`; in a

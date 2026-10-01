@@ -6,6 +6,7 @@ library;
 
 import 'dart:js_interop';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:flutter_webui_client/web.dart';
@@ -18,8 +19,18 @@ import 'src/host_colors.dart';
 /// channel directly and apps keep `DynamicColorBuilder` /
 /// `DynamicColorPlugin` unchanged.
 abstract final class DynamicColorWebUi {
+  static DynamicColorWebUiHandler? _handler;
+
+  /// Optional, beyond the stock API: the manager's own scheme for
+  /// [brightness] as a Flutter [ColorScheme], with the host's exact role
+  /// colours when its stylesheet is that brightness and the rest derived as
+  /// dynamic_color does. Null in a browser tab, without colours, or before
+  /// registration.
+  static Future<ColorScheme?> hostColorScheme(Brightness brightness) async =>
+      _handler?.colorScheme(brightness);
+
   static void registerWith(Registrar registrar) {
-    final handler = DynamicColorWebUiHandler(
+    final handler = _handler = DynamicColorWebUiHandler(
       host: WebUi.host,
       fetch: _fetchColorsCss,
     );

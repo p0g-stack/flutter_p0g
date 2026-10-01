@@ -17,6 +17,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webui_client/flutter_webui_client.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
@@ -45,37 +46,221 @@ Map<String, int> parseColorsCss(String css) {
   return colors;
 }
 
+/// Roles KernelSU's MIUIX UI mode fills with colours of other roles
+/// (`MonetColorsProvider.UpdateCssMiuix`: `tertiary` is a container variant,
+/// `onTertiary` the tertiary container, `inverseSurface` a disabled text
+/// colour, `surfaceBright` / `surfaceDim` the surface, ...). They are dropped
+/// when [isMiuixShaped].
+const Set<String> miuixMislabelledRoles = {
+  'tertiary',
+  'onTertiary',
+  'inversePrimary',
+  'inverseSurface',
+  'inverseOnSurface',
+  'surfaceBright',
+  'surfaceDim',
+  'surfaceContainerLow',
+  'surfaceContainerLowest',
+  'onSurfaceVariant',
+  'outlineVariant',
+  'scrim',
+};
+
+/// Whether [colors] has MIUIX's shape: `surfaceBright`, `surfaceDim` and
+/// `surface` equal, and `surfaceContainerLow` equal to
+/// `surfaceContainerLowest`. A Material 3 scheme never has both.
+bool isMiuixShaped(Map<String, int> colors) {
+  final surface = colors['surface'];
+  return surface != null &&
+      colors['surfaceBright'] == surface &&
+      colors['surfaceDim'] == surface &&
+      colors['surfaceContainerLow'] != null &&
+      colors['surfaceContainerLow'] == colors['surfaceContainerLowest'];
+}
+
+/// [colors] without the roles a MIUIX-shaped stylesheet mislabels.
+Map<String, int> trustedHostRoles(Map<String, int> colors) =>
+    isMiuixShaped(colors)
+    ? {
+        for (final e in colors.entries)
+          if (!miuixMislabelledRoles.contains(e.key)) e.key: e.value,
+      }
+    : colors;
+
+/// Whether the host's stylesheet is its dark scheme: the tone of
+/// `background` (or `surface`) is below 50. Null without either.
+Brightness? hostBrightness(Map<String, int> colors) {
+  final base = colors['background'] ?? colors['surface'];
+  if (base == null) return null;
+  return Hct.fromInt(base).tone < 50 ? Brightness.dark : Brightness.light;
+}
+
+/// A tonal palette from the roles of one family: hue from the first role
+/// present (the key role), chroma the highest among them (light and dark
+/// tones lose chroma to the gamut, so one role alone underestimates it).
+TonalPalette? _family(
+  Map<String, int> colors,
+  List<String> roles, {
+  double minChroma = 0,
+}) {
+  final hcts = [
+    for (final r in roles)
+      if (colors[r] != null) Hct.fromInt(colors[r]!),
+  ];
+  if (hcts.isEmpty) return null;
+  final chroma = hcts.map((h) => h.chroma).reduce(math.max);
+  return TonalPalette.of(hcts.first.hue, math.max(minChroma, chroma));
+}
+
 /// A CorePalette from the host's scheme colours, or null without `primary`.
 ///
-/// Hue and chroma come from the host's own roles, so a palette the manager
-/// derived differently (MIUIX, a custom accent) keeps its secondary and
-/// tertiary: primary (chroma at least 48, as Material's CorePalette),
-/// secondary, tertiary, and the neutrals from `surfaceVariant`'s hue with
-/// Material's neutral chromas (4 and 8). Missing roles fall back to
-/// `CorePalette.of(primary)`.
-CorePalette? corePaletteFromHost(Map<String, int> colors) {
+/// Both managers serve one scheme, light or dark, as Compose `ColorScheme`
+/// role names; a CorePalette is brightness-free, so it is rebuilt from the
+/// roles of each family (hue of the key role, highest chroma of the family):
+/// - primary: `primary`, `primaryContainer`, `onPrimaryContainer`,
+///   `inversePrimary`, `surfaceTint` (chroma at least 48 when only `primary`
+///   is known, as Material's `CorePalette.of`);
+/// - secondary, tertiary: the same roles of that family;
+/// - neutral: `inverseSurface`, `onSurface`, `inverseOnSurface` (mid and
+///   extreme tones), default chroma 4;
+/// - neutral variant: `onSurfaceVariant`, `outline`, `outlineVariant`,
+///   `surfaceVariant`, default chroma 8.
+/// Missing families fall back to `CorePalette.of(primary)`. Roles a
+/// MIUIX-shaped stylesheet mislabels are ignored ([trustedHostRoles]).
+CorePalette? corePaletteFromHost(Map<String, int> hostColors) {
+  final colors = trustedHostRoles(hostColors);
   final primary = colors['primary'];
   if (primary == null) return null;
   final base = CorePalette.of(primary);
-  final p = Hct.fromInt(primary);
-  TonalPalette from(String role, TonalPalette fallback) {
-    final argb = colors[role];
-    if (argb == null) return fallback;
-    final hct = Hct.fromInt(argb);
-    return TonalPalette.of(hct.hue, hct.chroma);
+  const primaryRoles = [
+    'primary',
+    'primaryContainer',
+    'onPrimaryContainer',
+    'inversePrimary',
+  ];
+  final known = primaryRoles.where(colors.containsKey).length;
+  List<String> family(String name) {
+    final cap = name[0].toUpperCase() + name.substring(1);
+    return [name, '${name}Container', 'on${cap}Container'];
   }
 
-  final neutralHue = colors['surfaceVariant'] == null
-      ? p.hue
-      : Hct.fromInt(colors['surfaceVariant']!).hue;
-  final palette = CorePalette.fromList([
-    ...TonalPalette.of(p.hue, math.max(48, p.chroma)).asList,
-    ...from('secondary', base.secondary).asList,
-    ...from('tertiary', base.tertiary).asList,
-    ...TonalPalette.of(neutralHue, 4).asList,
-    ...TonalPalette.of(neutralHue, 8).asList,
+  final neutralRoles = ['inverseSurface', 'onSurface', 'inverseOnSurface'];
+  final neutralVariantRoles = [
+    'onSurfaceVariant',
+    'outline',
+    'outlineVariant',
+    'surfaceVariant',
+  ];
+  final neutralKnown = neutralRoles.any(colors.containsKey);
+  final variantKnown = neutralVariantRoles.any(colors.containsKey);
+  return CorePalette.fromList([
+    ..._family(colors, primaryRoles, minChroma: known < 2 ? 48 : 0)!.asList,
+    ...(_family(colors, family('secondary')) ?? base.secondary).asList,
+    ...(_family(colors, family('tertiary')) ?? base.tertiary).asList,
+    ...(neutralKnown
+            ? _family(colors, neutralRoles)!
+            : TonalPalette.of(Hct.fromInt(primary).hue, 4))
+        .asList,
+    ...(variantKnown
+            ? _family(colors, neutralVariantRoles)!
+            : TonalPalette.of(Hct.fromInt(primary).hue, 8))
+        .asList,
   ]);
-  return palette;
+}
+
+/// The host's scheme as a Flutter [ColorScheme] for [brightness], or null
+/// without `primary`.
+///
+/// Every role comes from [corePaletteFromHost], the way dynamic_color builds
+/// its schemes on Android (legacy `Scheme` roles, newer roles from
+/// `ColorScheme.fromSeed`). When the stylesheet is the [brightness] scheme
+/// ([hostBrightness]), the host's own colours then replace the derived ones
+/// role by role, so the app matches the manager exactly; roles the host does
+/// not serve (the fixed roles, `shadow`) stay derived. The other brightness
+/// is all derived.
+ColorScheme? colorSchemeFromHost(
+  Map<String, int> hostColors,
+  Brightness brightness,
+) {
+  final palette = corePaletteFromHost(hostColors);
+  if (palette == null) return null;
+  final s = brightness == Brightness.light
+      ? Scheme.lightFromCorePalette(palette)
+      : Scheme.darkFromCorePalette(palette);
+  final derived =
+      ColorScheme.fromSeed(
+        seedColor: Color(s.primary),
+        brightness: brightness,
+      ).copyWith(
+        primary: Color(s.primary),
+        onPrimary: Color(s.onPrimary),
+        primaryContainer: Color(s.primaryContainer),
+        onPrimaryContainer: Color(s.onPrimaryContainer),
+        secondary: Color(s.secondary),
+        onSecondary: Color(s.onSecondary),
+        secondaryContainer: Color(s.secondaryContainer),
+        onSecondaryContainer: Color(s.onSecondaryContainer),
+        tertiary: Color(s.tertiary),
+        onTertiary: Color(s.onTertiary),
+        tertiaryContainer: Color(s.tertiaryContainer),
+        onTertiaryContainer: Color(s.onTertiaryContainer),
+        error: Color(s.error),
+        onError: Color(s.onError),
+        errorContainer: Color(s.errorContainer),
+        onErrorContainer: Color(s.onErrorContainer),
+        outline: Color(s.outline),
+        outlineVariant: Color(s.outlineVariant),
+        surface: Color(s.surface),
+        onSurface: Color(s.onSurface),
+        onSurfaceVariant: Color(s.onSurfaceVariant),
+        inverseSurface: Color(s.inverseSurface),
+        onInverseSurface: Color(s.inverseOnSurface),
+        inversePrimary: Color(s.inversePrimary),
+        shadow: Color(s.shadow),
+        surfaceTint: Color(s.primary),
+        scrim: Color(s.scrim),
+      );
+  if (hostBrightness(hostColors) != brightness) return derived;
+  final c = trustedHostRoles(hostColors);
+  Color? h(String role) => c[role] == null ? null : Color(c[role]!);
+  return derived.copyWith(
+    primary: h('primary'),
+    onPrimary: h('onPrimary'),
+    primaryContainer: h('primaryContainer'),
+    onPrimaryContainer: h('onPrimaryContainer'),
+    inversePrimary: h('inversePrimary'),
+    secondary: h('secondary'),
+    onSecondary: h('onSecondary'),
+    secondaryContainer: h('secondaryContainer'),
+    onSecondaryContainer: h('onSecondaryContainer'),
+    tertiary: h('tertiary'),
+    onTertiary: h('onTertiary'),
+    tertiaryContainer: h('tertiaryContainer'),
+    onTertiaryContainer: h('onTertiaryContainer'),
+    error: h('error'),
+    onError: h('onError'),
+    errorContainer: h('errorContainer'),
+    onErrorContainer: h('onErrorContainer'),
+    surface: h('surface'),
+    onSurface: h('onSurface'),
+    onSurfaceVariant: h('onSurfaceVariant'),
+    surfaceTint: h('surfaceTint'),
+    inverseSurface: h('inverseSurface'),
+    onInverseSurface: h('inverseOnSurface'),
+    outline: h('outline'),
+    outlineVariant: h('outlineVariant'),
+    scrim: h('scrim'),
+    surfaceBright: h('surfaceBright'),
+    surfaceDim: h('surfaceDim'),
+    surfaceContainerLowest: h('surfaceContainerLowest'),
+    surfaceContainerLow: h('surfaceContainerLow'),
+    surfaceContainer: h('surfaceContainer'),
+    surfaceContainerHigh: h('surfaceContainerHigh'),
+    // Compose's surfaceVariant is Flutter's surfaceContainerHighest
+    // (ColorScheme.surfaceVariant is deprecated in its favour).
+    surfaceContainerHighest:
+        h('surfaceContainerHighest') ?? h('surfaceVariant'),
+  );
 }
 
 /// Answers dynamic_color's channel on a WebUI host.
@@ -96,7 +281,9 @@ final class DynamicColorWebUiHandler {
 
   Future<Map<String, int>>? _colors;
 
-  Future<Map<String, int>> _hostColors() => _colors ??= () async {
+  /// The host's colours, read once; empty in a browser tab, without colours
+  /// or on error.
+  Future<Map<String, int>> hostColors() => _colors ??= () async {
     if (!host.isWebUi) return const <String, int>{};
     try {
       final css = await fetch();
@@ -106,14 +293,18 @@ final class DynamicColorWebUiHandler {
     }
   }();
 
+  /// The host's scheme for [brightness] ([colorSchemeFromHost]), or null.
+  Future<ColorScheme?> colorScheme(Brightness brightness) async =>
+      colorSchemeFromHost(await hostColors(), brightness);
+
   Future<Object?> handle(MethodCall call) async {
     switch (call.method) {
       case 'getCorePalette':
-        final palette = corePaletteFromHost(await _hostColors());
+        final palette = corePaletteFromHost(await hostColors());
         return palette == null ? null : Int32List.fromList(palette.asList());
       case 'getAccentColor':
         // Signed 32-bit like the palette; Color masks it back.
-        return (await _hostColors())['primary']?.toSigned(32);
+        return (await hostColors())['primary']?.toSigned(32);
       default:
         throw MissingPluginException(
           '${call.method} is not implemented by dynamic_color_webui',

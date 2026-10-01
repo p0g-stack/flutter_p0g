@@ -3,6 +3,8 @@
 
 // ignore_for_file: deprecated_member_use
 
+import 'dart:math' as math;
+
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:dynamic_color_webui/src/host_colors.dart';
 import 'package:flutter/services.dart';
@@ -126,4 +128,138 @@ void main() {
       throwsA(isA<MissingPluginException>()),
     );
   });
+
+  // A full Material 3 scheme as KernelSU's Material UI mode serves it
+  // (`UpdateCssMaterial`): Compose role names, one brightness.
+  Map<String, int> tonalSpot(int seed, {required bool dark}) {
+    final scheme = SchemeTonalSpot(
+      sourceColorHct: Hct.fromInt(seed),
+      isDark: dark,
+      contrastLevel: 0,
+    );
+    int a(DynamicColor d) => d.getArgb(scheme);
+    return {
+      'primary': a(MaterialDynamicColors.primary),
+      'onPrimary': a(MaterialDynamicColors.onPrimary),
+      'primaryContainer': a(MaterialDynamicColors.primaryContainer),
+      'onPrimaryContainer': a(MaterialDynamicColors.onPrimaryContainer),
+      'inversePrimary': a(MaterialDynamicColors.inversePrimary),
+      'secondary': a(MaterialDynamicColors.secondary),
+      'onSecondary': a(MaterialDynamicColors.onSecondary),
+      'secondaryContainer': a(MaterialDynamicColors.secondaryContainer),
+      'onSecondaryContainer': a(MaterialDynamicColors.onSecondaryContainer),
+      'tertiary': a(MaterialDynamicColors.tertiary),
+      'onTertiary': a(MaterialDynamicColors.onTertiary),
+      'tertiaryContainer': a(MaterialDynamicColors.tertiaryContainer),
+      'onTertiaryContainer': a(MaterialDynamicColors.onTertiaryContainer),
+      'background': a(MaterialDynamicColors.background),
+      'onBackground': a(MaterialDynamicColors.onBackground),
+      'surface': a(MaterialDynamicColors.surface),
+      'onSurface': a(MaterialDynamicColors.onSurface),
+      'surfaceVariant': a(MaterialDynamicColors.surfaceVariant),
+      'onSurfaceVariant': a(MaterialDynamicColors.onSurfaceVariant),
+      'surfaceTint': a(MaterialDynamicColors.surfaceTint),
+      'inverseSurface': a(MaterialDynamicColors.inverseSurface),
+      'inverseOnSurface': a(MaterialDynamicColors.inverseOnSurface),
+      'error': a(MaterialDynamicColors.error),
+      'onError': a(MaterialDynamicColors.onError),
+      'errorContainer': a(MaterialDynamicColors.errorContainer),
+      'onErrorContainer': a(MaterialDynamicColors.onErrorContainer),
+      'outline': a(MaterialDynamicColors.outline),
+      'outlineVariant': a(MaterialDynamicColors.outlineVariant),
+      'scrim': a(MaterialDynamicColors.scrim),
+      'surfaceBright': a(MaterialDynamicColors.surfaceBright),
+      'surfaceDim': a(MaterialDynamicColors.surfaceDim),
+      'surfaceContainer': a(MaterialDynamicColors.surfaceContainer),
+      'surfaceContainerHigh': a(MaterialDynamicColors.surfaceContainerHigh),
+      'surfaceContainerHighest': a(
+        MaterialDynamicColors.surfaceContainerHighest,
+      ),
+      'surfaceContainerLow': a(MaterialDynamicColors.surfaceContainerLow),
+      'surfaceContainerLowest': a(MaterialDynamicColors.surfaceContainerLowest),
+    };
+  }
+
+  // Distance in HCT between two colours, hue weighted by chroma.
+  double distance(int a, int b) {
+    final x = Hct.fromInt(a), y = Hct.fromInt(b);
+    final dh = ((x.hue - y.hue + 540) % 360) - 180;
+    final hueTerm = dh.abs() * math.min(x.chroma, y.chroma) / 60;
+    return (x.tone - y.tone).abs() + (x.chroma - y.chroma).abs() + hueTerm;
+  }
+
+  for (final seed in [0xff6750a4, 0xff4a6800, 0xffd32f2f, 0xff0061a4]) {
+    group('full scheme from ${seed.toRadixString(16)}', () {
+      final light = tonalSpot(seed, dark: false);
+      final dark = tonalSpot(seed, dark: true);
+
+      test('the brightness of the served set', () {
+        expect(hostBrightness(light), Brightness.light);
+        expect(hostBrightness(dark), Brightness.dark);
+        expect(hostBrightness(const {'primary': 1}), isNull);
+      });
+
+      test('the matching brightness gets the host roles exactly', () {
+        final scheme = colorSchemeFromHost(light, Brightness.light)!;
+        expect(scheme.primary.toARGB32(), light['primary']);
+        expect(
+          scheme.onTertiaryContainer.toARGB32(),
+          light['onTertiaryContainer'],
+        );
+        expect(
+          scheme.surfaceContainerLowest.toARGB32(),
+          light['surfaceContainerLowest'],
+        );
+        expect(
+          scheme.surfaceContainerHighest.toARGB32(),
+          light['surfaceContainerHighest'],
+        );
+        expect(scheme.onInverseSurface.toARGB32(), light['inverseOnSurface']);
+        expect(scheme.brightness, Brightness.light);
+      });
+
+      test('the other brightness is derived and close to the real one', () {
+        for (final (served, other, b) in [
+          (light, dark, Brightness.dark),
+          (dark, light, Brightness.light),
+        ]) {
+          final scheme = colorSchemeFromHost(served, b)!;
+          expect(scheme.brightness, b);
+          for (final (role, value) in [
+            ('primary', scheme.primary),
+            ('primaryContainer', scheme.primaryContainer),
+            ('secondary', scheme.secondary),
+            ('tertiary', scheme.tertiary),
+            ('surface', scheme.surface),
+            ('onSurfaceVariant', scheme.onSurfaceVariant),
+            ('outline', scheme.outline),
+          ]) {
+            expect(
+              distance(value.toARGB32(), other[role]!),
+              lessThan(6),
+              reason: '$role for $b',
+            );
+          }
+        }
+      });
+
+      test('a MIUIX-shaped set drops the roles it mislabels', () {
+        final miuix = {
+          ...light,
+          'tertiary': light['tertiaryContainer']!,
+          'onTertiary': light['tertiaryContainer']!,
+          'surfaceBright': light['surface']!,
+          'surfaceDim': light['surface']!,
+          'surfaceContainerLow': light['surfaceContainer']!,
+          'surfaceContainerLowest': light['surfaceContainer']!,
+        };
+        expect(isMiuixShaped(miuix), isTrue);
+        expect(isMiuixShaped(light), isFalse);
+        final scheme = colorSchemeFromHost(miuix, Brightness.light)!;
+        expect(scheme.primary.toARGB32(), light['primary']);
+        expect(scheme.onTertiary.toARGB32(), isNot(light['tertiaryContainer']));
+        expect(scheme.surfaceDim.toARGB32(), isNot(light['surface']));
+      });
+    });
+  }
 }
