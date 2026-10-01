@@ -92,57 +92,8 @@ class InstallCommand extends FlutterCommand {
   }
 
   Future<void> _installAera(Adb adb, File aerap) async {
-    final AerapPackage package;
-    try {
-      package = AerapPackage.decode(aerap.readAsBytesSync());
-    } on FormatException catch (e) {
-      throwToolExit('${aerap.path}: ${e.message}');
-    }
-    final state = await adb.state();
-    if (state != 'recovery') {
-      throwToolExit(
-        state == null
-            ? 'No adb device.'
-            : 'The device is in "$state" state; AERA plugins install in recovery. '
-                  'Run `adb reboot recovery` first.',
-      );
-    }
-    if ((await adb.run(['shell', '[ -p $kAeraRpcIn ] && echo yes'], check: false))?.trim() !=
-        'yes') {
-      globals.printWarning('This recovery has no AERA RPC channel; is it AERA?');
-    }
-
-    final pushed = '/tmp/flutter_p0g-${package.id}';
-    final tmp = globals.fs.systemTempDirectory.createTempSync('p0g_aerap');
-    try {
-      tmp.childFile('plugin.json').writeAsBytesSync(package.manifest);
-      tmp.childFile('runtime.xz').writeAsBytesSync(package.runtimeXz);
-      if (package.signature != null) {
-        tmp.childFile('plugin.json.sig').writeAsBytesSync(package.signature!);
-      }
-      await adb.run(['shell', 'rm -rf ${shellQuote(pushed)} && mkdir -p ${shellQuote(pushed)}']);
-      for (final f in tmp.listSync().whereType<File>()) {
-        await adb.run(['push', f.path, '$pushed/${f.basename}']);
-      }
-    } finally {
-      tmp.deleteSync(recursive: true);
-    }
     final ram = boolArg('ram');
-    await adb.stream(
-      adb.rootShell(
-        aeraInstallScript(
-          pushed: pushed,
-          root: ram ? kAeraMemoryRoot : kAeraStorageRoot,
-          id: package.id,
-          sha256: package.payloadSha256,
-          signed: package.signature != null,
-        ),
-        recovery: true,
-      ),
-    );
-    globals.printStatus(
-      'Installed ${package.id} in AERA ${ram ? 'RAM (until reboot)' : 'internal storage'}.',
-    );
+    final package = await installAeraPackage(adb, aerap, ram: ram);
     if (boolArg('open')) await openAeraPlugin(adb, package.id);
   }
 
@@ -177,6 +128,65 @@ class InstallCommand extends FlutterCommand {
       );
     }
     return candidates.values.single.single;
+  }
+}
+
+/// Installs [aerap] into AERA recovery's plugin store on [adb]'s device
+/// (RAM store with [ram]).
+Future<AerapPackage> installAeraPackage(Adb adb, File aerap, {bool ram = false}) async {
+  final AerapPackage package;
+  try {
+    package = AerapPackage.decode(aerap.readAsBytesSync());
+  } on FormatException catch (e) {
+    throwToolExit('${aerap.path}: ${e.message}');
+  }
+  await requireAeraRecovery(adb);
+  final pushed = '/tmp/flutter_p0g-${package.id}';
+  final tmp = globals.fs.systemTempDirectory.createTempSync('p0g_aerap');
+  try {
+    tmp.childFile('plugin.json').writeAsBytesSync(package.manifest);
+    tmp.childFile('runtime.xz').writeAsBytesSync(package.runtimeXz);
+    if (package.signature != null) {
+      tmp.childFile('plugin.json.sig').writeAsBytesSync(package.signature!);
+    }
+    await adb.run(['shell', 'rm -rf ${shellQuote(pushed)} && mkdir -p ${shellQuote(pushed)}']);
+    for (final f in tmp.listSync().whereType<File>()) {
+      await adb.run(['push', f.path, '$pushed/${f.basename}']);
+    }
+  } finally {
+    tmp.deleteSync(recursive: true);
+  }
+  await adb.stream(
+    adb.rootShell(
+      aeraInstallScript(
+        pushed: pushed,
+        root: ram ? kAeraMemoryRoot : kAeraStorageRoot,
+        id: package.id,
+        sha256: package.payloadSha256,
+        signed: package.signature != null,
+      ),
+      recovery: true,
+    ),
+  );
+  globals.printStatus(
+    'Installed ${package.id} in AERA ${ram ? 'RAM (until reboot)' : 'internal storage'}.',
+  );
+  return package;
+}
+
+/// Fails unless [adb]'s device is in recovery; warns unless it is AERA's.
+Future<void> requireAeraRecovery(Adb adb) async {
+  final state = await adb.state();
+  if (state != 'recovery') {
+    throwToolExit(
+      state == null
+          ? 'No adb device.'
+          : 'The device is in "$state" state; AERA plugins run in recovery. '
+                'Run `adb reboot recovery` first.',
+    );
+  }
+  if ((await adb.run(['shell', '[ -p $kAeraRpcIn ] && echo yes'], check: false))?.trim() != 'yes') {
+    globals.printWarning('This recovery has no AERA RPC channel; is it AERA?');
   }
 }
 

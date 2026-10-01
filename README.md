@@ -37,7 +37,7 @@ Gaps are listed here, not hidden.
 |---|---|---|
 | `create --platforms` | `create` adds `webui/` | `create` adds `aera/` |
 | `build <target>` (all flags) | `build webui`: every `build web` flag | `build aera`: every `build bundle` flag; debug, profile, release |
-| `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` on the manager origin; device path (adb reverse, page swap) not yet run on a device | gap: needs flutter-aera's debug engine with the VM service URL in its log |
+| `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` on the manager origin; device path (adb reverse, page swap) not yet run on a device | `run --aera`: debug `.aerap` into AERA recovery, started over AERA's RPC with the VM service on a forwarded port, then the stock `flutter attach` (flutter-aera `docs/debugging.md`); checked against a fake adb and a stand-in VM, not yet on a device |
 | `attach` | gap | gap (follows the debug engine) |
 | `install` | `install`: adb + ksud / apd / magisk; activates on reboot | `install`: into AERA's plugin store as its Plugin Manager does, `--open` over AERA's RPC; not yet run on a device |
 | `devices` | `devices`: adb devices with the root manager probe `install` uses | `devices`: recovery with AERA's RPC channel |
@@ -156,6 +156,18 @@ SDK that can compile Android executables directly.
    at the proxy (the release page kept as `index.release.html`, put back on
    exit). Without one, open `dev.html?dev=http://127.0.0.1:8800/` from any
    page that serves flutter-webui's bootstrap.
+
+### `run --aera`
+
+With the device in AERA recovery: builds a debug `.aerap` (`build aera
+--debug`, or `--aerap <file>`), installs it as `install` does, writes
+`--vm-service-port=<port>` (the stock `--vm-service-port`, default 8181) to
+the plugin's `engine-switches` in its data directory
+(`/sdcard/AERA/plugin-data/<id>`, or `/tmp/aera/plugin-data/<id>` when
+`/sdcard/AERA` is absent, as AERA picks it), forwards the port, opens the
+plugin over AERA's RPC, waits for `vm-service-url`, and runs the stock
+`flutter attach --debug-url <url> -d flutter-tester` in the app. Without a
+URL in 30 s it prints the tail of `aera-flutter.log`.
 
 ### `build aera`
 

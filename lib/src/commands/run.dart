@@ -16,7 +16,8 @@ import '../squadron.dart';
 import '../webui/flutter_webui.dart';
 import '../webui/plugin.dart';
 import '../webui/webui_packages.dart';
-import 'install.dart' show shellQuote;
+import '../adb.dart';
+import 'run_aera.dart';
 
 /// `flutter run` for WebUI: flutter_tools' `web-server` device (DDC, hot
 /// reload and restart, the debug service) built against the patched web SDK
@@ -35,6 +36,16 @@ class RunCommand extends fl.RunCommand {
         help: 'Port of the dev server the module page loads the app from (device and host).',
       )
       ..addOption('serial', abbr: 's', help: 'adb serial (default: the only device, if any).')
+      ..addSeparator('AERA options')
+      ..addFlag(
+        'aera',
+        negatable: false,
+        help:
+            'Run the AERA plugin instead: build a debug .aerap, install it in AERA '
+            'recovery (adb), start it and attach (hot reload, restart, DevTools).',
+      )
+      ..addOption('aerap', help: 'aera: install this .aerap instead of building one.')
+      ..addFlag('ram', negatable: false, help: "aera: install into AERA's RAM store.")
       ..addFlag(
         'device-swap',
         defaultsTo: true,
@@ -70,12 +81,27 @@ class RunCommand extends fl.RunCommand {
   int? _upstreamPort;
 
   @override
-  Future<FlutterCommandResult> verifyThenRunCommand(String? commandPath) {
+  Future<FlutterCommandResult> verifyThenRunCommand(String? commandPath) async {
+    if (boolArg('aera')) {
+      final code = await runAera(
+        app: project.directory,
+        adb: Adb.find(stringArg('serial')),
+        vmPort:
+            // The stock option; AERA's engine needs a fixed port to forward.
+            int.tryParse(stringArg('vm-service-port') ?? '8181') ??
+            throwToolExit('Bad --vm-service-port.'),
+        ram: boolArg('ram'),
+        buildArgs: [if (stringArg('target') case final t?) '--target=$t'],
+        aerap: stringArg('aerap') == null ? null : globals.fs.file(stringArg('aerap')),
+      );
+      if (code != 0) throwToolExit('flutter attach exited with $code.', exitCode: code);
+      return FlutterCommandResult.success();
+    }
     // The page is the device; flutter_tools serves it as `web-server`. Set
     // before anything (artifacts, validation) looks devices up.
     WebServerDevice.showWebServerDevice = true;
     globals.deviceManager!.specifiedDeviceId = 'web-server';
-    return super.verifyThenRunCommand(commandPath);
+    return await super.verifyThenRunCommand(commandPath);
   }
 
   @override

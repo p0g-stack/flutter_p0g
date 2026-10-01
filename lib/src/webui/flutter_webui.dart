@@ -15,7 +15,7 @@ import 'dart_android.dart';
 /// `web_ui/` patch series builds the patched web SDK the build compiles
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
-const kFlutterWebuiCommit = '058a33e691b156befe9f7249e56cf5306db77bba';
+const kFlutterWebuiCommit = 'eeac6e9fb8a68a055a7887fd31a44771c440f60a';
 
 Directory flutterWebuiDir() => p0gCacheDir().childDirectory('flutter-webui');
 Directory flutterWebuiSource() => flutterWebuiDir().childDirectory('src');
