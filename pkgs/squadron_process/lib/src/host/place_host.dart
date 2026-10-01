@@ -144,6 +144,7 @@ class _HostLink {
   final PlaceLink link;
   late final StreamSubscription<Uint8List> _sub;
   bool _greeted = false;
+  bool _helloSeen = false;
   late final Invoker _service;
   bool _gone = false;
   Timer? _handshake;
@@ -193,7 +194,16 @@ class _HostLink {
     link.close();
   }
 
+  /// Largest frame accepted before the handshake: a hello is a few dozen
+  /// bytes, so anything bigger is not one.
+  static const maxHelloBytes = 4096;
+
   void _onFrame(Uint8List frame) {
+    if (!_greeted) {
+      if (_helloSeen) return; // one hello per link; the rest is noise
+      _helloSeen = true;
+      if (frame.length > maxHelloBytes) return _refuse('bad hello');
+    }
     final List m;
     try {
       m = Msg.decode(frame);
@@ -209,6 +219,24 @@ class _HostLink {
       _onHello(m);
       return;
     }
+    try {
+      _dispatch(m);
+    } catch (e) {
+      // A message of a known type with fields of the wrong types. Fail the
+      // request it names, if any; never let it take the host down.
+      _log?.w('Malformed message ${m[0]}: $e');
+      final id = m.length > 1 ? m[1] : null;
+      if (m[0] == Msg.request && id is int && !_tasks.containsKey(id)) {
+        _send([
+          Msg.error,
+          id,
+          WorkerException('Malformed request: $e').serialize(),
+        ]);
+      }
+    }
+  }
+
+  void _dispatch(List m) {
     switch (m[0]) {
       case Msg.request:
         _onRequest(
@@ -237,10 +265,12 @@ class _HostLink {
   Future<void> _onHello(List m) async {
     if (m[0] != Msg.hello || m.length < 3) return _refuse('expected hello');
     if (m[1] != Msg.version) return _refuse('protocol ${m[1]} unsupported');
-    if (m[2] is! String || !PlaceHost._sameToken(m[2], host.token)) {
+    final token = m[2];
+    if (token is! String || !PlaceHost._sameToken(token, host.token)) {
       return _refuse('bad token');
     }
     final name = m.length > 3 ? m[3] : null;
+    if (name != null && name is! String) return _refuse('bad service name');
     final service = name is String
         ? host.services[name]
         : (host.services.length == 1 ? host.services.values.single : null);
@@ -272,6 +302,9 @@ class _HostLink {
     String? tokenId,
     bool streaming,
   ) {
+    if (_tasks.containsKey(id)) {
+      throw StateError('request id $id is already in use');
+    }
     final task = _Task(this, id);
     _tasks[id] = task;
     if (tokenId != null) (_byToken[tokenId] ??= {}).add(task);

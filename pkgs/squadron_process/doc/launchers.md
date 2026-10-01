@@ -60,6 +60,11 @@ directory. An elevated host can write there; other users cannot read it.
   token; nothing else authenticates the client. An embedding that can check
   the peer (for instance the connecting socket's uid) can add that in its own
   launcher and host setup.
+- The host validates every frame before acting on it. The first frame must be
+  a well-formed hello of at most 4 KiB, or the link is refused and closed; a
+  link gets one hello. After the handshake, a malformed message fails the
+  request it names (if any) and the link stays up. Nothing a client sends can
+  stop the host.
 - The launch id is not a secret.
 - Endpoints are IP literals (the host binds 127.0.0.1); a ready line or
   session file naming a hostname is ignored. Some runtimes cannot resolve

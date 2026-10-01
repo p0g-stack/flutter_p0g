@@ -13,6 +13,11 @@
 - Launchers: `IoProcessLauncher`, `ElevatedLauncher` (`PkexecLauncher`,
   `SuLauncher`, `MacAdminLauncher`, `WindowsRunAsLauncher`), launch ids and
   `FileEndpointStore` for front-ends that hide stdout.
+- A worker reconnects after its link drops: the next call opens a new link,
+  starting a new host if the old one is gone (one for all workers that lost
+  it). `ProcessHandshake` and `ProcessChannel.fromHandshake(reconnect:)`.
+- The host refuses malformed or oversized hellos and survives malformed
+  messages after the handshake; the client rejects a malformed welcome.
 - Benchmark of isolate, Web Worker and process places on the VM and in
   Chromium (`benchmark/`, `tool/bench.sh`, doc/benchmark.md).
 - `squadron_patch` executable and the Squadron 7.4.4 channel-factory patch.

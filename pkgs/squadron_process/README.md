@@ -126,6 +126,15 @@ it cancels every running task and exits. A host nobody connects to exits after
 `--first-link-grace-ms` (default 30 s). SIGTERM and SIGINT do the same as an
 expired window.
 
+A worker outlives its link. If the link drops, calls in flight on it fail with
+a `WorkerException`; the worker's next call opens a new link, finding the host
+again and starting a new one if the old host is gone. Workers that lose a host
+together start one new host between them. In-flight calls are not replayed:
+on loopback a dropped link almost always means the host itself went away.
+
+One host serves any number of clients at once, each on its own link, with
+its own requests, cancellations and streams.
+
 ## Launchers
 
 `ProcessLauncher` implementations are siblings: `IoProcessLauncher` (the
@@ -164,8 +173,8 @@ output: [doc/serve.md](doc/serve.md).
   `StandardMessageCodec`); custom types need Squadron marshalers.
 - The host trusts any local client that presents the token; there is no peer
   credential check.
-- A worker whose link drops fails its pending calls and must be recreated; the
-  host keeps the work running for the grace window.
+- Calls in flight when a link drops fail; they are not resumed on the next
+  link, even when the host kept them running through its grace window.
 
 ## Scope
 

@@ -8,37 +8,28 @@ import 'facts.dart';
 import 'link.dart';
 import 'protocol.dart';
 
-/// A Squadron [Channel] to a service hosted in another process, over a
-/// [PlaceLink].
-///
-/// Opened by [ProcessChannel.connect], which runs the handshake: the client
-/// presents the host's token and the host answers with the facts of its place.
-/// [Worker.start] reaches it through a channel factory (see `ProcessPlace`).
-class ProcessChannel implements Channel {
-  ProcessChannel._(
-    this._link,
-    this.exceptionManager,
-    this.logger,
-    this.place,
-    this.facts,
-  ) {
-    _sub = _link.frames.listen(
-      _onFrame,
-      onError: (Object e) => _lost('link error: $e'),
-      onDone: () => _lost('link closed'),
-    );
-  }
+/// A link that passed the handshake, with what the host said about its place.
+class ProcessHandshake {
+  ProcessHandshake._(this.link, this.place, this.facts);
 
-  /// Connects over [link]: sends hello with [token] and the [service] name
-  /// (null: the host's only service), and waits for the host's
-  /// welcome. Throws [WorkerException] if the host refuses or does not answer
-  /// within [timeout]; the link is closed in that case.
-  static Future<ProcessChannel> connect(
+  /// The link after the welcome; requests go over it.
+  final PlaceLink link;
+
+  /// The kind of place the host reported (`process`).
+  final String place;
+
+  /// The facts the host checked when it accepted the link.
+  final PlaceFacts facts;
+
+  /// Runs the handshake over [link]: sends hello with [token] and the
+  /// [service] name (null: the host's only service), and waits for the host's
+  /// welcome. Throws [WorkerException] if the host refuses, answers with
+  /// something that is not a welcome, or does not answer within [timeout];
+  /// the link is closed in that case.
+  static Future<ProcessHandshake> run(
     PlaceLink link, {
     required String token,
     String? service,
-    ExceptionManager? exceptionManager,
-    Logger? logger,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final frames = StreamIterator(link.frames);
@@ -47,21 +38,29 @@ class ProcessChannel implements Channel {
       if (!await frames.moveNext().timeout(timeout)) {
         throw WorkerException('Place host closed the link during handshake');
       }
-      final m = Msg.decode(frames.current);
-      if (m[0] == Msg.refused) {
-        throw WorkerException('Place host refused the link: ${m[1]}');
+      final List m;
+      try {
+        m = Msg.decode(frames.current);
+      } on FormatException catch (e) {
+        throw WorkerException('Malformed handshake from place host: $e');
       }
-      if (m[0] != Msg.welcome || m[1] != Msg.version) {
+      if (m[0] == Msg.refused) {
+        throw WorkerException(
+          'Place host refused the link: ${m.length > 1 ? m[1] : '?'}',
+        );
+      }
+      if (m[0] != Msg.welcome ||
+          m.length < 4 ||
+          m[1] != Msg.version ||
+          m[2] is! String ||
+          m[3] is! Map) {
         throw WorkerException('Unexpected handshake from place host: $m');
       }
-      final channel = ProcessChannel._(
+      return ProcessHandshake._(
         _RestOf(frames, link),
-        exceptionManager ?? ExceptionManager(),
-        logger,
         m[2] as String,
         PlaceFacts.fromMap(m[3] as Map),
       );
-      return channel;
     } on TimeoutException {
       await frames.cancel();
       await link.close();
@@ -72,15 +71,84 @@ class ProcessChannel implements Channel {
       rethrow;
     }
   }
+}
 
-  final PlaceLink _link;
-  late final StreamSubscription<Uint8List> _sub;
+/// Opens a fresh, handshaken link to the same service, for a channel whose
+/// link dropped.
+typedef Reconnect = Future<ProcessHandshake> Function();
+
+/// A Squadron [Channel] to a service hosted in another process, over a
+/// [PlaceLink].
+///
+/// Opened by [ProcessChannel.connect], which runs the handshake: the client
+/// presents the host's token and the host answers with the facts of its place.
+/// [Worker.start] reaches it through a channel factory (see `ProcessPlace`).
+///
+/// If the link drops, calls in flight fail with a [WorkerException]. With a
+/// [Reconnect], the channel stays usable: the next call opens a new link
+/// (which may start a new host) and goes over it, so the worker that owns the
+/// channel keeps working. Without one, the channel is closed for good.
+class ProcessChannel implements Channel {
+  ProcessChannel._(
+    ProcessHandshake handshake,
+    this.exceptionManager,
+    this.logger,
+    this._reconnect,
+  ) {
+    _attach(handshake);
+  }
+
+  /// Connects over [link] (see [ProcessHandshake.run]) and returns the
+  /// channel. [reconnect], if given, replaces the link after it drops.
+  static Future<ProcessChannel> connect(
+    PlaceLink link, {
+    required String token,
+    String? service,
+    ExceptionManager? exceptionManager,
+    Logger? logger,
+    Duration timeout = const Duration(seconds: 10),
+    Reconnect? reconnect,
+  }) async => ProcessChannel.fromHandshake(
+    await ProcessHandshake.run(
+      link,
+      token: token,
+      service: service,
+      timeout: timeout,
+    ),
+    exceptionManager: exceptionManager,
+    logger: logger,
+    reconnect: reconnect,
+  );
+
+  /// A channel over a link that already passed the handshake.
+  factory ProcessChannel.fromHandshake(
+    ProcessHandshake handshake, {
+    ExceptionManager? exceptionManager,
+    Logger? logger,
+    Reconnect? reconnect,
+  }) => ProcessChannel._(
+    handshake,
+    exceptionManager ?? ExceptionManager(),
+    logger,
+    reconnect,
+  );
+
+  final Reconnect? _reconnect;
+  PlaceLink? _link;
+  StreamSubscription<Uint8List>? _sub;
+  Future<void>? _reconnecting;
+  late String _place;
+  late PlaceFacts _facts;
 
   /// The kind of place the host reported (`process`).
-  final String place;
+  String get place => _place;
 
-  /// The facts the host checked when this link was accepted.
-  final PlaceFacts facts;
+  /// The facts the host checked when the current link was accepted.
+  PlaceFacts get facts => _facts;
+
+  /// Whether a link is up right now. A channel with a [Reconnect] can be
+  /// unlinked and still usable.
+  bool get isLinked => _link != null;
 
   @override
   final ExceptionManager exceptionManager;
@@ -94,6 +162,8 @@ class ProcessChannel implements Channel {
   final _closed = Completer<void>();
   String? _lostReason;
 
+  /// Closed for good: [close] was called, or the link dropped and there is no
+  /// [Reconnect].
   bool get isClosed => _closed.isCompleted;
 
   @override
@@ -102,8 +172,10 @@ class ProcessChannel implements Channel {
   @override
   Future<void> close() {
     if (!_closed.isCompleted) {
+      final link = _link;
       _lost('channel closed');
-      _link.close();
+      _closed.complete();
+      link?.close();
     }
     return _closed.future;
   }
@@ -119,7 +191,9 @@ class ProcessChannel implements Channel {
 
   @override
   void cancelToken(SquadronCancelationToken? token) {
-    if (token == null || isClosed) return;
+    // Tokens belong to calls on the current link; without one there is
+    // nothing in flight to cancel.
+    if (token == null || _link == null) return;
     _send([Msg.cancel, token.id, token.exception?.message]);
   }
 
@@ -148,9 +222,14 @@ class ProcessChannel implements Channel {
       token?.id,
       false,
     ], command);
+    if (_link != null) return _request(id, frame);
+    return _linked(command).then((_) => _request(id, frame));
+  }
+
+  Future<dynamic> _request(int id, Uint8List frame) {
     final c = Completer<dynamic>();
     _pending[id] = c;
-    _link.send(frame);
+    _link!.send(frame);
     return c.future;
   }
 
@@ -163,41 +242,90 @@ class ProcessChannel implements Channel {
     bool inspectResponse = false,
   }) {
     late final StreamController<dynamic> controller;
-    late final int id;
+    int? id;
+    var canceled = false;
+
+    void start() {
+      if (canceled) return;
+      id = _nextId++;
+      final Uint8List frame;
+      try {
+        frame = _encode([
+          Msg.request,
+          id,
+          command,
+          args,
+          token?.id,
+          true,
+        ], command);
+      } catch (e) {
+        controller.addError(e);
+        controller.close();
+        return;
+      }
+      _streams[id!] = controller;
+      _link!.send(frame);
+    }
+
+    void fail(Object e) {
+      controller.addError(e);
+      controller.close();
+    }
+
     controller = StreamController<dynamic>(
       onListen: () {
-        if (isClosed) {
-          controller.addError(_lostError(command));
-          controller.close();
-          return;
-        }
-        id = _nextId++;
-        final Uint8List frame;
-        try {
-          frame = _encode([
-            Msg.request,
-            id,
-            command,
-            args,
-            token?.id,
-            true,
-          ], command);
-        } catch (e) {
-          controller.addError(e);
-          controller.close();
-          return;
-        }
-        _streams[id] = controller;
-        _link.send(frame);
+        if (isClosed) return fail(_lostError(command));
+        if (_link != null) return start();
+        _linked(command).then((_) => start(), onError: fail);
       },
       onCancel: () {
-        if (_streams.remove(id) != null) _send([Msg.unlisten, id]);
+        canceled = true;
+        final i = id;
+        if (i != null && _streams.remove(i) != null) _send([Msg.unlisten, i]);
       },
     );
     return controller.stream;
   }
 
-  void _send(List message) => _link.send(Msg.encode(message));
+  /// Completes once a link is up, opening a new one if the last dropped.
+  Future<void> _linked(int command) {
+    final reconnect = _reconnect;
+    if (reconnect == null) return Future.error(_lostError(command));
+    return _reconnecting ??= () async {
+      try {
+        logger?.i('Process place link is gone ($_lostReason); reconnecting');
+        final handshake = await reconnect();
+        if (isClosed) {
+          await handshake.link.close();
+          throw _lostError(command);
+        }
+        _attach(handshake);
+      } finally {
+        _reconnecting = null;
+      }
+    }();
+  }
+
+  void _attach(ProcessHandshake handshake) {
+    final link = handshake.link;
+    _place = handshake.place;
+    _facts = handshake.facts;
+    _link = link;
+    _lostReason = null;
+    _sub = link.frames.listen(
+      _onFrame,
+      onError: (Object e) => _dropped(link, 'link error: $e'),
+      onDone: () => _dropped(link, 'link closed'),
+    );
+  }
+
+  void _dropped(PlaceLink link, String reason) {
+    if (!identical(link, _link)) return;
+    _lost(reason);
+    if (_reconnect == null && !_closed.isCompleted) _closed.complete();
+  }
+
+  void _send(List message) => _link?.send(Msg.encode(message));
 
   Uint8List _encode(List message, int command) {
     try {
@@ -230,12 +358,15 @@ class ProcessChannel implements Channel {
       return;
     }
     final id = m.length > 1 ? m[1] : null;
+    final payload = m.length > 2 ? m[2] : null;
     switch (m[0]) {
       case Msg.value:
-        _pending.remove(id)?.complete(m[2]);
+        _pending.remove(id)?.complete(payload);
       case Msg.error:
         final ex =
-            exceptionManager.deserialize((m[2] as List).cast()) ??
+            (payload is List
+                ? exceptionManager.deserialize(payload.cast())
+                : null) ??
             WorkerException('Unknown error from place host');
         final c = _pending.remove(id);
         if (c != null) {
@@ -244,7 +375,7 @@ class ProcessChannel implements Channel {
           _streams[id]?.addError(ex);
         }
       case Msg.item:
-        _streams[id]?.add(m[2]);
+        _streams[id]?.add(payload);
       case Msg.end:
         _streams.remove(id)?.close();
       default:
@@ -252,10 +383,13 @@ class ProcessChannel implements Channel {
     }
   }
 
+  /// The current link is gone: fail what was in flight on it.
   void _lost(String reason) {
-    if (_closed.isCompleted) return;
+    if (_link == null) return;
     _lostReason = reason;
-    _sub.cancel();
+    _link = null;
+    _sub?.cancel();
+    _sub = null;
     final ex = _lostError();
     for (final c in _pending.values) {
       c.completeError(ex);
@@ -266,7 +400,6 @@ class ProcessChannel implements Channel {
       s.close();
     }
     _streams.clear();
-    _closed.complete();
   }
 }
 

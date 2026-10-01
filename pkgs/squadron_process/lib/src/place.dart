@@ -148,58 +148,71 @@ final class ProcessPlace extends Place {
           open(exceptionManager, logger, service: service);
 
   /// Opens one channel to [service] on the host, finding or starting the host
-  /// first.
+  /// first. If its link drops, the channel's next call opens a new one the
+  /// same way, starting a new host if the old one is gone.
   Future<ProcessChannel> open(
     ExceptionManager exceptionManager,
     Logger? logger, {
     String? service,
-  }) async {
-    var endpoint = await _find();
+  }) async => ProcessChannel.fromHandshake(
+    await _link(service),
+    exceptionManager: exceptionManager,
+    logger: logger,
+    reconnect: () => _link(service),
+  );
+
+  /// A handshaken link to [service], finding or starting the host first.
+  Future<ProcessHandshake> _link(String? service) async {
+    final endpoint = await _find();
     try {
-      return await _handshake(endpoint, exceptionManager, logger, service);
+      return await _handshake(endpoint, service);
     } on WorkerException catch (e) {
       // The host is there but does not serve that name: starting another
       // copy of the same CLI would not help.
       if (e.message.contains('service')) rethrow;
-      return _retry(endpoint, e, exceptionManager, logger, service);
+      return _retry(endpoint, e, service);
     } catch (e) {
-      return _retry(endpoint, e, exceptionManager, logger, service);
+      return _retry(endpoint, e, service);
     }
   }
 
-  Future<ProcessChannel> _retry(
+  Future<ProcessHandshake> _retry(
     ProcessEndpoint endpoint,
     Object e,
-    ExceptionManager exceptionManager,
-    Logger? logger,
     String? service,
   ) async {
-    // The host we knew is gone (exited after its grace window, or a stale
-    // session file). Find it again once: this starts a new one.
-    this.logger?.i('Place host at $endpoint unavailable ($e); finding again');
-    _endpoint = null;
-    _finding = null;
-    endpoint = await _find(skipStore: true);
-    return _handshake(endpoint, exceptionManager, logger, service);
+    // The host we knew is gone (exited after its grace window, crashed, or a
+    // stale session file). Find it again once: this starts a new one. Links
+    // that fail together share that one new host: only the first to notice
+    // forgets the old endpoint, and the others join its search.
+    if (_same(_endpoint, endpoint)) {
+      logger?.i('Place host at $endpoint unavailable ($e); finding again');
+      _endpoint = null;
+    }
+    var next = await _find(skipStore: true);
+    if (_same(next, endpoint)) {
+      // We joined a search that read the same stale entry from the store.
+      _endpoint = null;
+      next = await _find(skipStore: true);
+    }
+    return _handshake(next, service);
   }
 
-  Future<ProcessChannel> _handshake(
+  static bool _same(ProcessEndpoint? a, ProcessEndpoint b) =>
+      a != null && a.host == b.host && a.port == b.port && a.token == b.token;
+
+  Future<ProcessHandshake> _handshake(
     ProcessEndpoint endpoint,
-    ExceptionManager exceptionManager,
-    Logger? logger,
     String? service,
   ) async {
-    final link = await _connect(endpoint);
-    final channel = await ProcessChannel.connect(
-      link,
+    final handshake = await ProcessHandshake.run(
+      await _connect(endpoint),
       token: endpoint.token,
       service: service,
-      exceptionManager: exceptionManager,
-      logger: logger,
       timeout: handshakeTimeout,
     );
-    _facts = channel.facts;
-    return channel;
+    _facts = handshake.facts;
+    return handshake;
   }
 
   Future<ProcessEndpoint> _find({bool skipStore = false}) {
