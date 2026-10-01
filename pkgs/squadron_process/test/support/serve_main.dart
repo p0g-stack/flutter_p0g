@@ -12,7 +12,7 @@ Future<void> main(List<String> args) async {
       await serve(
         EchoWorker(),
         args.skip(1).toList(),
-        extraFacts: {'test.cli': true},
+        facts: () async => {'test.cli': true},
       ),
     );
   }

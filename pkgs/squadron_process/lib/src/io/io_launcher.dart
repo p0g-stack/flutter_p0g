@@ -1,12 +1,13 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import '../launcher.dart';
+import 'elevated.dart';
 
 /// Starts a place host with `dart:io`, detached from this process but with
-/// its stdio piped so the ready line can be read. For desktop and tests;
-/// WebUI uses flutter-webui's root channel instead.
+/// its stdio piped so the ready line can be read, with the caller's rights.
+/// Elevation goes through an [ElevatedLauncher] instead.
 class IoProcessLauncher implements ProcessLauncher {
   const IoProcessLauncher();
 

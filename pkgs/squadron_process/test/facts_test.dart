@@ -3,32 +3,28 @@ import 'package:test/test.dart';
 
 void main() {
   test('absent and non-true facts read as false', () {
-    final f = PlaceFacts({Fact.root: true, Fact.net: false, 'x': 'yes'});
-    expect(f.has(Fact.root), isTrue);
-    expect(f.has(Fact.net), isFalse);
-    expect(f.has(Fact.usbWeb), isFalse);
+    final f = PlaceFacts({'root': true, 'net': false, 'x': 'yes'});
+    expect(f.has('root'), isTrue);
+    expect(f.has('net'), isFalse);
+    expect(f.has('usb.web'), isFalse);
     expect(f.has('x'), isFalse);
     expect(f['x'], 'yes');
   });
 
   test('merge overrides and round-trips through a map', () {
-    final f = PlaceFacts({Fact.root: false}).merge({Fact.root: true, 'a': 1});
+    final f = PlaceFacts({'root': false}).merge({'root': true, 'a': 1});
     expect(f, PlaceFacts.fromMap({'root': true, 'a': 1}));
     expect(PlaceFacts.fromMap(f.toMap()), f);
   });
 
   test('facts are immutable', () {
-    final f = PlaceFacts({Fact.root: true});
+    final f = PlaceFacts({'root': true});
     expect(() => f.toMap()['root'] = false, throwsUnsupportedError);
   });
 
-  test('the local place checks every initial fact', () async {
-    final facts = await const LocalPlace().facts();
-    for (final key in Fact.all) {
-      expect(facts[key], isA<bool>(), reason: key);
-    }
-    // Checked here, on the VM: no WebUSB in a Dart VM process.
-    expect(facts.has(Fact.usbWeb), isFalse);
-    expect(const LocalPlace().kind, PlaceKind.isolate);
-  }, testOn: 'vm');
+  test('the local place runs the app\'s check, or reports nothing', () async {
+    expect(await const LocalPlace().facts(), const PlaceFacts.none());
+    final place = LocalPlace(check: () async => {'gpu': true});
+    expect((await place.facts()).has('gpu'), isTrue);
+  });
 }

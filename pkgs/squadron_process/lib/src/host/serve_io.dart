@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:logger/web.dart';
 import 'package:squadron/squadron.dart';
 
-import '../check/check_io.dart' as check;
+import '../facts.dart';
 import '../connect/connect_io.dart';
 import '../launcher.dart';
 import 'place_host.dart';
@@ -14,8 +14,8 @@ import 'place_host.dart';
 /// Options of the CLI serve mode, parsed from the app's own arguments.
 ///
 /// ```
-/// <app> serve [--port N] [--session-file PATH] [--grace-ms N]
-///             [--first-link-grace-ms N]
+/// <app> serve [--port N] [--session-file PATH] [--launch-id ID]
+///             [--grace-ms N] [--first-link-grace-ms N]
 /// ```
 ///
 /// The token is never taken from argv (other apps can read
@@ -29,6 +29,7 @@ class ServeOptions {
     this.token,
     this.grace = const Duration(seconds: 10),
     this.firstLinkGrace = const Duration(seconds: 30),
+    this.launchId,
   });
 
   final int port;
@@ -36,6 +37,10 @@ class ServeOptions {
   final String? token;
   final Duration grace;
   final Duration firstLinkGrace;
+
+  /// Echoed in the ready line and session file so the launcher can tell
+  /// this host from an older one.
+  final String? launchId;
 
   /// Parses the arguments after `serve`. Throws [FormatException] on unknown
   /// or malformed options.
@@ -68,6 +73,8 @@ class ServeOptions {
           o = o._with(sessionFile: value());
         case '--grace-ms':
           o = o._with(grace: Duration(milliseconds: intValue()));
+        case '--launch-id':
+          o = o._with(launchId: value());
         case '--first-link-grace-ms':
           o = o._with(firstLinkGrace: Duration(milliseconds: intValue()));
         default:
@@ -82,12 +89,14 @@ class ServeOptions {
     String? sessionFile,
     Duration? grace,
     Duration? firstLinkGrace,
+    String? launchId,
   }) => ServeOptions(
     port: port ?? this.port,
     sessionFile: sessionFile ?? this.sessionFile,
     token: token,
     grace: grace ?? this.grace,
     firstLinkGrace: firstLinkGrace ?? this.firstLinkGrace,
+    launchId: launchId ?? this.launchId,
   );
 }
 
@@ -128,12 +137,11 @@ class ServedPlace {
 ///
 /// Binds 127.0.0.1 only, accepts WebSocket links on `/squadron`, publishes
 /// the endpoint to [ServeOptions.sessionFile] (atomic rename) and returns.
-/// Facts are checked by this process for every handshake, merged with
-/// [extraFacts].
+/// [facts] runs in this process for every handshake.
 Future<ServedPlace> startServe(
   Invoker service, {
   ServeOptions options = const ServeOptions(),
-  Map<String, Object?> extraFacts = const {},
+  FactsCheck? facts,
   Logger? logger,
 }) async {
   final token = options.token ?? _newToken();
@@ -141,14 +149,19 @@ Future<ServedPlace> startServe(
     InternetAddress.loopbackIPv4,
     options.port,
   );
-  final endpoint = ProcessEndpoint(port: server.port, token: token, pid: pid);
+  final endpoint = ProcessEndpoint(
+    port: server.port,
+    token: token,
+    pid: pid,
+    launchId: options.launchId,
+  );
   final host = PlaceHost(
     service: service,
     token: token,
     grace: options.grace,
     firstLinkGrace: options.firstLinkGrace,
     logger: logger,
-    checkFacts: () async => (await check.checkFacts()).merge(extraFacts),
+    checkFacts: facts == null ? null : () async => PlaceFacts(await facts()),
   );
 
   server.listen((request) async {
@@ -196,7 +209,7 @@ Future<ServedPlace> startServe(
 Future<int> serve(
   Invoker service,
   List<String> args, {
-  Map<String, Object?> extraFacts = const {},
+  FactsCheck? facts,
   Logger? logger,
 }) async {
   final ServeOptions options;
@@ -209,7 +222,7 @@ Future<int> serve(
   final served = await startServe(
     service,
     options: options,
-    extraFacts: extraFacts,
+    facts: facts,
     logger: logger,
   );
   stdout.writeln(served.endpoint.encode());

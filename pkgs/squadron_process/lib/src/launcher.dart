@@ -6,6 +6,7 @@ class ProcessEndpoint {
     required this.port,
     required this.token,
     this.pid,
+    this.launchId,
     this.host = '127.0.0.1',
   });
 
@@ -13,6 +14,9 @@ class ProcessEndpoint {
   final int port;
   final String token;
   final int? pid;
+
+  /// The `--launch-id` the host was started with, if any.
+  final String? launchId;
 
   Uri get uri => Uri(scheme: 'ws', host: host, port: port, path: '/squadron');
 
@@ -24,6 +28,7 @@ class ProcessEndpoint {
     'port': port,
     'token': token,
     if (pid != null) 'pid': pid,
+    if (launchId != null) 'launch_id': launchId,
   };
 
   String encode() => jsonEncode(toJson());
@@ -40,6 +45,7 @@ class ProcessEndpoint {
         port: port,
         token: token,
         pid: m['pid'] as int?,
+        launchId: m['launch_id'] as String?,
       );
     } catch (_) {
       return null;
@@ -64,6 +70,13 @@ class ProcessCommand {
   final Map<String, String> environment;
   final String? workingDirectory;
 
+  ProcessCommand withArguments(List<String> arguments) => ProcessCommand(
+    executable,
+    arguments: arguments,
+    environment: environment,
+    workingDirectory: workingDirectory,
+  );
+
   @override
   String toString() => '$executable ${arguments.join(' ')}';
 }
@@ -79,22 +92,23 @@ abstract interface class LaunchedProcess {
   Future<int> get exitCode;
 }
 
-/// Starts place hosts. squadron_process does not know how a platform starts
-/// processes; each platform supplies one of these:
+/// Starts place hosts. Implementations are siblings, one per way of starting
+/// a process; `package:squadron_process/io.dart` has a plain one
+/// (`IoProcessLauncher`) and one per OS elevation front-end
+/// (`ElevatedLauncher`). An embedding with its own way of starting processes
+/// (a privileged helper, a remote shell, a sandbox broker) implements this
+/// interface; docs/launchers.md says what it must do.
 ///
-/// - desktop and tests: `IoProcessLauncher` (`package:squadron_process/io.dart`);
-/// - WebUI: an adapter over flutter-webui's root channel, wired in by the
-///   `p0g_app` brick (see docs/webui-launch.md for what it must provide).
-///
-/// The process must be started detached: it has to outlive the caller's link
-/// (a page reload, a manager closing its shell) and stop only by the lifetime
-/// rule.
+/// The process must be started detached: it has to outlive the client's link
+/// (a client restart, the launcher's own shell going away) and stop only by
+/// the host's lifetime rule.
 abstract interface class ProcessLauncher {
   Future<LaunchedProcess> launch(ProcessCommand command);
 }
 
-/// Finds a host that is already running, so a reloaded page reattaches to the
-/// same process instead of starting another one. Reads what the host wrote to
+/// Finds a host that is already running, so a restarted client reattaches to
+/// the same process instead of starting another one, and so a launcher that
+/// cannot see the host's stdout can still find it. Reads what the host wrote to
 /// its session file (`serve --session-file`).
 abstract interface class EndpointStore {
   /// The last endpoint the host published, or null if there is none.

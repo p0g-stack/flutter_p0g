@@ -59,7 +59,7 @@ void main() {
           sessionFile: session,
           grace: const Duration(milliseconds: 200),
         ),
-        extraFacts: {'test.extra': true},
+        facts: () async => {'test.extra': true, 'pid': pid},
       );
 
       final stored = await FileEndpointStore(session).read();
@@ -73,7 +73,7 @@ void main() {
       expect(await w.count(3).toList(), [0, 1, 2]);
       final facts = await place.facts();
       expect(facts.has('test.extra'), isTrue);
-      expect(facts[Fact.processSpawn], isA<bool>());
+      expect(facts['pid'], pid);
 
       // Not a WebSocket upgrade on the right path: 404.
       final http = HttpClient();

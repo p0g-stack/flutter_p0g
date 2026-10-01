@@ -17,6 +17,8 @@ class FakeLauncher implements ProcessLauncher {
   final commands = <ProcessCommand>[];
   int _nextPort = 4000;
   bool silent = false;
+  bool stdoutVisible = true;
+  final endpoints = <ProcessEndpoint>[];
 
   @override
   Future<LaunchedProcess> launch(ProcessCommand command) async {
@@ -26,13 +28,18 @@ class FakeLauncher implements ProcessLauncher {
     hosts[port] = PlaceHost(
       service: EchoWorker(),
       token: token,
-      checkFacts: () async => PlaceFacts({Fact.root: true, 'port': port}),
+      checkFacts: () async => PlaceFacts({'root': true, 'port': port}),
+    );
+    final launchId = command.arguments.last;
+    endpoints.add(
+      ProcessEndpoint(port: port, token: token, pid: port, launchId: launchId),
     );
     final lines = StreamController<String>();
-    if (!silent) {
+    if (!silent && stdoutVisible) {
       lines.add('some log line before the ready line');
-      lines.add(ProcessEndpoint(port: port, token: token, pid: port).encode());
+      lines.add(endpoints.last.encode());
     }
+    if (!stdoutVisible) lines.close();
     return _Launched(port, lines.stream);
   }
 
@@ -73,7 +80,7 @@ class FakeStore implements EndpointStore {
 void main() {
   late FakeLauncher launcher;
   late FakeStore store;
-  const command = ProcessCommand('/data/adb/modules/demo/bin/demo');
+  const command = ProcessCommand('/opt/demo/bin/demo');
 
   setUp(() {
     launcher = FakeLauncher();
@@ -93,7 +100,11 @@ void main() {
     final p = place();
     final w = p.bind(EchoWorker());
     expect(await w.echo(42), 42);
-    expect(launcher.commands, [command]);
+    expect(launcher.commands.single.arguments, [
+      'serve',
+      '--launch-id',
+      launcher.endpoints.single.launchId,
+    ]);
     expect(p.endpoint!.port, 4000);
     expect((await p.facts())['port'], 4000);
     w.stop();
@@ -160,9 +171,40 @@ void main() {
     w.stop();
   });
 
+  test(
+    'without stdout (an elevation prompt) the host is found in the store',
+    () async {
+      launcher.stdoutVisible = false;
+      // An older host's entry is still there; it must not be taken.
+      store.endpoint = const ProcessEndpoint(
+        port: 9,
+        token: 'old',
+        launchId: 'older',
+      );
+      final p = ProcessPlace(
+        launcher: launcher,
+        command: command,
+        store: store,
+        connector: launcher.connect,
+        storePollInterval: const Duration(milliseconds: 20),
+      );
+      final w = p.bind(EchoWorker());
+      // The stale entry fails to connect, so the place launches; the new host
+      // publishes its endpoint shortly after.
+      Timer(
+        const Duration(milliseconds: 100),
+        () => store.endpoint = launcher.endpoints.last,
+      );
+      expect(await w.echo('elevated'), 'elevated');
+      expect(p.endpoint!.launchId, launcher.endpoints.last.launchId);
+      w.stop();
+    },
+  );
+
   test('ready lines parse; anything else is ignored', () {
-    final e = ProcessEndpoint(port: 1234, token: 'abc', pid: 7);
+    final e = ProcessEndpoint(port: 1234, token: 'abc', pid: 7, launchId: 'L');
     final parsed = ProcessEndpoint.tryParse(e.encode())!;
+    expect(parsed.launchId, 'L');
     expect(parsed.port, 1234);
     expect(parsed.token, 'abc');
     expect(parsed.pid, 7);

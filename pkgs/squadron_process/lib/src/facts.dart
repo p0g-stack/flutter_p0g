@@ -1,45 +1,15 @@
 import 'package:meta/meta.dart';
 
-/// Keys of the facts a place reports. Additions are agreed in the contracts
-/// table (p0g-stack reshape summary) before they land here.
-abstract final class Fact {
-  /// The place runs with root (effective uid 0).
-  static const root = 'root';
-
-  /// The place can open block devices (partitions) for reading.
-  static const blockDevices = 'block_devices';
-
-  /// The place can reach USB devices through the OS (`/dev/bus/usb`).
-  static const usbNative = 'usb.native';
-
-  /// The place can reach USB devices through WebUSB (`navigator.usb`).
-  static const usbWeb = 'usb.web';
-
-  /// The place can start other processes.
-  static const processSpawn = 'process.spawn';
-
-  /// The place has storage that survives a restart of the place.
-  static const fsPersistent = 'fs.persistent';
-
-  /// The place has a network interface other than loopback that is up.
-  static const net = 'net';
-
-  static const all = [
-    root,
-    blockDevices,
-    usbNative,
-    usbWeb,
-    processSpawn,
-    fsPersistent,
-    net,
-  ];
-}
-
 /// What a place can do, as checked by the place itself.
 ///
-/// Facts come from the place, never from the platform: a WebUI page and the
-/// root process it started run on the same phone and report different facts.
-/// A key that is absent means "not checked", which reads as false.
+/// A neutral map: squadron_process defines no keys and makes no checks. The
+/// app supplies a [FactsCheck] to each place; the process place runs it in the
+/// host process and sends the result in the handshake, so a client and the
+/// process it started (say, an unprivileged UI and an elevated helper) report
+/// what each of them can really do. A key that is absent reads as false.
+/// Checks the facts of the place it runs in.
+typedef FactsCheck = Future<Map<String, Object?>> Function();
+
 @immutable
 class PlaceFacts {
   PlaceFacts(Map<String, Object?> values) : _values = Map.unmodifiable(values);

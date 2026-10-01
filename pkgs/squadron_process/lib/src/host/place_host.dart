@@ -18,8 +18,8 @@ import '../protocol.dart';
 /// exceptions are Squadron's, forwarded over the link.
 ///
 /// Lifetime: the host keeps running while at least one link is open, and for
-/// [grace] after the last one closes (a page reload on rotation reconnects
-/// within it). Work keeps running through that window; results for a link
+/// [grace] after the last one closes (a client that restarts, say a
+/// reloaded web page, reconnects within it). Work keeps running through that window; results for a link
 /// that went away are dropped. If no link returns in time, every running
 /// task is cancelled and [done] completes. A host nobody connects to at all
 /// gives up after [firstLinkGrace].

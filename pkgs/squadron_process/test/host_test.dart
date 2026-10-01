@@ -23,7 +23,7 @@ class Rig {
         token: token,
         grace: grace,
         firstLinkGrace: const Duration(seconds: 5),
-        checkFacts: () async => PlaceFacts({Fact.root: true}),
+        checkFacts: () async => PlaceFacts({'root': true}),
       );
 
   final PlaceHost host;
@@ -70,7 +70,7 @@ void main() {
 
   test('the handshake carries the facts of the host place', () async {
     final place = rig.place;
-    expect(await place.facts(), PlaceFacts({Fact.root: true}));
+    expect(await place.facts(), PlaceFacts({'root': true}));
     expect(place.kind, PlaceKind.process);
   });
 
