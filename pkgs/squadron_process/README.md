@@ -110,7 +110,10 @@ dart test -p chrome test/codec_test.dart test/facts_test.dart
 ```
 
 Until the patch is upstream, an app depending on squadron_process needs the
-same patched Squadron through `dependency_overrides`.
+same patched Squadron: `dart run squadron_process:squadron_patch` from its
+package or workspace root fetches it into `.dart_tool` and adds the
+`dependency_overrides` entry. How a CLI wires `serve`, its options and its
+output: [docs/serve.md](docs/serve.md).
 
 ## Scope
 
