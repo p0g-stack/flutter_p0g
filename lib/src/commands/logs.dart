@@ -15,8 +15,8 @@ const kAeraLog = '/tmp/recovery.log';
 /// it starts.
 @visibleForTesting
 String webuiLogScript(String moduleId, {int lines = 50}) {
-  final run = shellQuote('/data/adb/modules/$moduleId/webroot/.run');
-  return 'cd $run 2>/dev/null || { echo "no $moduleId/webroot/.run: open the module page first" >&2; '
+  final run = shellQuote('/data/adb/modules/$moduleId/flutter_webui/run');
+  return 'cd $run 2>/dev/null || { echo "no $moduleId/flutter_webui/run: open the module page first" >&2; '
       'exit 3; }; '
       r'set -- root.log $(ls -t proc/*.log 2>/dev/null | head -n 4); '
       'exec tail -n $lines -F "\$@"';

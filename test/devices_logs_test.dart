@@ -60,7 +60,7 @@ void main() {
 
   test('webuiLogScript follows root.log and the newest process logs', () {
     final s = webuiLogScript('counter');
-    expect(s, contains("cd '/data/adb/modules/counter/webroot/.run'"));
+    expect(s, contains("cd '/data/adb/modules/counter/flutter_webui/run'"));
     expect(s, contains('set -- root.log'));
     expect(s, endsWith(r'exec tail -n 50 -F "$@"'));
   });
