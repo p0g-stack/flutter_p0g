@@ -1,6 +1,7 @@
 @TestOn('linux || mac-os')
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_webui_client/flutter_webui_client.dart';
@@ -35,13 +36,19 @@ void main() {
     );
     await Process.run('chmod', ['+x', bin.path]);
 
+    // `root start` in-process: start the channel once and print its session.
+    Future<ExecResult> rootStart() async {
+      server ??= await RootChannelServer.start(
+        moduleDir: module,
+        runDir: Directory('${module.path}/flutter_webui/run'),
+        store: SessionStore(_MemoryConfig()),
+      );
+      return ExecResult(0, '${jsonEncode(server!.info.toJson())}\n', '');
+    }
+
     Future<RootChannel> connect() async => channel = await RootChannel.connect(
-      transport: IoChannelTransport(
-        File('${module.path}/webroot/.run/session.json'),
-        origin: managerOrigin,
-      ),
-      start: () async =>
-          server ??= await RootChannelServer.start(moduleDir: module),
+      transport: IoChannelTransport(origin: managerOrigin),
+      start: rootStart,
     );
 
     final place = webUiProcessPlace(
@@ -54,4 +61,18 @@ void main() {
     expect(await worker.hello('webui'), 'Hello, webui!');
     expect(await worker.count(2).toList(), [1, 2]);
   }, timeout: const Timeout(Duration(minutes: 3)));
+}
+
+/// tmp.config in memory, in place of `ksud module config`.
+final class _MemoryConfig implements ModuleConfig {
+  final _temp = <String, String>{};
+
+  @override
+  Future<String?> get(String key) async => _temp[key];
+
+  @override
+  Future<void> setTemp(String key, String value) async => _temp[key] = value;
+
+  @override
+  Future<void> deleteTemp(String key) async => _temp.remove(key);
 }

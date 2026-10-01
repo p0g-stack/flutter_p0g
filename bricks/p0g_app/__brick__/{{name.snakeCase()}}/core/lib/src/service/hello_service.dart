@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:squadron/squadron.dart';
 
 import '../facts/facts.dart';
+import '../log.dart';
 {{#rust}}import '../strategy/digest.dart';
 {{/rust}}import 'hello_service.activator.g.dart';
 
@@ -19,6 +20,11 @@ part 'hello_service.worker.g.dart';
 )
 base class HelloService {
   static final _log = Logger('service.hello');
+
+  /// Runs where the service runs: its logs reach the caller's sink.
+  HelloService() {
+    forwardLogs();
+  }
 
   @squadronMethod
   FutureOr<String> hello(String who) {

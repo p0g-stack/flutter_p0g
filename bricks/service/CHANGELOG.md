@@ -1,3 +1,8 @@
+# 0.4.0
+
+- Logs come back: the service's constructor calls `forwardLogs()`, and the
+  panel and `serve` wrap its worker in `withLogs(...)`. Needs p0g_app 0.8.0.
+
 # 0.3.0
 
 - README "Shaping the methods" and the service's doc comment: process-place

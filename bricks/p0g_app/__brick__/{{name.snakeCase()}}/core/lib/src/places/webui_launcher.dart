@@ -14,7 +14,8 @@ ProcessPlace webUiProcessPlace(
   required String app,
 }) {
   final root = RootChannelConnection(connect);
-  final session = '$moduleDir/webroot/.run/$app.place.json';
+  // Outside webroot/, which the manager serves: the file holds the token.
+  final session = '$moduleDir/run/$app.place.json';
   return ProcessPlace(
     launcher: WebUiLauncher(root),
     store: WebUiSessionStore(root, session),

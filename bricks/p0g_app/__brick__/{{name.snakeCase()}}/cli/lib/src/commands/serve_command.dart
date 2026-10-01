@@ -5,9 +5,10 @@ import 'package:squadron_process/io.dart';
 import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 
 /// The services this CLI hosts for the process place, by the name a client
-/// binds with. Each worker runs in its own isolate of this process.
+/// binds with. Each worker runs in its own isolate of this process; wrap it
+/// in [withLogs] so its logs reach this CLI's log.
 Map<String, Invoker> services() => {
-  'hello': HelloServiceWorker(),
+  'hello': withLogs(HelloServiceWorker()),
   // p0g:services (bricks insert services above this line)
 };
 

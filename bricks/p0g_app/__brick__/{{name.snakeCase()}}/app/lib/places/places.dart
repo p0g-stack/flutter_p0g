@@ -23,4 +23,10 @@ final class Places {
   /// The place of [kind] (`PlaceKind.process`, else the local one).
   Place forKind(String kind) =>
       (kind == PlaceKind.process ? process : null) ?? local;
+
+  /// Where work that must keep going runs: the process place when there is
+  /// one. A Web Worker lives in the page, and on WebUI the page stops: WebUI X
+  /// pauses its timers while hidden, and Next and WebUI X recreate it on
+  /// rotation. See docs/patterns/places.md in bricks.
+  Place get lasting => process ?? local;
 }

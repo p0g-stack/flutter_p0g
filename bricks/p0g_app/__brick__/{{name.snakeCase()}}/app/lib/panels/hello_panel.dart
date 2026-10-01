@@ -23,7 +23,7 @@ class HelloPanel extends StatefulWidget {
       kind: place.kind,
       facts: place.facts,
       connect: () => place.bind<HelloServiceWorker>(
-        HelloServiceWorker(),
+        withLogs(HelloServiceWorker()),
         service: 'hello',
       ),
     );

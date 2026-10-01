@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:squadron/squadron.dart';
 
+import '../log.dart';
 import '{{name.snakeCase()}}_service.activator.g.dart';
 
 part '{{name.snakeCase()}}_service.worker.g.dart';
@@ -19,6 +20,11 @@ part '{{name.snakeCase()}}_service.worker.g.dart';
 )
 base class {{name.pascalCase()}}Service {
   static final _log = Logger('service.{{name.snakeCase()}}');
+
+  /// Runs where the service runs: its logs reach the caller's sink.
+  {{name.pascalCase()}}Service() {
+    forwardLogs();
+  }
 
   /// An example method; replace it with the service's work. Decide how with
   /// an `Objective` (`mason make strategy`), never with the platform.

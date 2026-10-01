@@ -37,9 +37,8 @@ going in it.
    listening. The host prints its ready line first; everything after it is
    logs. stderr may be dropped or logged by the channel.
 3. **Read one small text file under the module's directory**, for the session
-   file below, or serve it to the page the way the channel serves its own
-   `webroot/.run/session.json`. Either works; reading through the channel
-   avoids exposing the token on the manager's HTTP origin.
+   file below. The file is outside `webroot/`, which the manager serves, so
+   its token never reaches the manager's HTTP origin.
 
 Nothing else: no job store, no restart policy, no knowledge of Squadron.
 
@@ -54,7 +53,7 @@ read the same name. One host serves all of the app's services;
 a client names the service when it binds a worker.
 
 ```
-<module>/bin/<app> serve --session-file <module>/webroot/.run/<app>.place.json
+<module>/bin/<app> serve --session-file <module>/run/<app>.place.json
                          --launch-id <id, appended by ProcessPlace>
                          [--port N] [--grace-ms N] [--first-link-grace-ms N]
 ```

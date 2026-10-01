@@ -20,7 +20,7 @@ class {{name.pascalCase()}}Panel extends StatefulWidget {
       kind: place.kind,
       facts: place.facts,
       connect: () => place.bind<{{name.pascalCase()}}ServiceWorker>(
-        {{name.pascalCase()}}ServiceWorker(),
+        withLogs({{name.pascalCase()}}ServiceWorker()),
         service: '{{name.snakeCase()}}',
       ),
     );

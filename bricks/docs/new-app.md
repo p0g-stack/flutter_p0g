@@ -61,7 +61,9 @@ is a worked example (on-device `dd` against host `fastboot fetch`).
 
 Keep service methods coarse. A call into the process place costs a few
 hundred microseconds, so give each call a whole job and stream progress (see
-the service brick's README).
+the service brick's README). Bind work that must keep going while the page
+is hidden or rotated to `places.lasting` (the process place) and never to a
+Web Worker ([patterns/places.md](patterns/places.md)).
 
 ## 3. Run it on a desktop
 

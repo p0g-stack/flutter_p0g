@@ -1,3 +1,24 @@
+# 0.8.0
+
+- flutter-webui bebb1ec (root channel 0.2.0): `root start` prints the
+  session and the channel keeps its state out of `webroot/`. The app's
+  process place follows: its session file moves from
+  `webroot/.run/<app>.place.json` to `<module>/run/<app>.place.json`, so the
+  token is no longer on the manager's HTTP origin. The CLI's launch test
+  starts the channel the new way.
+- Logs come back from services. A service's constructor calls
+  `forwardLogs()`, and callers wrap workers in `withLogs(...)` (the panels
+  and `serve` do). Records from a worker now reach the app's log, and those
+  from services in the CLI's `serve` reach the CLI's log, under their own
+  logger names. Carrying them from the process place to the page waits on
+  squadron_process.
+- `Places.lasting`: the process place when there is one. Work that must
+  keep going while the page is hidden or rotated goes there, never to a Web
+  Worker (docs/patterns/places.md).
+- docs/patterns/files.md in bricks: saving a file per target. On WebUI,
+  use `getSaveLocation` and then `WebUiRoot.writeFile` (or `dart:io` in the
+  process place), followed by `AppPlane.scanMedia`. Never `XFile.saveTo`.
+
 # 0.7.4
 
 - `rust` on the web: the `native` fact asks for the small JS glue
