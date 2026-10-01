@@ -11,8 +11,8 @@ import 'package:flutter_p0g/src/webui/app_plane.dart';
 import 'package:pointycastle/export.dart';
 import 'package:test/test.dart';
 
-/// A minimal compiled manifest: `<manifest package=...><application
-/// android:label=@0x7f010000><receiver android:name=.../></application></manifest>`.
+// A minimal compiled manifest: `<manifest package=...><application
+// android:label=@0x7f010000><receiver android:name=.../></application></manifest>`.
 Uint8List manifestXml(List<String> extra) {
   final strings = ['package', 'label', 'name', 'manifest', 'application', 'receiver', ...extra];
   int s(String v) => strings.indexOf(v);

@@ -96,6 +96,14 @@ Gaps are listed here, not hidden.
    and, per ABI, `flutter_webui/<abi>/{flutter_webui_root.aot,dartaotruntime}`
    (compiled as below). `customize.sh` gets a generated block making the
    tool's program directories executable.
+   The module's data folder is `/data/adb/<id>/` (the app's support,
+   documents, cache and temp directories). `customize.sh` gets a generated
+   block: a fresh install (no `/data/adb/modules/<id>` yet) removes a leftover
+   `/data/adb/<id>`, an update keeps it, and both set `webui.installed` in
+   KernelSU's `ksud module config` (KernelSU or KernelSU Next 3.0+; ksud clears
+   it on uninstall). `uninstall.sh` ends with the fixed line
+   `MODPATH=${0%/*}; rm -rf "/data/adb/${MODPATH##*/}"`, after the app's own
+   `webui/uninstall.sh` if it has one.
 8. With `webui_app_plane` in the build (a `*_webui` plugin brings it): the app
    plane, `webui_app_plane/termux-api`, `webui_app_plane/<abi>/webui_termux_api.aot`
    and the module's own copy of the webui-termux-api APK. The base release is

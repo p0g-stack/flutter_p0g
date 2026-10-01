@@ -45,7 +45,7 @@ void main() {
 
   group('assembleModule', () {
     final webui = {
-      'module.prop': b('id=c\nversion=v$kBuildNameVar\nversionCode=$kBuildNumberVar\n'),
+      'module.prop': b('id=demo\nversion=v$kBuildNameVar\nversionCode=$kBuildNumberVar\n'),
       'customize.sh': b('true\n'),
       'webroot/config.json': b('{"v":"$kBuildNameVar"}'),
     };
@@ -64,10 +64,23 @@ void main() {
       final byPath = {for (final f in files) f.path: utf8.decode(f.bytes)};
       expect(byPath['webroot/index.html'], 'web');
       expect(byPath['webroot/config.json'], '{"v":"2.0.0"}');
-      expect(byPath['module.prop'], 'id=c\nversion=v2.0.0\nversionCode=5\n');
+      expect(byPath['module.prop'], 'id=demo\nversion=v2.0.0\nversionCode=5\n');
       expect(byPath.containsKey('webroot/flutter_service_worker.js'), isFalse);
       expect(byPath['META-INF/com/google/android/updater-script'], '#MAGISK\n');
-      expect(byPath['customize.sh'], 'true\n');
+      expect(byPath['customize.sh'], startsWith('true\n# flutter_p0g: the data folder'));
+      expect(
+        byPath['customize.sh'],
+        contains('[ -d /data/adb/modules/demo ] || rm -rf /data/adb/demo\n'),
+      );
+      expect(
+        byPath['customize.sh'],
+        contains('KSU_MODULE=demo /data/adb/ksud module config set webui.installed 1 ||'),
+      );
+      expect(byPath['uninstall.sh'], endsWith('\n$kUninstallLine\n'));
+    });
+
+    test('an invalid module id is refused before it reaches a script', () {
+      expect(() => withDataFolder('', 'a b;rm'), throwsStateError);
     });
 
     test('extra files (the CLI) are executable in bin/', () {
@@ -83,6 +96,7 @@ void main() {
       final exec = {for (final f in files) f.path: f.executable};
       expect(exec['bin/app'], isTrue);
       expect(exec['customize.sh'], isTrue);
+      expect(exec['uninstall.sh'], isTrue);
       expect(exec['META-INF/com/google/android/update-binary'], isTrue);
       expect(exec['module.prop'], isFalse);
     });

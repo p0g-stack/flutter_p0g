@@ -72,6 +72,15 @@ List<ModuleFile> assembleModule({
     final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
     files['customize.sh'] = utf8.encode(withToolPerms(own, permDirs));
   }
+  final moduleId = files['module.prop'] == null
+      ? null
+      : readProp(utf8.decode(files['module.prop']!), 'id');
+  if (moduleId != null) {
+    final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
+    files['customize.sh'] = utf8.encode(withDataFolder(own, moduleId));
+    final ownUninstall = files['uninstall.sh'] == null ? '' : utf8.decode(files['uninstall.sh']!);
+    files['uninstall.sh'] = utf8.encode(withUninstall(ownUninstall));
+  }
   files['META-INF/com/google/android/update-binary'] = utf8.encode(kUpdateBinary);
   files['META-INF/com/google/android/updater-script'] = utf8.encode(kUpdaterScript);
   if (!files.containsKey('module.prop')) {
@@ -94,6 +103,43 @@ String withToolPerms(String customizeSh, List<String> dirs) {
   for (final d in dirs) {
     b.writeln('set_perm_recursive "\$MODPATH/$d" 0 0 0755 0755');
   }
+  return b.toString();
+}
+
+/// The persist.config key customize.sh sets on install (KernelSU's
+/// `ksud module config`, cleared by ksud on uninstall).
+const kInstallMarkerKey = 'webui.installed';
+
+/// [customizeSh] with the data folder's install step (app-plane-picture.md
+/// section 8): a fresh install (no `/data/adb/modules/<id>` yet) wipes a
+/// leftover `/data/adb/<id>`, an update keeps it; both set the install
+/// marker in persist.config.
+String withDataFolder(String customizeSh, String moduleId) {
+  if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9._-]+$').hasMatch(moduleId)) {
+    throw StateError('module.prop id "$moduleId" is not a valid module id');
+  }
+  final b = StringBuffer(customizeSh);
+  if (customizeSh.isNotEmpty && !customizeSh.endsWith('\n')) b.writeln();
+  b
+    ..writeln('# flutter_p0g: the data folder /data/adb/$moduleId (generated at build).')
+    ..writeln('[ -d /data/adb/modules/$moduleId ] || rm -rf /data/adb/$moduleId')
+    ..writeln(
+      'KSU_MODULE=$moduleId /data/adb/ksud module config set $kInstallMarkerKey 1 ||'
+      ' ui_print "! ksud module config failed: KernelSU 3.0+ or KernelSU Next 3.0+ is needed"',
+    );
+  return b.toString();
+}
+
+/// The fixed uninstall line: frees `/data/adb/<id>` after a final uninstall.
+const kUninstallLine = r'MODPATH=${0%/*}; rm -rf "/data/adb/${MODPATH##*/}"';
+
+/// [uninstallSh] (the app's own, if any) followed by [kUninstallLine].
+String withUninstall(String uninstallSh) {
+  final b = StringBuffer(uninstallSh.isEmpty ? '#!/system/bin/sh\n' : uninstallSh);
+  if (uninstallSh.isNotEmpty && !uninstallSh.endsWith('\n')) b.writeln();
+  b
+    ..writeln('# flutter_p0g: free the data folder (generated at build).')
+    ..writeln(kUninstallLine);
   return b.toString();
 }
 
