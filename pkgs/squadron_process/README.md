@@ -1,9 +1,8 @@
 # squadron_process
 
-> This repo was `surfaces`; it is being renamed to `squadron_process`. The old
-> Rust crates, transports, CLI, templates and design package are gone: their
-> jobs moved to Squadron, the Mason bricks (`bricks`), `flutterp0g_tool` and
-> app code.
+> Formerly `surfaces`. Its Rust crates, transports, CLI, templates and design
+> package are gone: their jobs moved to Squadron, the Mason bricks (`bricks`),
+> `flutter_p0g` and app code.
 
 An unofficial extension for [Squadron](https://pub.dev/packages/squadron) that
 adds a third place to run a worker. Squadron runs a service in an **isolate**
@@ -44,7 +43,7 @@ In: the process channel (client + serve host), launching (WebUI root channel,
 later `pkexec`), place facts, the Squadron patch.
 
 Out: strategies, logging conventions and app shape (bricks), building and
-packaging (`flutterp0g_tool`), Rust (frb, per app).
+packaging (`flutter_p0g`), Rust (frb, per app).
 
 ## License
 
