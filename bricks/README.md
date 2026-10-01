@@ -14,8 +14,31 @@ any Flutter app, the way `flutter create --platforms` does.
 | `service` | a Squadron service exposed to both the GUI and the CLI |
 | `strategy` | a strategy with `available(facts)` (e.g. on-device `dd` vs host `fastboot fetch`) |
 
-A new app: `mason make p0g_app`, then `flutter_p0g create .`, write the
-core, then `flutter_p0g build webui` / `aera`.
+A new app:
+
+```sh
+dart pub global activate mason_cli
+mason add p0g_app --git-url https://github.com/p0g-stack/bricks --git-path bricks/p0g_app
+mason make p0g_app
+cd <name> && bash tool/bootstrap.sh
+flutter_p0g create .     # webui/ and aera/
+```
+
+Then write the core, and `flutter_p0g build webui` / `aera`. Each brick's
+README lists its variables; `bricks/<brick>/CHANGELOG.md` its versions.
+
+## Pins
+
+Flutter 3.47.5 (Dart 3.13), Squadron 7.4.4 with squadron_builder 9.3.2,
+flutter_rust_bridge 2.14.0-beta.2 (the base of flutter_p0g's frb patches),
+mason_cli 0.1.4.
+
+## CI
+
+`tool/ci.sh` generates every brick into a scratch folder, bootstraps it, and
+runs the generated workspace's analyzer, unit and widget tests, the CLI
+executable, and the web and Linux builds; the `rust` variant runs
+`cargo test`. No e2e. `.github/workflows/ci.yaml` runs it on every push.
 
 ## License
 

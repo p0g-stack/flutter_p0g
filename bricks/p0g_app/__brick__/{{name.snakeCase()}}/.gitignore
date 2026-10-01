@@ -1,0 +1,11 @@
+.dart_tool/
+build/
+pubspec_overrides.yaml
+# Squadron codegen output; tool/bootstrap.sh regenerates it.
+*.g.dart
+*.g.dart.js
+*.g.dart.js.deps
+*.g.dart.js.map
+app/web/workers/
+{{#rust}}rust/target/
+{{/rust}}

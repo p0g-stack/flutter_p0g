@@ -1,0 +1,13 @@
+[package]
+name = "{{name.snakeCase()}}_native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# Must match the Dart package version in core/pubspec.yaml. flutter_p0g
+# applies its frb patch series (single-threaded web) on top of this pin.
+flutter_rust_bridge = "=2.14.0-beta.2"

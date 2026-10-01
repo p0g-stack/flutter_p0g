@@ -1,0 +1,50 @@
+import 'package:args/command_runner.dart';
+import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
+import 'package:squadron_process/squadron_process.dart';
+
+import '../probe.dart';
+
+/// Hosts the app's Squadron services for the process place.
+///
+/// On WebUI the page starts this through flutter-webui's root channel, so the
+/// same services run as root next to the page. The process exits when the
+/// page link is gone for longer than the grace window: hidden keeps running,
+/// closed stops.
+class ServeCommand extends Command<int> {
+  ServeCommand() {
+    argParser
+      ..addOption('port', defaultsTo: '0', help: 'Port on 127.0.0.1; 0 picks one.')
+      ..addOption(
+        'grace',
+        defaultsTo: '10',
+        help: 'Seconds to wait for the page to come back.',
+      );
+  }
+
+  static final _log = Logger('cli.serve');
+
+  @override
+  String get name => 'serve';
+
+  @override
+  String get description => 'Host the services for the process place.';
+
+  @override
+  Future<int> run() async {
+    final facts = await probeFacts();
+    await serveProcess(
+      services: {
+        'hello': $HelloServiceInitializer,
+        // p0g:services (bricks insert services above this line)
+      },
+      facts: facts.toJson(),
+      port: int.parse(argResults!.option('port')!),
+      grace: Duration(seconds: int.parse(argResults!.option('grace')!)),
+      onListening: (endpoint) {
+        _log.info('serving at $endpoint with ${facts.present}');
+        print(endpoint);
+      },
+    );
+    return 0;
+  }
+}
