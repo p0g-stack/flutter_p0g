@@ -115,7 +115,7 @@ all have the root channel (APatch finds its module id from the build's
 
 | Method | All WebUI hosts | Browser tab |
 |---|---|---|
-| `openFile`, `openFiles` | stock web: `<input type=file>`; every manager implements `onShowFileChooser` | stock |
+| `openFile`, `openFiles` | with the module's app: Android's document picker (`DocumentOpen`, webui.5) copies into a hand-off folder, root moves the files to `/data/adb/<id>/tmp/open-<call>/`; `XFile` carries that root path, name, type, size. Without the app: stock `<input type=file>` (every manager implements `onShowFileChooser`) | stock |
 | `getDirectoryPath(s)`, `...WithOptions` | root listing picker (one directory) | stock (`null`) |
 | `getSaveLocation`, `getSavePath` | root listing picker plus a file name | stock (`''`) |
 
@@ -124,6 +124,13 @@ by `PickerState` over `ls -1ApL -- <dir>` as root (directories first; symlinks
 to directories count as directories). It starts at `initialDirectory` or
 `/storage/emulated/0` and walks up past unreadable directories. An unreachable
 root channel is `PlatformException(webui-root-unavailable)`.
+
+Opened files follow the rule that bytes never cross the WebView: the
+`XFile` path is a root path for the app's root process (or the root
+channel); `readAsBytes` in the page does not work for it. Type groups map to
+MIME types; a group with only extensions offers any file (Android's picker
+filters by type). The picker may stay open up to 30 min. Temp files are the
+app's to delete; the module's temp dir is also cleared each boot.
 
 Gaps: the returned paths are real root paths, so the app reads or writes them
 through its root process or the root channel; `XFile.saveTo` on web still

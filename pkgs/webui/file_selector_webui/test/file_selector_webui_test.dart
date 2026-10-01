@@ -1,6 +1,8 @@
 // Copyright 2026 The p0g-stack authors.
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+import 'dart:io';
+
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:file_selector_webui/src/directory_picker.dart';
 import 'package:file_selector_webui/src/file_selector_webui_impl.dart';
@@ -251,5 +253,116 @@ void main() {
         '/storage/emulated/0',
       );
     }
+  });
+
+  group('opening files through the app', () {
+    /// A fake with the app installed; DocumentOpen answers [answer].
+    FakeRootChannel withApp(String answer) => FakeRootChannel(
+      handler: (run) {
+        if (run.argv.contains('path')) {
+          return const FakeProcessResult(stdout: 'package:/x.apk');
+        }
+        if (run.argv.contains('DocumentOpen')) {
+          return FakeProcessResult(stdout: '$answer\n');
+        }
+        return const FakeProcessResult();
+      },
+    );
+
+    FileSelectorWebUiImpl selector(FakeRootChannel fake) =>
+        FileSelectorWebUiImpl(
+          stock: StockSelector(),
+          root: fake.root(),
+          dialog: ScriptedDialog((_) async => null),
+        );
+
+    test('picks into a hand-off folder, moves to module temp', () async {
+      final fake = withApp(
+        '[{"name":"a b.png","mime":"image/png","size":3,'
+        '"path":"/data/data/com.webui.api.demo/cache/handoff/x/a b.png"}]',
+      );
+      final file = await selector(fake).openFile(
+        acceptedTypeGroups: [
+          const XTypeGroup(mimeTypes: ['image/png', 'image/jpeg']),
+        ],
+      );
+      final call = fake.runs.firstWhere((r) => r.argv.contains('DocumentOpen'));
+      final dir = call.argv[call.argv.indexOf('dir') + 1];
+      expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+      expect(call.argv.sublist(4, 6), ['--wait', '1800']);
+      expect(call.argv.sublist(call.argv.indexOf('DocumentOpen')), [
+        'DocumentOpen',
+        '--es',
+        'dir',
+        dir,
+        '--esa',
+        'mime',
+        'image/png,image/jpeg',
+      ]);
+      final callId = dir.split('/').last;
+      expect(file!.path, '/data/adb/demo/tmp/open-$callId/a b.png');
+      expect(file.name, 'a b.png');
+      expect(file.mimeType, 'image/png');
+      // The hand-off folder goes after the move.
+      expect(fake.runs.last.argv, ['/system/bin/rm', '-rf', dir]);
+    });
+
+    test('openFiles allows several; cancel gives none', () async {
+      final fake = withApp('[]');
+      expect(await selector(fake).openFiles(), isEmpty);
+      final call = fake.runs.firstWhere((r) => r.argv.contains('DocumentOpen'));
+      expect(call.argv.last, 'true');
+      expect(call.argv, isNot(contains('mime')));
+    });
+
+    test('extension-only groups offer any file', () {
+      expect(
+        FileSelectorWebUiImpl.mimeTypes([
+          const XTypeGroup(mimeTypes: ['text/plain']),
+          const XTypeGroup(extensions: ['zip']),
+        ]),
+        isEmpty,
+      );
+    });
+
+    test('a failed copy is a PlatformException', () async {
+      final fake = withApp('{"error":"cannot open content://x"}');
+      await expectLater(
+        selector(fake).openFile(),
+        throwsA(
+          isA<PlatformException>().having(
+            (e) => e.message,
+            'message',
+            contains('cannot open'),
+          ),
+        ),
+      );
+    });
+
+    test('the move script works in a real sh', () async {
+      final fake = withApp(
+        '[{"name":"n.txt","mime":"text/plain","size":1,"path":"/p/n.txt"}]',
+      );
+      await selector(fake).openFile();
+      final move = fake.runs.lastWhere(
+        (r) => r.argv.length > 2 && r.argv[2].contains('mv '),
+      );
+      final tmp = await Directory.systemTemp.createTemp('open');
+      addTearDown(() => tmp.delete(recursive: true));
+      final src = Directory('${tmp.path}/handoff')..createSync();
+      File('${src.path}/n.txt').writeAsStringSync('x');
+      File('${src.path}/.hidden').writeAsStringSync('y');
+      final script = move.argv[2].replaceFirst('chown -R 0:0 "\$t"', 'true');
+      final r = await Process.run('sh', [
+        '-c',
+        script,
+        'sh',
+        src.path,
+        '${tmp.path}/t',
+      ]);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      expect(File('${tmp.path}/t/n.txt').readAsStringSync(), 'x');
+      expect(File('${tmp.path}/t/.hidden').existsSync(), isTrue);
+    }, testOn: 'linux');
   });
 }

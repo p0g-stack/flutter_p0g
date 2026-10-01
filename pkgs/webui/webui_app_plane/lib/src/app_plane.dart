@@ -181,22 +181,37 @@ final class AppHandoff {
     return '$dir/${safe.isEmpty || safe.startsWith('.') ? 'file$safe' : safe}';
   }
 
+  /// The shell script that creates [dir] for the app and, given a file,
+  /// writes stdin to it: owned by the app and labelled with its data dir's
+  /// SELinux context (categories included).
+  static const String _script =
+      r'set -e; d=$1; f=$2; a=${d%/cache/handoff/*}; h=$a/cache/handoff; '
+      r'mkdir -p "$d"; [ -z "$f" ] || cat > "$f"; '
+      r'o=$(stat -c %u:%g "$a"); chown "$o" "$a/cache"; chown -R "$o" "$h"; '
+      r'chmod 700 "$h" "$d"; [ -z "$f" ] || chmod 600 "$f"; '
+      // restorecon drops the app's MLS categories (devicelab, Android 15):
+      // copy the data dir's full context instead.
+      r'c=$(stat -c %C "$a" 2>/dev/null || ls -dZ "$a" | cut -d" " -f1); '
+      r'case "$c" in *:*) chcon "$c" "$a/cache"; chcon -R "$c" "$h" ;; esac';
+
+  /// Creates [dir], empty and owned by the app, for a method that writes
+  /// into it (DocumentOpen, CameraPhoto). Returns [dir].
+  Future<String> create() async {
+    final r = await _plane.root.sh(_script, args: [dir, '']);
+    if (!r.ok) {
+      throw AppPlaneException(
+        'failed',
+        'could not create $dir: ${r.errorText.trim()}',
+      );
+    }
+    return dir;
+  }
+
   /// Writes [bytes] to [name] in [dir], owned by the app and labelled with
   /// its data dir's SELinux context (categories included). Returns the path.
   Future<String> write(String name, List<int> bytes) async {
     final file = path(name);
-    final r = await _plane.root.sh(
-      r'set -e; d=$1; f=$2; a=${d%/cache/handoff/*}; h=$a/cache/handoff; '
-      r'mkdir -p "$d"; cat > "$f"; '
-      r'o=$(stat -c %u:%g "$a"); chown "$o" "$a/cache"; chown -R "$o" "$h"; '
-      r'chmod 700 "$h" "$d"; chmod 600 "$f"; '
-      // restorecon drops the app's MLS categories (devicelab, Android 15):
-      // copy the data dir's full context instead.
-      r'c=$(stat -c %C "$a" 2>/dev/null || ls -dZ "$a" | cut -d" " -f1); '
-      r'case "$c" in *:*) chcon "$c" "$a/cache"; chcon -R "$c" "$h" ;; esac',
-      args: [dir, file],
-      stdin: bytes,
-    );
+    final r = await _plane.root.sh(_script, args: [dir, file], stdin: bytes);
     if (!r.ok) {
       throw AppPlaneException(
         'failed',
