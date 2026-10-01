@@ -173,6 +173,9 @@ output: [doc/serve.md](doc/serve.md).
   `StandardMessageCodec`); custom types need Squadron marshalers.
 - The host trusts any local client that presents the token; there is no peer
   credential check.
+- The default link is a loopback WebSocket. Browsers with Local Network Access
+  may block it for pages from other origins; a custom `PlaceLink` is the way
+  around it ([doc/transport.md](doc/transport.md)).
 - Calls in flight when a link drops fail; they are not resumed on the next
   link, even when the host kept them running through its grace window.
 
