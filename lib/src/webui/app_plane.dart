@@ -12,9 +12,9 @@ import 'webui_packages.dart';
 /// all carry the same APK (proposals/app-plane-termux-api.md, "Overlay
 /// collisions"); bump it here only.
 const kAppPlaneRepo = 'https://github.com/p0g-stack/webui-termux-api';
-const kAppPlaneTag = 'webui-v0.53.0-webui.1';
-const kAppPlaneAsset = 'webui-termux-api_v0.53.0-webui.1.apk';
-const kAppPlaneSha256 = 'bd0d1153d1d12eef08d3539a7dcd5ec9fc45b96dfc48b55eb6b29d57bcd9537e';
+const kAppPlaneTag = 'webui-v0.53.0-webui.2';
+const kAppPlaneAsset = 'webui-termux-api_v0.53.0-webui.2.apk';
+const kAppPlaneSha256 = 'b6925a96aa7e8fdd919c22aa10a177bd72acac9524bfcc80e2708fc705b084e2';
 
 /// Where the module carries the APK: a non-privileged product app.
 const kAppPlaneApkPath = 'system/product/app/WebuiTermuxApi/WebuiTermuxApi.apk';
