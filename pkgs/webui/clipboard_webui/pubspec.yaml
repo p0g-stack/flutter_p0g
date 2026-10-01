@@ -1,0 +1,33 @@
+name: clipboard_webui
+description: Stock Flutter Clipboard on WebUI hosts. Keeps the browser clipboard where the WebView allows it and falls back to the module's app (webui-termux-api's Clipboard method), since WebView never lets a page read the clipboard.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    platforms:
+      web:
+        pluginClass: ClipboardWebUi
+        fileName: clipboard_webui.dart
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  flutter_webui:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      ref: 798548958306fb5baedf5c06a2f520c85448dba6
+      path: packages/flutter_webui
+  webui_app_plane:
+    path: ../webui_app_plane
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

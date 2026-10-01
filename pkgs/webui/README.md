@@ -31,6 +31,9 @@ with no route on the baseline is not shipped as a stub.
 | `dynamic_color_webui` | manager colours from `/internal/colors.css` |
 | `url_launcher_webui` | root channel: `am start` VIEW (no new app method needed) |
 | `path_provider_webui` | root channel: `/data/adb/<id>` state, shared storage dirs |
+| `shared_preferences_webui` | root channel: one value in KernelSU's module config |
+| `permission_handler_webui` | app plane `Permission` (Android's own dialog) |
+| `clipboard_webui` | browser clipboard, app plane `Clipboard` for reads WebView refuses (engine clipboard via flutter-webui) |
 
 ## Nest
 

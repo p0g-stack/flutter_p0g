@@ -3,7 +3,7 @@
 Each `*_webui` package takes the first route that works on every manager
 (README, "How a plugin is closed"). Host behaviour comes from
 `WebUiHost.detect` in `flutter_webui_client` (pinned at flutter-webui
-`3049dc9`), never a manager name. In a browser tab every package hands
+`7985489`), never a manager name. In a browser tab every package hands
 everything to the stock web implementation, so one web build serves both.
 
 **Nothing below is device-verified.** Routes are chosen from source reads;
@@ -171,6 +171,24 @@ install starts with an empty `/data/adb/<id>` (install marker
 `webui.installed` in module config), temp is cleared on the first start of
 each boot, uninstall.sh removes the folder. The paths are for the app's root
 process; the page cannot open them.
+
+### clipboard_webui
+
+Stock `Clipboard.setData` / `Clipboard.getData` go to the engine, not a
+plugin channel, so this package has no platform interface: on WebUI hosts
+it installs an engine clipboard through flutter-webui's
+`WebUiClipboard.use` (patch 0005's `setHostClipboard`). In a browser tab it
+does nothing.
+
+| Call | WebUI host with the app | No app | Browser tab |
+|---|---|---|---|
+| write | browser `writeText` (WebView grants it; flutter-webui falls back to `execCommand('copy')`), else the app's `Clipboard --ez set true` with the text on stdin | browser | stock |
+| read | browser `readText`, which WebView always refuses (flutter-webui docs/parity.md), so the app's `Clipboard`: on Android 10+ an invisible activity reads once focused (webui.6, waits up to 30 s); Android 12+ shows its "pasted" notice naming the module | `paste_fail`, as stock in Firefox | stock |
+
+User paste in a text field never needs this (the WebView's own menu
+pastes). Needs webui-termux-api webui.6 and the `WebUiClipboard` seam in
+flutter-webui. Open device checks: the read's activity on KernelSU, Next
+and WebUI X (focus, lifecycle blip on WX's `WX_ON_PAUSE`).
 
 ### permission_handler_webui
 
