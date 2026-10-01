@@ -1,0 +1,35 @@
+name: dynamic_color_webui
+description: WebUI implementation of dynamic_color. Answers the plugin's channel with a core palette built from the manager's Material You colours (/internal/colors.css), so DynamicColorBuilder themes a module page like the manager.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    implements: dynamic_color
+    platforms:
+      web:
+        pluginClass: DynamicColorWebUi
+        fileName: dynamic_color_webui.dart
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  flutter_webui_client:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      ref: 3049dc94adb1df919ccdab1ab305759601a772c3
+      path: packages/flutter_webui_client
+  material_color_utilities: ^0.13.0
+  web: ^1.1.0
+
+dev_dependencies:
+  dynamic_color: ^2.1.0
+  flutter_test:
+    sdk: flutter

@@ -183,3 +183,41 @@ jailbreak mode; devicelab `lab-results`
   listed) once the appop is granted; the file passed ShareAPI's own
   readability check as the app (devicelab
   `runs/20261001T111144Z-avd-ksu-kernelsu-demo-0.9-final-2-36852361631`).
+
+### dynamic_color_webui
+
+`dynamic_color` (2.1.0) has no web implementation and is not federated: it
+calls `OptionalMethodChannel('io.material.plugins/dynamic_color')` and treats
+`null` as "no dynamic colour". This package answers that channel on a WebUI
+host, so apps keep `DynamicColorBuilder` / `DynamicColorPlugin` unchanged.
+
+| Method | WebUI host with colours | Host without colours / browser tab |
+|---|---|---|
+| `getCorePalette` | 5 x 13 tones built from the host's `primary`, `secondary`, `tertiary`, `surfaceVariant` | `null` |
+| `getAccentColor` | the host's `primary` | `null` |
+
+Colours come from the page-side virtual stylesheet `/internal/colors.css`
+(`:root { --<role>: #rrggbb[aa]; }`, Compose ColorScheme role names), fetched
+once:
+- KernelSU (08a3b08, `SuFilePathHandler` + `MonetColorsProvider`): filled only
+  in its Monet colour modes or the Material UI mode, otherwise empty, so the
+  app keeps its own scheme.
+- WebUI X (ed569e1, `InternalPathHandler` + `WebColors`, also under
+  `/mmrl/`): always filled, `#rrggbbaa`.
+- APatch, KernelSU Next, KsuWebUIStandalone: not checked; a missing or empty
+  stylesheet answers `null`.
+
+Primary keeps its hue with chroma at least 48 (as Material's `CorePalette`);
+secondary and tertiary keep the host's own hue and chroma; neutrals use
+`surfaceVariant`'s hue with chroma 4 and 8. Missing roles fall back to
+`CorePalette.of(primary)`.
+
+Checked in headless Chromium with a stub `window.ksu` and a served
+`internal/colors.css`: `DynamicColorBuilder` got primary `#4a6800`; in a
+plain tab it got `null`. Not yet device-verified per manager.
+
+Note for apps: `dynamic_color` 2.1.0 hands back `package:material_ui`'s
+`ColorScheme`, not `package:flutter/material.dart`'s, so it cannot go straight
+into `ThemeData(colorScheme:)`; that is the stock package's API, unchanged
+here. Like the others, this package must be a direct dependency of the WebUI
+build (flutter_p0g adds it).

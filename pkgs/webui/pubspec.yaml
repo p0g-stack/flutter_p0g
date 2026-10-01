@@ -10,6 +10,7 @@ workspace:
   - packages/path_provider_webui
   - packages/url_launcher_webui
   - packages/share_plus_webui
+  - packages/dynamic_color_webui
 
 dev_dependencies:
   lints: ^6.0.0

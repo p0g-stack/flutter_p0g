@@ -28,6 +28,7 @@ with no route on the baseline is not shipped as a stub.
 | `webui_app_plane` | shared pieces: root commands, the `webui-termux-api` client (the socket pair and broadcast) and its pre-check, test fakes |
 | `file_selector_webui` | WebView chooser for files; root listing picker for directories and save locations |
 | `share_plus_webui` | app plane `Share` |
+| `dynamic_color_webui` | manager colours from `/internal/colors.css` |
 | `url_launcher_webui` | root channel: `am start` VIEW (no new app method needed) |
 | `path_provider_webui` | root channel: `/data/adb/<id>` state, shared storage dirs |
 
