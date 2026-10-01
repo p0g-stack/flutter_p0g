@@ -1,3 +1,8 @@
+# 0.6.3
+
+- flutter-webui 020ab92: Back at the root route works in WebUI X. The fix is
+  in the patched web SDK (flutter_p0g rebuilds it); no Dart change here.
+
 # 0.6.2
 
 - flutter-webui 9342a42: host detection survives a throwing
