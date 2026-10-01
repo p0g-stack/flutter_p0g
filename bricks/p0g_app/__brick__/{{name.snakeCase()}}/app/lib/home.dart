@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canLaunch = widget.places.hasProcess;
+    final canLaunch = widget.places.process != null;
     return Scaffold(
       appBar: AppBar(title: const Text('{{name.titleCase()}}')),
       body: ListView(

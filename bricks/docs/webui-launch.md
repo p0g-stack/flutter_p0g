@@ -47,10 +47,11 @@ Nothing else: no job store, no restart policy, no knowledge of Squadron.
 
 `bin/<app>` is a launcher flutter_p0g ships: it runs the CLI's AOT snapshot
 with `<abi>/dartaotruntime` and `exec`s, so the root channel's detached wrapper
-sees the host's own exit code. One host serves one service.
+sees the host's own exit code. One host serves all of the app's services;
+a client names the service when it binds a worker.
 
 ```
-<module>/bin/<app> serve <service> --session-file <module>/webroot/.run/<app>.<service>.place.json
+<module>/bin/<app> serve --session-file <module>/webroot/.run/<app>.place.json
                          --launch-id <id, appended by ProcessPlace>
                          [--port N] [--grace-ms N] [--first-link-grace-ms N]
 ```

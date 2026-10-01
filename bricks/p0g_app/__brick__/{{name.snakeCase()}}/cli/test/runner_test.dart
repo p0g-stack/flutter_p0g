@@ -11,8 +11,8 @@ void main() {
     expect(await AppRunner().run(['nope']), 64);
   });
 
-  test('serve needs a known service', () async {
-    expect(await AppRunner().run(['serve', 'nope']), 64);
+  test('serve rejects an unknown option', () async {
+    expect(await AppRunner().run(['serve', '--nope']), 64);
   });
 
   test('the CLI checks its own facts', () async {

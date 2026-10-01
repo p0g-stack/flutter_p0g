@@ -1,6 +1,6 @@
 # service
 
-Adds a Squadron service to a `p0g_app` workspace (0.2.0 or later). Run it in
+Adds a Squadron service to a `p0g_app` workspace (0.3.0 or later). Run it in
 the workspace root:
 
 ```sh

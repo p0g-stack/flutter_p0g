@@ -1,3 +1,17 @@
+# 0.3.0
+
+- squadron_process 52ee2f6: one `serve` process hosts every service by name
+  (`serve` takes the generated workers); workers bind with `service:`.
+- Patched Squadron through `dart run squadron_process:squadron_patch` in
+  bootstrap (writes the gitignored `pubspec_overrides.yaml`); `tool/squadron.sh`
+  and `.p0g/` are gone.
+- The WebUI launcher matches flutter_webui's `RootChannel` (29e692a) behind
+  `WebUiRoot`, set by the WebUI target's glue: depending on flutter_webui
+  directly breaks a stock `flutter build web` (it needs the patched engine).
+  A plain browser has no process place. Tests for the launcher and store.
+- Desktop session file under `$XDG_RUNTIME_DIR/<app>/` (else mkdtemp).
+- README and AGENTS.md: one app, one CLI; Rust only through frb inside it.
+
 # 0.2.0
 
 - Built on squadron_process (git, pinned) with the patched Squadron through

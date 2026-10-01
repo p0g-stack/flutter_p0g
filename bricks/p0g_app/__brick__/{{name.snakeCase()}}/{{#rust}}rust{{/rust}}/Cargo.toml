@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+# A library only: the app's Dart CLI is its one command line, and it calls
+# this crate through frb. Never add a [[bin]] target.
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 

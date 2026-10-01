@@ -4,7 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bash tool/squadron.sh
+# squadron_process needs Squadron with its channel-factory patch: resolve,
+# fetch the patched copy into .dart_tool and override to it, resolve again.
+flutter pub get
+(cd cli && dart run squadron_process:squadron_patch ..)
 flutter pub get
 (cd core && dart run build_runner build --delete-conflicting-outputs)
 

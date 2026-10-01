@@ -15,12 +15,13 @@ class {{name.pascalCase()}}Panel extends StatefulWidget {
   });
 
   static Widget inPlace(Places places, String kind) {
-    final place = places.forService(kind, '{{name.snakeCase()}}');
+    final place = places.forKind(kind);
     return {{name.pascalCase()}}Panel(
       kind: place.kind,
       facts: place.facts,
       connect: () => place.bind<{{name.pascalCase()}}ServiceWorker>(
         {{name.pascalCase()}}ServiceWorker(),
+        service: '{{name.snakeCase()}}',
       ),
     );
   }

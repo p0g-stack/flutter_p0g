@@ -44,7 +44,8 @@ echo "::group::p0g_app (rust)"
 make_app ci_rust true
 (
   cd "$out/ci_rust"
-  bash tool/squadron.sh
+  flutter pub get
+  (cd cli && dart run squadron_process:squadron_patch ..)
   flutter pub get
   (cd rust && cargo test)
 )

@@ -14,7 +14,7 @@ dependencies:
   squadron_process:
     git:
       url: https://github.com/p0g-stack/squadron_process
-      ref: daf4a21b5cfcefb40afafb14bcaa7bc41d079545
+      ref: 52ee2f66b0928dbcb2a33a39a04d9f7e72f697f8
   {{name.snakeCase()}}_core: any
 
 dev_dependencies:

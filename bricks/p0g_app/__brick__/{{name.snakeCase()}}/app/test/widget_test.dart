@@ -12,7 +12,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomePage(
-          places: Places(process: (_) => null),
+          places: Places(process: () => null),
           lines: LogLines(),
           panels: [
             (places, kind) => HelloPanel(
@@ -42,7 +42,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomePage(
-          places: Places(process: (_) => null),
+          places: Places(process: () => null),
           lines: LogLines(),
           panels: const [],
         ),

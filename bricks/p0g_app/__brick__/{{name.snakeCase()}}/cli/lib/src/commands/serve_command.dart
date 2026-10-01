@@ -4,19 +4,20 @@ import 'package:squadron/squadron.dart';
 import 'package:squadron_process/io.dart';
 import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 
-/// The services this CLI can host for the process place, by name.
-final Map<String, Worker Function()> services = {
-  'hello': HelloServiceWorker.new,
+/// The services this CLI hosts for the process place, by the name a client
+/// binds with. Each worker runs in its own isolate of this process.
+Map<String, Invoker> services() => {
+  'hello': HelloServiceWorker(),
   // p0g:services (bricks insert services above this line)
 };
 
-/// Hosts one of the app's Squadron services for the process place.
+/// Hosts the app's Squadron services for the process place.
 ///
-/// On WebUI the page starts
-/// `{{name.snakeCase()}} serve <service> --session-file ...` as root
-/// through flutter-webui's root channel; on a desktop, `IoProcessLauncher`
-/// starts it. The host prints its endpoint as the first stdout line, and exits once its last page link has been gone
-/// for the grace window: hidden keeps running, closed stops.
+/// On WebUI the page starts `{{name.snakeCase()}} serve --session-file ...`
+/// as root through flutter-webui's root channel; on a desktop,
+/// `IoProcessLauncher` starts it. The host prints its endpoint as the first
+/// stdout line, and exits once its last client link has been gone for the
+/// grace window: hidden keeps running, closed stops.
 class ServeCommand extends Command<int> {
   @override
   final ArgParser argParser = ArgParser.allowAnything();
@@ -26,18 +27,13 @@ class ServeCommand extends Command<int> {
 
   @override
   String get description =>
-      'Host a service for the process place: serve <service> '
-      '[--session-file F] [--port N] [--grace-ms N] [--first-link-grace-ms N]. '
-      'Services: ${services.keys.join(', ')}.';
+      'Host the services for the process place: serve [--session-file F] '
+      '[--port N] [--launch-id ID] [--grace-ms N] [--first-link-grace-ms N].';
 
   @override
   Future<int> run() async {
-    final args = argResults!.rest;
-    final create = args.isEmpty ? null : services[args.first];
-    if (create == null) {
-      usageException('serve needs one of: ${services.keys.join(', ')}');
-    }
-    Logger('cli.serve').info('serving ${args.first}');
-    return serve(create(), args.skip(1).toList(), facts: checkFacts);
+    final hosted = services();
+    Logger('cli.serve').info('serving ${hosted.keys.join(', ')}');
+    return serve(hosted, argResults!.rest, facts: checkFacts);
   }
 }

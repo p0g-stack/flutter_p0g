@@ -18,11 +18,14 @@ class HelloPanel extends StatefulWidget {
 
   /// The hello service's worker, bound to the picked place.
   static Widget inPlace(Places places, String kind) {
-    final place = places.forService(kind, 'hello');
+    final place = places.forKind(kind);
     return HelloPanel(
       kind: place.kind,
       facts: place.facts,
-      connect: () => place.bind<HelloServiceWorker>(HelloServiceWorker()),
+      connect: () => place.bind<HelloServiceWorker>(
+        HelloServiceWorker(),
+        service: 'hello',
+      ),
     );
   }
 

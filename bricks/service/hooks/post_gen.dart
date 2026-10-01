@@ -17,7 +17,7 @@ void run(HookContext context) {
   insertAtMarker(log, core, 'exports', "export 'src/service/${snake}_service.dart';");
   insertAtMarker(log, runner, 'imports', "import 'commands/${snake}_command.dart';");
   insertAtMarker(log, runner, 'commands', 'addCommand(${pascal}Command());');
-  insertAtMarker(log, serve, 'services', "'$snake': ${pascal}ServiceWorker.new,");
+  insertAtMarker(log, serve, 'services', "'$snake': ${pascal}ServiceWorker(),");
   insertAtMarker(log, panels, 'imports', "import '${snake}_panel.dart';");
   insertAtMarker(log, panels, 'panels', '${pascal}Panel.inPlace,');
   format(log, [

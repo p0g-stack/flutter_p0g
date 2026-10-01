@@ -5,6 +5,10 @@ Self-contained; no external base file.
 - Bricks are versioned; a change bumps the brick version with a changelog line.
 - `core/` never imports `package:flutter` (the CLI runs on the plain Dart VM),
   and never uses Flutter-only plugins.
+- One app, one CLI: the app's Dart `cli/`, compiled per OS and ABI, is its
+  only command-line interface. A Rust crate is used through frb inside that
+  CLI (and the app), never shipped as its own binary or CLI, so the shell
+  interface is ours everywhere. The `rust/` template stays a library crate.
 - Strategies decide with `available(facts)`, never `kIsWeb` / `Platform`.
 - Every call logs which strategy ran, in which place, with which facts.
 - `demo` is generated from `p0g_app`; CI regenerates it and diffs, so a brick
@@ -22,4 +26,4 @@ Self-contained; no external base file.
   and its contract (`docs/webui-launch.md`) are ours. Its API is used only in
   `cli/.../serve_command.dart`, `app/lib/places/` and
   `core/lib/src/facts/facts.dart`; keep that seam that small. Bump its pinned
-  commit in all three pubspecs and `tool/squadron.sh` together.
+  commit in all three pubspecs together.

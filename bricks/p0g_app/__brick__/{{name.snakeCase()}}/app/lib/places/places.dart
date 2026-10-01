@@ -6,28 +6,21 @@ import 'launch.dart';
 /// The places this run of the app can put a service in.
 ///
 /// Squadron's own place (an isolate, or a Web Worker on the web) is always
-/// there. The process place, the app's CLI in `serve` mode, is there when
-/// this platform has a launcher for it: `IoProcessLauncher` on a desktop
-/// (set `P0G_CLI` to the CLI executable), flutter-webui's root channel on
-/// WebUI. A process place hosts one service, so there is one per service.
+/// there. The process place, this app's CLI in `serve` mode hosting every
+/// service, is there when this platform can launch it: flutter-webui's root
+/// channel on WebUI, `IoProcessLauncher` on a desktop (with `P0G_CLI` naming
+/// the CLI). Choosing a launcher by platform is fine; what a place can do
+/// comes from its facts.
 final class Places {
-  Places({ProcessPlace? Function(String service)? process})
-    : _process = process ?? processPlaceFor;
-
-  final ProcessPlace? Function(String service) _process;
-  final _byService = <String, ProcessPlace?>{};
+  Places({ProcessPlace? Function() process = openProcessPlace})
+    : process = process();
 
   final Place local = localPlace;
 
-  /// Whether this platform can launch the process place at all.
-  bool get hasProcess => _process('') != null;
+  /// The process place, or null where this platform cannot launch one.
+  final ProcessPlace? process;
 
-  /// The process place for [service], or null where there is none.
-  ProcessPlace? process(String service) =>
-      _byService.putIfAbsent(service, () => _process(service));
-
-  /// The place of [kind] (`PlaceKind.process`, else the local one) for
-  /// [service].
-  Place forService(String kind, String service) =>
-      (kind == PlaceKind.process ? process(service) : null) ?? local;
+  /// The place of [kind] (`PlaceKind.process`, else the local one).
+  Place forKind(String kind) =>
+      (kind == PlaceKind.process ? process : null) ?? local;
 }

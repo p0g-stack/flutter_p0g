@@ -28,9 +28,13 @@ P0G_CLI=$PWD/build/{{name.snakeCase()}} flutter run -d linux -t app/lib/main.dar
 
 ## Conventions
 
+- **One CLI.** `cli/` is this app's only command line, compiled per OS and
+  ABI. Rust crates are used through frb inside it (and the app), never
+  shipped as a separate binary with its own CLI.
+
 - **Places.** A service is a Squadron service in `core/lib/src/service/`. It
   runs in Squadron's own place (an isolate, a Web Worker) or in the process
-  place: this app's CLI in `serve <service>` mode, through squadron_process,
+  place: this app's CLI in `serve` mode (hosting every service), through squadron_process,
   started by a launcher (`P0G_CLI` on a desktop, flutter-webui's root channel
   on WebUI). The app binds each worker to the place the user picked.
 - **Facts.** `core/lib/src/facts/` owns the fact keys and the checks that
@@ -54,5 +58,5 @@ P0G_CLI=$PWD/build/{{name.snakeCase()}} flutter run -d linux -t app/lib/main.dar
   `core/lib/src/rust/`. Bindings are sync (`default_dart_async: false`):
   Squadron owns threads, so a call runs inside whichever worker makes it.
 {{/rust}}- **Patched Squadron.** squadron_process needs Squadron with its
-  channel-factory patch; `tool/squadron.sh` builds it under `.p0g/` and
-  `pubspec_overrides.yaml` points pub at it, until flutter_p0g does this.
+  channel-factory patch; bootstrap runs `squadron_process:squadron_patch`,
+  which puts it under `.dart_tool/` and writes `pubspec_overrides.yaml`.
