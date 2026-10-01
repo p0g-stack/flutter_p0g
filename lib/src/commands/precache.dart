@@ -36,9 +36,11 @@ class PrecacheCommand extends FlutterCommand {
         defaultsTo: [kDefaultAbi],
         help: 'Device ABIs to fetch release kits for (x86_64 for emulators).',
       )
+      ..addFlag('aera', help: "flutter-aera's released runtime kit for --aera-mode.")
+      ..addOption('aera-mode', allowed: ['debug', 'profile', 'release'], defaultsTo: 'debug')
       ..addOption(
         'aera-kit',
-        help: 'Install a flutter-aera runtime kit .tar.gz (path or https URL).',
+        help: 'Install a flutter-aera runtime kit (.tar.xz or .tar.gz, path or https URL).',
       )
       ..addOption('aera-kit-sha256', help: 'Expected sha256 of the AERA kit archive.')
       ..addFlag('app-plane', help: 'The webui-termux-api APK (not released yet).');
@@ -68,6 +70,10 @@ class PrecacheCommand extends FlutterCommand {
     }
     if (stringArg('aera-kit') case final kit?) {
       await precacheAeraKit(kit, sha256Hex: stringArg('aera-kit-sha256'));
+    } else if (boolArg('aera')) {
+      await precacheAeraKit(
+        aeraKitUrl(globals.flutterVersion.frameworkVersion, stringArg('aera-mode')!),
+      );
     }
     if (boolArg('app-plane')) globals.printWarning('webui-termux-api: no release yet.');
     return FlutterCommandResult.success();

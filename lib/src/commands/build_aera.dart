@@ -57,7 +57,7 @@ class BuildAeraCommand extends BuildBundleCommand {
     if (!kit.isInstalled) {
       throwToolExit(
         'No AERA runtime kit for $target-$mode. '
-        'Run `flutter_p0g precache --aera-kit=<path or url>` with a flutter-aera kit.',
+        'Run `flutter_p0g precache --aera --aera-mode=$mode` (or --aera-kit=<path or url>).',
       );
     }
 

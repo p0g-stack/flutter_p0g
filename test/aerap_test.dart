@@ -124,26 +124,45 @@ void main() {
       return a;
     }
 
-    const base = {
-      'VERSION': 'abc',
-      'TARGET': 'linux-arm64',
-      'MODE': 'debug',
-      'payload/usr/bin/aera-plugin': 'x',
-    };
+    String meta({String mode = 'debug', String engine = 'abc'}) => jsonEncode({
+      'kit': 1,
+      'arch': 'arm64',
+      'mode': mode,
+      'flutter': '3.47.5',
+      'engine_revision': engine,
+    });
 
-    test(
-      'accepts a debug kit for this engine',
-      () => expect(validateAeraKit(kit(base), 'abc'), isNull),
-    );
-    test(
-      'rejects another engine',
-      () => expect(validateAeraKit(kit(base), 'def'), contains('engine')),
-    );
-    test('release needs the host gen_snapshot', () {
-      expect(validateAeraKit(kit({...base, 'MODE': 'release'}), 'abc'), contains('gen_snapshot'));
+    test('accepts the released debug kit layout', () {
+      final k = kit({'kit.json': meta(), 'usr/bin/aera-plugin': 'x'});
+      expect(validateAeraKit(k, 'abc'), isNull);
+      expect(kitTarget(k), 'linux-arm64');
+      expect(kitMode(k), 'debug');
+    });
+
+    test('rejects another engine', () {
       expect(
-        validateAeraKit(kit({...base, 'MODE': 'release', 'host/gen_snapshot': 'g'}), 'abc'),
-        isNull,
+        validateAeraKit(kit({'kit.json': meta(engine: 'def'), 'usr/bin/aera-plugin': 'x'}), 'abc'),
+        contains('engine'),
+      );
+    });
+
+    test('release needs the host gen_snapshot', () {
+      final base = {'kit.json': meta(mode: 'release'), 'usr/bin/aera-plugin': 'x'};
+      expect(validateAeraKit(kit(base), 'abc'), contains('gen_snapshot'));
+      expect(validateAeraKit(kit({...base, 'host/gen_snapshot': 'g'}), 'abc'), isNull);
+    });
+
+    test('kit.json and host/ stay out of the payload', () {
+      expect(isKitMetadata('kit.json'), isTrue);
+      expect(isKitMetadata('host/gen_snapshot'), isTrue);
+      expect(isKitMetadata('usr/lib/libc.so.6'), isFalse);
+    });
+
+    test('release URL', () {
+      expect(
+        aeraKitUrl('3.47.5', 'debug'),
+        'https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.47.5/'
+        'flutter-aera-kit-linux-arm64-debug-3.47.5.tar.xz',
       );
     });
   });

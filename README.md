@@ -46,7 +46,7 @@ Gaps are listed here, not hidden.
 |---|---|---|
 | `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json` with flutter-webui's `docs/hosts.md` settings) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
-| `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works with a kit; the arm64 kit isn't released yet |
+| `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works; debug against the released arm64 kit (kit-3.47.5) |
 | `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
 | `run` | dev loop with hot restart | stub: waits on flutter-webui's bootstrap |
 | `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits | works; the kit releases and `--app-plane` wait on CI |
@@ -113,9 +113,12 @@ AERA's runtime stream, xz-compressed with CRC32 and the ARM64 BCJ filter
 packer's fixed and computed fields. Output: `build/aera/<id>-<version>.aerap`
 and a copy of `plugin.json`.
 
-The kit (`precache --aera-kit=<path|url>`) is a `.tar.gz` with `VERSION`
-(engine revision, must match the pinned Flutter), `TARGET`, `MODE`,
-`payload/` and, for profile/release, `host/gen_snapshot`. Checked: a debug
+The kit is flutter-aera's release (`precache --aera [--aera-mode=debug]`
+fetches `kit-<flutter>/flutter-aera-kit-linux-arm64-<mode>-<flutter>.tar.xz`
+and checks its `.sha256`; `--aera-kit=<path|url>` installs another). Its
+`kit.json` must name the pinned engine revision and stays out of the
+payload, as does `host/gen_snapshot`, which profile and release kits need
+(only a debug kit is released so far). Checked: a debug
 `.aerap` of the counter app, built against a linux-x64 kit of the pinned
 debug engine, expands and runs in flutter-aera's `aera-host-sim` (taps
 count).

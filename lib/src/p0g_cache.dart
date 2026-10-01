@@ -55,9 +55,12 @@ String engineRevision() => globals.fs
     .trim();
 
 /// Decodes a `.tar.gz`, dropping the `./` prefix `tar -C dir .` writes.
-Archive decodeTarGz(List<int> bytes) {
+Archive decodeTarGz(List<int> bytes) => decodeTar(GZipDecoder().decodeBytes(bytes));
+
+/// Decodes a tar, dropping `./` prefixes and directory entries.
+Archive decodeTar(List<int> tar) {
   final archive = Archive();
-  for (final f in TarDecoder().decodeBytes(GZipDecoder().decodeBytes(bytes)).files) {
+  for (final f in TarDecoder().decodeBytes(tar).files) {
     if (!f.isFile) continue;
     final name = f.name.startsWith('./') ? f.name.substring(2) : f.name;
     archive.addFile(ArchiveFile(name, f.size, f.content)..mode = f.mode);
