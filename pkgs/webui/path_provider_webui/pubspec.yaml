@@ -1,0 +1,30 @@
+name: path_provider_webui
+description: WebUI implementation of path_provider. Root-side paths for a module (state under /data/adb/<id>, shared storage for documents and downloads), for the app's root process to use.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    implements: path_provider
+    platforms:
+      web:
+        pluginClass: PathProviderWebUi
+        fileName: path_provider_webui.dart
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  path_provider_platform_interface: ^2.1.3
+  webui_app_plane:
+    path: ../webui_app_plane
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

@@ -1,0 +1,26 @@
+name: webui_app_plane
+description: Shared pieces of the WebUI plugins. Root commands through the flutter-webui root channel, and the client for webui-termux-api (Termux:API repackaged) with its presence check.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+executables:
+  webui_termux_api:
+
+dependencies:
+  flutter_webui_client:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      ref: 3049dc94adb1df919ccdab1ab305759601a772c3
+      path: packages/flutter_webui_client
+  flutter_webui_root:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      ref: 3049dc94adb1df919ccdab1ab305759601a772c3
+      path: packages/flutter_webui_root
+
+dev_dependencies:
+  test: ^1.25.0

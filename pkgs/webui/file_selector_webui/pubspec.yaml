@@ -1,0 +1,37 @@
+name: file_selector_webui
+description: WebUI implementation of file_selector. Files open through the manager WebView's chooser (the stock web route); directories and save locations are picked from a root listing.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    implements: file_selector
+    platforms:
+      web:
+        pluginClass: FileSelectorWebUi
+        fileName: file_selector_webui.dart
+
+dependencies:
+  file_selector_platform_interface: ^2.7.0
+  file_selector_web: ^0.9.5
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  flutter_webui_client:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      ref: 3049dc94adb1df919ccdab1ab305759601a772c3
+      path: packages/flutter_webui_client
+  web: ^1.1.0
+  webui_app_plane:
+    path: ../webui_app_plane
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

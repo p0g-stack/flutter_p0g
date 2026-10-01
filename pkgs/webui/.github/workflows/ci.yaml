@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed packages
+      - run: dart analyze --fatal-infos packages
+      - name: webui_app_plane
+        run: dart test
+        working-directory: packages/webui_app_plane
+      - name: plugins
+        run: |
+          for p in file_selector path_provider url_launcher share_plus; do
+            (cd packages/${p}_webui && flutter test) || exit 1
+          done

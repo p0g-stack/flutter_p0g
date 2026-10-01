@@ -21,17 +21,17 @@ manager name.
 Which route each plugin uses, per host, lives in `docs/plugins.md`. A plugin
 with no route on the baseline is not shipped as a stub.
 
-## First packages (proposed)
+## Packages
 
 | Package | Closed by |
 |---|---|
-| `webui_app_plane` | shared Dart client for `webui-termux-api`: the socket pair and broadcast, about 100 lines |
-| `file_selector_webui` | WebView chooser; root listing when a real path is needed |
+| `webui_app_plane` | shared pieces: root commands, the `webui-termux-api` client (the socket pair and broadcast) and its pre-check, test fakes |
+| `file_selector_webui` | WebView chooser for files; root listing picker for directories and save locations |
 | `share_plus_webui` | app plane `Share` |
-| `url_launcher_webui` | app plane start activity *(new method)* |
-| `path_provider_webui` | root channel: module and state dirs |
+| `url_launcher_webui` | root channel: `am start` VIEW (no new app method needed) |
+| `path_provider_webui` | root channel: `/data/adb/<id>` state, shared storage dirs |
 
-## Nest (proposed)
+## Nest
 
 ```
 packages/<plugin>_webui/   one package per plugin, tests against flutter-webui fakes
@@ -41,11 +41,21 @@ docs/plugins.md            route per plugin per host
 
 A pub workspace; each package is versioned and published on its own.
 
-## Open
+## Registration
 
-- Registration order: a `*_webui` package and the stock `*_web` package both
-  register on web. Whether `*_webui` reliably registers last, or
-  `flutter_p0g` has to order the registrant, is unverified.
+Flutter registers one web implementation per plugin; a `*_webui` package
+replaces the stock one only as a **direct** dependency of the app (as a
+transitive one the build fails, or for share_plus the stock one wins). So
+`flutter_p0g`'s WebUI build adds the `*_webui` packages as direct
+dependencies; no registrant ordering is involved. Details in
+`docs/plugins.md`.
+
+## Tests
+
+`dart test` in `packages/webui_app_plane`, `flutter test` in each plugin.
+Unit tests only, against `webui_app_plane/testing.dart` (a fake root channel
+speaking the real protocol) and a fake Termux:API app on real abstract
+sockets; host claims come from devicelab.
 
 ## License
 

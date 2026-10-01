@@ -1,0 +1,27 @@
+#!/system/bin/sh
+# webui_app_plane: call one Termux:API method as root, like termux-api from
+# termux-api-package. Lives at <moddir>/webui_app_plane/termux-api.
+# Usage: sh termux-api [--package <pkg>] <Method> [am extras...]
+#   stdin goes to the method, its answer comes out on stdout.
+# Runs bin/webui_termux_api.dart (<abi>/webui_termux_api.aot) on the Dart
+# runtime flutter-webui ships in <moddir>/flutter_webui/<abi>/.
+# SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
+dir=${0%/*}
+case "$dir" in /*) ;; *) dir=$(cd "$dir" && pwd) ;; esac
+moddir=${dir%/*}
+
+case "$(uname -m)" in
+  aarch64 | arm64) abi=arm64-v8a ;;
+  x86_64) abi=x86_64 ;;
+  *) echo "webui_app_plane: unsupported CPU $(uname -m)" >&2; exit 1 ;;
+esac
+
+rt=$moddir/flutter_webui/$abi
+aot=$dir/$abi/webui_termux_api.aot
+# A linux (glibc) runtime ships its loader and libraries next to it; an
+# Android-built runtime runs directly (same rule as flutter_webui/root).
+for ld in "$rt"/ld-linux-*.so.*; do
+  [ -f "$ld" ] && exec "$ld" --library-path "$rt" "$rt/dartaotruntime" "$aot" "$@"
+done
+exec "$rt/dartaotruntime" "$aot" "$@"

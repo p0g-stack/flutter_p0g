@@ -1,0 +1,15 @@
+name: webui_packages_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+workspace:
+  - packages/webui_app_plane
+  - packages/file_selector_webui
+  - packages/path_provider_webui
+  - packages/url_launcher_webui
+  - packages/share_plus_webui
+
+dev_dependencies:
+  lints: ^6.0.0
