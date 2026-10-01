@@ -193,11 +193,18 @@ Future<void> requireAeraRecovery(Adb adb) async {
 /// Opens installed plugin [id] in AERA over its RPC channel (needs the
 /// Host API 3 patch series' `plugin` operation).
 Future<void> openAeraPlugin(Adb adb, String id) async {
-  final out = await adb.run([
-    'shell',
-    aeraRpcScript(aeraRpcRequest('plugin', {'action': 'open', 'id': id})),
-  ]);
-  final events = parseAeraRpcEvents(out ?? '');
+  final script = aeraRpcScript(aeraRpcRequest('plugin', {'action': 'open', 'id': id}));
+  // The script runs in a subshell and `echo` reports its exit code, apart
+  // from adb's own (older adbd drops the remote exit code).
+  final out = await adb.run(['shell', '($script); echo "rpc-exit:\$?"']) ?? '';
+  final code = RegExp(r'rpc-exit:(\d+)\s*$').firstMatch(out)?.group(1);
+  if (code == '$kAeraNotRunningExit') {
+    throwToolExit(
+      'AERA not running: no RPC pipe at $kAeraRpcIn. Start AERA in recovery, '
+      'then open $id from its Plugins screen or run this again.',
+    );
+  }
+  final events = parseAeraRpcEvents(out);
   events.logs.forEach(globals.printStatus);
   if (events.code != 0) {
     throwToolExit(

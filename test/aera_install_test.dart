@@ -144,4 +144,22 @@ void main() {
     expect(e.code, 0);
     expect(e.logs.single, contains('op:plugin'));
   });
+
+  test('aeraRpcScript writes nothing without the FIFO', () async {
+    final tmp = Directory.systemTemp.createTempSync('aera_rpc');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    final input = '${tmp.path}/aerain', output = '${tmp.path}/aeraout';
+    final script = aeraRpcScript(aeraRpcRequest('plugin', {'id': 'c'}))
+        .replaceAll(kAeraRpcIn, input)
+        .replaceAll(kAeraRpcOut, output);
+    final r = await Process.run('sh', ['-c', script]);
+    expect(r.exitCode, kAeraNotRunningExit);
+    expect(File(input).existsSync(), isFalse);
+
+    // A plain file where the pipe should be (left by an older flutter_p0g).
+    File(input).writeAsStringSync('stale');
+    final again = await Process.run('sh', ['-c', script]);
+    expect(again.exitCode, kAeraNotRunningExit);
+    expect(File(input).readAsStringSync(), 'stale');
+  });
 }

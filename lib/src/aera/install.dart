@@ -123,10 +123,15 @@ String aeraInstallScript({
 String aeraRpcRequest(String op, Map<String, Object?> args, {String id = 'flutter_p0g'}) =>
     jsonEncode({'v': 1, 'id': id, 'op': op, 'args': args});
 
+/// Exit code of [aeraRpcScript] when AERA's input FIFO is not there.
+const kAeraNotRunningExit = 66;
+
 /// Sends [request] and prints AERA's events until it closes the output.
 /// The input FIFO takes the request on EOF; AERA opens the output once it
-/// dispatches.
+/// dispatches. Without the FIFO (AERA not running) nothing is written: a
+/// redirect would leave a plain file where AERA makes its pipe.
 String aeraRpcScript(String request) =>
+    '[ -p $kAeraRpcIn ] || exit $kAeraNotRunningExit; '
     'printf %s ${shellQuote(request)} > $kAeraRpcIn && cat $kAeraRpcOut';
 
 /// The `result` code in AERA's RPC output, or null without one.
