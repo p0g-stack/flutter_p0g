@@ -15,10 +15,14 @@ jobs:
       - name: Patched Squadron
         run: tool/squadron.sh
       - run: dart pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart format --output=none --set-exit-if-changed lib test bin example
       - run: dart analyze --fatal-infos
       - name: VM
         run: dart test -p vm
+      - name: Example
+        run: dart run example/squadron_process_example.dart
+      - name: Publish dry run (patched Squadron)
+        run: dart pub publish --dry-run
       - name: Browser (dart2js, dart2wasm)
         run: |
           dart test -p chrome test/codec_test.dart test/facts_test.dart
