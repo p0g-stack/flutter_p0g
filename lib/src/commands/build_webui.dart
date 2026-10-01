@@ -11,6 +11,7 @@ import '../frb/frb.dart';
 import '../webui/cli_exe.dart';
 import '../webui/dart_android.dart';
 import '../webui/module.dart';
+import '../webui/workers.dart';
 
 /// `flutter build web` with WebUI defaults, then the module zip.
 ///
@@ -71,6 +72,9 @@ class BuildWebUiCommand extends BuildWebCommand {
     final Directory web = fs.directory(
       stringArg('output') ?? fs.path.join(app.path, getWebBuildDirectory()),
     );
+    final workers = findWorkers(app, wasm: boolArg(FlutterOptions.kWebWasmFlag));
+    await compileWorkers(workers, web, release: buildInfo.isRelease);
+
     final Directory out = app.childDirectory('build').childDirectory('webui');
     if (out.existsSync()) out.deleteSync(recursive: true);
     out.createSync(recursive: true);

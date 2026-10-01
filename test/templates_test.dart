@@ -45,11 +45,12 @@ void main() {
     );
   });
 
-  test('aera template is valid JSON with the app id', () {
-    final json = jsonDecode(
-      aeraTemplate(const AppInfo(id: 'c', name: 'C', description: ''))['plugin.json']!,
-    ) as Map;
-    expect(json['id'], 'c');
+  test('aera template carries only the app fields, with an AERA id', () {
+    final files = aeraTemplate(const AppInfo(id: 'my_app', name: 'C', description: ''));
+    final json = jsonDecode(files['plugin.json']!) as Map;
+    expect(json['id'], 'my-app');
     expect(json['version'], kBuildNameVar);
+    expect(json['permissions'], isEmpty);
+    expect(json.containsKey('schema'), isFalse);
   });
 }

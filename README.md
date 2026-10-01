@@ -40,10 +40,13 @@ flutter_p0g install --reboot  # adb + the device's ksud / apd / magisk
    fonts bundled; managers can't rely on a CDN) and no service worker.
 3. Prunes what a manager never loads: `*.symbols`, the service worker,
    `webparagraph/`, `wimp.*`, and Skwasm unless `--wasm`.
-4. If the app or its workspace root has `cli/` (the bricks layout): compiles it
+4. Squadron Web Workers: every generated `*.web.g.dart` in the app or its
+   workspace packages is compiled (`dart compile js`, `wasm` with `--wasm`)
+   to the `~/workers/...` path its activator loads, inside `webroot/`.
+5. If the app or its workspace root has `cli/` (the bricks layout): compiles it
    for the device into `bin/`, with the frb `.so` from `rust/` beside it.
    See "The root process" below.
-5. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
+6. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
    the build), Magisk's installer stub in `META-INF/`. `module.prop`'s
    `$(FLUTTER_BUILD_NAME)` and `$(FLUTTER_BUILD_NUMBER)` come from the pubspec
    version or `--build-name` / `--build-number`, as on iOS.
