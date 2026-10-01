@@ -113,6 +113,12 @@ Gaps are listed here, not hidden.
    in front of a leading digit), labels it with module.prop's `name`, and puts
    it at `system/product/app/WebuiApi_<seg>/WebuiApi_<seg>.apk`. So Android's
    permission dialog names the module, and grants and data are per module.
+   KernelSU 3.x mounts a module's `system/` only through a metamodule, so
+   `post-fs-data.sh` gets a generated step that mounts the app at
+   `/product/app/WebuiApi_<seg>` itself when the manager has not (Magisk's
+   "magic mount": a tmpfs of binds, rbound over /product/app, as devicelab
+   proved on the Android 15 AVD); `system/` stays in the zip for the managers
+   that mount it.
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
    - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
