@@ -135,6 +135,14 @@ on loopback a dropped link almost always means the host itself went away.
 One host serves any number of clients at once, each on its own link, with
 its own requests, cancellations and streams.
 
+## Logs
+
+Log records a service sends with Squadron's cross-worker logging reach the
+client worker's `channelLogger`, as they do from an isolate or a Web Worker.
+The host relays each record over the link (a `log` frame) to every client
+bound to that service, and still passes it to the hosted worker's own
+`channelLogger` if it has one. Set loggers before the workers start.
+
 ## Launchers
 
 `ProcessLauncher` implementations are siblings: `IoProcessLauncher` (the

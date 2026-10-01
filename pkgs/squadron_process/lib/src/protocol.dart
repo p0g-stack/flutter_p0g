@@ -14,7 +14,14 @@ import 'codec.dart';
 /// cancel   [2, tokenId, message?]    error    [13, id, exception]
 /// unlisten [3, id]                   item     [14, id, value]
 ///                                    end      [15, id]
+///                                    log      [16, level, message,
+///                                              timeUs, error?, stack?]
 /// ```
+///
+/// `log` relays a log record of the service the link is bound to (what
+/// Squadron's own channels deliver to a worker's `channelLogger`). `level` is
+/// package:logger's `Level.value`; `timeUs` is microseconds since the epoch.
+/// A client that does not know it ignores it.
 ///
 /// `exception` is `SquadronException.serialize()`, so a client's
 /// `ExceptionManager` rebuilds custom exceptions the same way it does for
@@ -33,6 +40,7 @@ abstract final class Msg {
   static const error = 13;
   static const item = 14;
   static const end = 15;
+  static const log = 16;
 
   static Uint8List encode(List message) => PlaceCodec.encode(message);
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cancelation_token/cancelation_token.dart';
+import 'package:logger/logger.dart';
 import 'package:squadron/squadron.dart';
 
 /// A hand-written Squadron service (what squadron_builder would generate),
@@ -11,6 +12,7 @@ class EchoService implements WorkerService {
   static const failCmd = 3;
   static const waitCmd = 4;
   static const bytesCmd = 5;
+  static const logCmd = 6;
 
   @override
   late final OperationsMap operations = OperationsMap({
@@ -19,7 +21,14 @@ class EchoService implements WorkerService {
     failCmd: (req) => throw WorkerException('failed: ${req.args[0]}'),
     waitCmd: (req) => _wait(req.cancelToken, req.args[0] as int),
     bytesCmd: (req) => (req.args[0] as List).length,
+    logCmd: (req) {
+      // Logged where the service runs; Squadron forwards it to the caller.
+      _log.w('${req.args[0]}', error: 'oops');
+      return true;
+    },
   });
+
+  final _log = Logger(filter: ProductionFilter(), output: MemoryOutput());
 
   Stream<int> _count(int n, int delayMs) async* {
     for (var i = 0; i < n; i++) {
@@ -54,6 +63,9 @@ class EchoWorker extends Worker {
       stream(EchoService.countCmd, args: [n, delayMs]);
 
   Future<dynamic> fail(String why) => send(EchoService.failCmd, args: [why]);
+
+  Future<dynamic> log(String message) =>
+      send(EchoService.logCmd, args: [message]);
 
   Future<dynamic> wait(int ms, {CancelationToken? token}) =>
       send(EchoService.waitCmd, args: [ms], token: token);

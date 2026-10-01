@@ -39,6 +39,17 @@ class PlaceHost {
     if (services.isEmpty) {
       throw ArgumentError.value(services, 'services', 'empty');
     }
+    // Relay each hosted worker's log records to its links. Set before the
+    // worker starts, since Squadron hands the logger to the channel on start.
+    for (final MapEntry(key: name, value: service) in services.entries) {
+      final Object worker = service;
+      if (worker is IWorker) {
+        worker.channelLogger = _RelayLogger(
+          worker.channelLogger,
+          (frame) => _relayLog(name, frame),
+        );
+      }
+    }
     _armIdle(firstLinkGrace);
   }
 
@@ -89,6 +100,13 @@ class PlaceHost {
       await l.link.close();
     }
     _done.complete();
+  }
+
+  /// Sends a log record of service [name] to every link bound to it.
+  void _relayLog(String name, List frame) {
+    for (final l in _links) {
+      if (l._serviceName == name) l._send(frame);
+    }
   }
 
   void _armIdle(Duration after) {
@@ -146,6 +164,7 @@ class _HostLink {
   bool _greeted = false;
   bool _helloSeen = false;
   late final Invoker _service;
+  String? _serviceName;
   bool _gone = false;
   Timer? _handshake;
 
@@ -282,6 +301,7 @@ class _HostLink {
       );
     }
     _service = service;
+    _serviceName = name is String ? name : host.services.keys.single;
     _greeted = true;
     _handshake?.cancel();
     host._linked(this);
@@ -359,4 +379,70 @@ class _HostLink {
     _sub.cancel();
     host._unlinked(this);
   }
+}
+
+/// Stands in as a hosted worker's `channelLogger`: records the worker's
+/// service sends (Squadron's cross-worker logging) go to the logger that was
+/// there before, if any, and out to the links bound to that service.
+class _RelayLogger extends Logger {
+  _RelayLogger(this._inner, this._relay)
+    : super(filter: _All(), printer: _Silent(), output: _Silent());
+
+  final Logger? _inner;
+  final void Function(List frame) _relay;
+
+  @override
+  void log(
+    Level level,
+    dynamic message, {
+    DateTime? time,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _inner?.log(
+      level,
+      message,
+      time: time,
+      error: error,
+      stackTrace: stackTrace,
+    );
+    _relay([
+      Msg.log,
+      level.value,
+      _stringify(message),
+      (time ?? DateTime.now()).microsecondsSinceEpoch,
+      error?.toString(),
+      stackTrace?.toString(),
+    ]);
+  }
+
+  static String _stringify(dynamic message) {
+    if (message is Function) {
+      try {
+        return '${message()}';
+      } catch (e) {
+        return 'Deferred message failed with error: $e';
+      }
+    }
+    return '$message';
+  }
+}
+
+class _All extends LogFilter {
+  @override
+  bool shouldLog(LogEvent event) => true;
+}
+
+class _Silent extends LogPrinter implements LogOutput {
+  @override
+  List<String> log(LogEvent event) => const [];
+
+  @override
+  void output(OutputEvent event) {}
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> destroy() async {}
 }

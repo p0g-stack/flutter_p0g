@@ -18,6 +18,9 @@
   it). `ProcessHandshake` and `ProcessChannel.fromHandshake(reconnect:)`.
 - The host refuses malformed or oversized hellos and survives malformed
   messages after the handshake; the client rejects a malformed welcome.
+- Service log records reach the client worker's `channelLogger` over the
+  process link (`log` frame), as from an isolate or Web Worker; the hosted
+  worker's own `channelLogger` still gets them.
 - Benchmark of isolate, Web Worker and process places on the VM and in
   Chromium (`benchmark/`, `tool/bench.sh`, doc/benchmark.md).
 - `squadron_patch` executable and the Squadron 7.4.4 channel-factory patch.

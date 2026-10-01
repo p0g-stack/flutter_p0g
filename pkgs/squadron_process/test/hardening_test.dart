@@ -127,9 +127,13 @@ void main() {
       (host.services.values.single as Worker).stop();
     });
 
+    /// The next answer, skipping relayed log records.
     Future<List> next() async {
-      expect(await answers.moveNext(), isTrue);
-      return Msg.decode(answers.current);
+      while (true) {
+        expect(await answers.moveNext(), isTrue);
+        final m = Msg.decode(answers.current);
+        if (m[0] != Msg.log) return m;
+      }
     }
 
     void send(List m) => link.send(Msg.encode(m));

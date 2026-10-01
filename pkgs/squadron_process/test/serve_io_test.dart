@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 
+import 'package:logger/logger.dart';
 import 'package:squadron/squadron.dart';
 import 'package:squadron_process/io.dart';
 import 'package:squadron_process/squadron_process.dart';
@@ -114,8 +115,15 @@ void main() {
       readyTimeout: const Duration(seconds: 120),
     );
 
-    final w = place.bind(EchoWorker());
+    final logs = <String>[];
+    final w = place.bind(
+      EchoWorker()..channelLogger = _Collect((m) => logs.add('$m')),
+    );
     expect(await w.echo('from another process'), 'from another process');
+    // A record logged in the host process's service isolate reaches us.
+    await w.log('logged in the host');
+    await Future.delayed(const Duration(milliseconds: 100));
+    expect(logs, contains('logged in the host'));
     expect(await w.count(5).toList(), [0, 1, 2, 3, 4]);
     await expectLater(w.fail('remote'), throwsA(isA<WorkerException>()));
     final facts = await place.facts();
@@ -136,4 +144,18 @@ void main() {
     );
     await dir.delete(recursive: true);
   }, timeout: const Timeout(Duration(minutes: 3)));
+}
+
+class _Collect extends Logger {
+  _Collect(this._add) : super(output: MemoryOutput());
+  final void Function(Object?) _add;
+
+  @override
+  void log(
+    Level level,
+    dynamic message, {
+    DateTime? time,
+    Object? error,
+    StackTrace? stackTrace,
+  }) => _add(message);
 }

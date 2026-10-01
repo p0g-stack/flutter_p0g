@@ -378,10 +378,44 @@ class ProcessChannel implements Channel {
         _streams[id]?.add(payload);
       case Msg.end:
         _streams.remove(id)?.close();
+      case Msg.log:
+        _onLog(m);
       default:
         logger?.w('Unexpected message from place host: ${m[0]}');
     }
   }
+
+  /// A log record of the service, relayed by the host: delivered to this
+  /// channel's [logger] the way Squadron's own channels deliver records from
+  /// an isolate or Web Worker.
+  void _onLog(List m) {
+    final logger = this.logger;
+    if (logger == null) return;
+    final value = m.length > 1 ? m[1] : null;
+    final time = m.length > 3 ? m[3] : null;
+    final error = m.length > 4 ? m[4] : null;
+    final stack = m.length > 5 ? m[5] : null;
+    logger.log(
+      _levels[value] ?? Level.info,
+      m.length > 2 ? m[2] : null,
+      time: time is int ? DateTime.fromMicrosecondsSinceEpoch(time) : null,
+      error: error,
+      stackTrace: stack is String ? StackTrace.fromString(stack) : null,
+    );
+  }
+
+  // Levels a record can carry (LogEvent rejects all, off and nothing).
+  static final _levels = {
+    for (final l in [
+      Level.trace,
+      Level.debug,
+      Level.info,
+      Level.warning,
+      Level.error,
+      Level.fatal,
+    ])
+      l.value: l,
+  };
 
   /// The current link is gone: fail what was in flight on it.
   void _lost(String reason) {
