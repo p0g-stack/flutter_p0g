@@ -26,14 +26,19 @@ jobs:
           gclient sync --jobs 8 --no-history
       - name: Build
         working-directory: dart/sdk
-        run: ./tools/build.py --no-rbe --mode release --arch arm64 --os android gen_snapshot dart_precompiled_runtime_product
+        run: ./tools/build.py --no-rbe --mode release --arch arm64 --os android gen_snapshot dartaotruntime
       - name: Pack
         working-directory: dart/sdk
         run: |
           out=out/ReleaseAndroidARM64
           mkdir kit
-          cp "$(find "$out" -path '*x64*' -name gen_snapshot -type f | head -1)" kit/gen_snapshot
-          cp "$out/dart_precompiled_runtime_product" kit/dartaotruntime
+          find "$out" -maxdepth 2 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
+          # Host gen_snapshot (x86-64 ELF) and the device runtime (aarch64 ELF).
+          gen=$(find "$out" -maxdepth 2 -type f -name 'gen_snapshot' -exec file {} \; | grep x86-64 | head -1 | cut -d: -f1)
+          rt=$(find "$out" -maxdepth 2 -type f \( -name 'dartaotruntime' -o -name 'dartaotruntime_product' -o -name 'dart_precompiled_runtime_product' \) -exec file {} \; | grep aarch64 | head -1 | cut -d: -f1)
+          test -n "$gen" && test -n "$rt"
+          cp "$gen" kit/gen_snapshot
+          cp "$rt" kit/dartaotruntime
           echo "${{ inputs.dart_version }}" > kit/VERSION
           file kit/gen_snapshot kit/dartaotruntime
           tar czf "dart-android-arm64-${{ inputs.dart_version }}.tar.gz" -C kit VERSION gen_snapshot dartaotruntime
