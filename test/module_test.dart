@@ -97,28 +97,6 @@ void main() {
       expect(isSigningSecret('webroot/keyboard.png'), isFalse);
     });
 
-    test('the app plane APK gets a post-fs-data mount step', () {
-      final files = assembleModule(
-        webBuild: const {},
-        webuiFolder: webui,
-        extra: {
-          'system/product/app/WebuiApi_demo/WebuiApi_demo.apk': [1],
-        },
-        buildName: '1',
-        buildNumber: '1',
-      );
-      final byPath = {for (final f in files) f.path: f};
-      final script = utf8.decode(byPath['post-fs-data.sh']!.bytes);
-      expect(byPath['post-fs-data.sh']!.executable, isTrue);
-      expect(script, contains(r'P=$(readlink -f /product/app)'));
-      expect(script, contains(r'if [ -d "$P/WebuiApi_demo" ]; then'));
-      expect(script, contains(r'mount -t tmpfs -o mode=755 tmpfs $T'));
-      expect(script, contains(r'mount -o rbind $T "$P"'));
-      expect(script, contains(r'L="$MODDIR/app_plane_mount.log"'));
-      expect(script, isNot(contains('overlay')));
-      expect(byPath.containsKey('system/product/app/WebuiApi_demo/WebuiApi_demo.apk'), isTrue);
-    });
-
     test('an invalid module id is refused before it reaches a script', () {
       expect(() => withDataFolder('', 'a b;rm'), throwsStateError);
     });

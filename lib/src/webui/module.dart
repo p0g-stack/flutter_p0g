@@ -84,15 +84,6 @@ List<ModuleFile> assembleModule({
     final ownUninstall = files['uninstall.sh'] == null ? '' : utf8.decode(files['uninstall.sh']!);
     files['uninstall.sh'] = utf8.encode(withUninstall(ownUninstall));
   }
-  final appDirs = {
-    for (final f in files.keys)
-      if (RegExp(r'^system/product/app/(WebuiApi_[A-Za-z0-9_]+)/').firstMatch(f) case final m?)
-        m[1]!,
-  };
-  for (final dir in appDirs) {
-    final own = files['post-fs-data.sh'] == null ? '' : utf8.decode(files['post-fs-data.sh']!);
-    files['post-fs-data.sh'] = utf8.encode(withAppPlaneMount(own, dir));
-  }
   files['META-INF/com/google/android/update-binary'] = utf8.encode(kUpdateBinary);
   files['META-INF/com/google/android/updater-script'] = utf8.encode(kUpdaterScript);
   if (!files.containsKey('module.prop')) {
@@ -150,49 +141,6 @@ String withDataFolder(String customizeSh, String moduleId) {
       'KSU_MODULE=$moduleId /data/adb/ksud module config set $kInstallMarkerKey 1 ||'
       ' ui_print "! ksud module config failed: KernelSU 3.0+ or KernelSU Next 3.0+ is needed"',
     );
-  return b.toString();
-}
-
-/// [postFsData] with a step that mounts the module's app at
-/// `/product/app/<dir>` when the manager has not: KernelSU 3.x mounts a
-/// module's `system/` only through a metamodule, and its release ships none.
-/// Magisk's "magic mount", as devicelab proved it on the Android 15 AVD
-/// (`checks/app_plane.sh`): a tmpfs holding binds of every entry already in
-/// /product/app plus ours, rbound over it, on /product/app's real path
-/// (`readlink -f`: /product can be a symlink into /system). Not overlayfs (EINVAL on
-/// /product/app there) and not a plain bind, which carries only the tmpfs and
-/// empties every product app (system_server crash-loops). The zip keeps
-/// `system/` for managers that mount it themselves.
-/// Where the generated post-fs-data step logs, in the module directory:
-/// tells "metamodule absent" from "mount failed" on a real device.
-const kAppPlaneMountLog = 'app_plane_mount.log';
-
-String withAppPlaneMount(String postFsData, String dir) {
-  final b = StringBuffer(postFsData.isEmpty ? '#!/system/bin/sh\n' : postFsData);
-  if (postFsData.isNotEmpty && !postFsData.endsWith('\n')) b.writeln();
-  final t = '/dev/p0g_${dir.toLowerCase()}';
-  b
-    ..writeln('# flutter_p0g: mount the app plane at /product/app/$dir unless the manager did')
-    ..writeln('# (generated at build). Errors go to \$MODDIR/$kAppPlaneMountLog.')
-    ..writeln('MODDIR=\${0%/*}; P=\$(readlink -f /product/app); L="\$MODDIR/$kAppPlaneMountLog"')
-    ..writeln('if [ -d "\$P/$dir" ]; then')
-    ..writeln('  echo "\$P/$dir present: mounted by the manager" >"\$L"')
-    ..writeln('else')
-    ..writeln('  A="\$MODDIR/system/product/app/$dir"; T=$t')
-    ..writeln('  echo "mounting \$A at \$P/$dir" >"\$L"')
-    ..writeln('  chcon -R u:object_r:system_file:s0 "\$MODDIR/system" 2>>"\$L"')
-    ..writeln('  # Source name plain "tmpfs": KernelSU unmounts "KSU" mounts for apps.')
-    ..writeln('  mkdir -p \$T && mount -t tmpfs -o mode=755 tmpfs \$T 2>>"\$L" &&')
-    ..writeln('    chcon u:object_r:system_file:s0 \$T 2>>"\$L"')
-    ..writeln('  for e in "\$P"/*; do')
-    ..writeln('    n=\${e##*/}; mkdir \$T/\$n; mount --bind "\$e" \$T/\$n 2>>"\$L"')
-    ..writeln('  done')
-    ..writeln('  mkdir \$T/$dir && mount --bind "\$A" \$T/$dir 2>>"\$L"')
-    ..writeln('  chcon u:object_r:system_file:s0 \$T/* 2>>"\$L"')
-    ..writeln('  # rbind: a plain bind carries only the tmpfs, not the binds inside it.')
-    ..writeln('  if mount -o rbind \$T "\$P" 2>>"\$L"; then echo "mounted" >>"\$L"')
-    ..writeln('  else echo "mount failed: \$?" >>"\$L"; fi')
-    ..writeln('fi');
   return b.toString();
 }
 
