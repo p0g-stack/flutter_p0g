@@ -50,7 +50,7 @@ void main() {
     expect(call.argv.sublist(1), [
       launcher,
       '--package',
-      'com.webui.termux.api',
+      'com.webui.api.demo',
       'Share',
       '--es',
       'action',
@@ -85,8 +85,8 @@ void main() {
     final write = fake.runs.firstWhere((r) => r.argv[1] == '-c');
     expect(write.argv.take(2), ['/system/bin/sh', '-c']);
     expect(write.shArgs, [
-      '/data/data/com.webui.termux.api/files/demo',
-      '/data/data/com.webui.termux.api/files/demo/pic.png',
+      '/data/data/com.webui.api.demo/files/demo',
+      '/data/data/com.webui.api.demo/files/demo/pic.png',
     ]);
     expect(write.stdin, [1, 2, 3]);
     expect(fake.runs.last.argv.sublist(4), [
@@ -96,7 +96,7 @@ void main() {
       'send',
       '--es',
       'file',
-      '/data/data/com.webui.termux.api/files/demo/pic.png',
+      '/data/data/com.webui.api.demo/files/demo/pic.png',
       '--es',
       'content-type',
       'image/png',
@@ -160,7 +160,7 @@ void main() {
     expect(fake.runs.single.argv, [
       '/system/bin/pm',
       'path',
-      'com.webui.termux.api',
+      'com.webui.api.demo',
     ]);
   });
 

@@ -41,8 +41,11 @@ registers the `Link` platform view).
 - `WebUiRoot`: the host plus root commands through the root channel
   (`run(argv, stdin)`, `sh(script, args)`; values are always argv, never
   spliced into a script).
-- `AppPlane`: webui-termux-api from the page. Pre-check `pm path
-  com.webui.termux.api` (once), which also runs `appops set
+- `AppPlane`: the module's own copy of webui-termux-api from the page,
+  renamed per module to `com.webui.api.<seg>` (`appPlanePackage`: the module
+  id with characters outside `[A-Za-z0-9_]` as `_`, `m` prefix before a digit;
+  webui-termux-api WEBUI.md, "Renaming per module"). Pre-check `pm path
+  <package>` (once), which also runs `appops set
   com.webui.termux.api SYSTEM_ALERT_WINDOW allow`: methods that open an
   activity from the broadcast (Share's chooser) are otherwise blocked as
   background activity starts on Android 10+ (devicelab: "Background activity
@@ -64,13 +67,13 @@ registers the `Link` platform view).
   without the app's MLS categories (devicelab, Android 15 AVD).
 - `scanMedia(paths)`: after the app writes a file to shared storage
   (`Download`, `Documents`, a path from the save picker), asks the media
-  provider to index it so it shows in Files and Gallery. With the app it is
-  Termux:API `MediaScanner` (`--esa paths`); without it, a root
-  `MEDIA_SCANNER_SCAN_FILE` broadcast per file. No `*_webui` package writes
+  provider to index it so it shows in Files and Gallery: a root
+  `MEDIA_SCANNER_SCAN_FILE` broadcast per file (devicelab, Android 15: indexed;
+  files written as root are not indexed on their own). The app's
+  `MediaScanner` method is gone since webui.3. No `*_webui` package writes
   to shared storage itself (`share_plus_webui` writes only into the app's
   private directory), so the app, or bricks' save flow, calls it after its
-  write. Not device-verified: whether MediaProvider indexes a file through
-  either route on Android 10 to 15.
+  write.
 - `testing.dart`: `FakeRootChannel` speaks the real v1 protocol to the real
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
@@ -88,7 +91,7 @@ When an app depends on `webui_app_plane` (directly or through a plugin):
 ```
 <moddir>/webui_app_plane/termux-api                     packages/webui_app_plane/module/termux-api
 <moddir>/webui_app_plane/<abi>/webui_termux_api.aot     AOT snapshot of bin/webui_termux_api.dart
-system/product/app/WebuiTermuxApi/WebuiTermuxApi.apk    the release APK above, pinned by sha256
+system/product/app/WebuiApi_<seg>/WebuiApi_<seg>.apk   the release APK above, renamed to the module's package and re-signed
 ```
 
 The launcher reuses flutter-webui's runtime in `<moddir>/flutter_webui/<abi>/`

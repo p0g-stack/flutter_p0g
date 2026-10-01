@@ -71,11 +71,11 @@ void main() {
         await plane.call('Toast', input: 'x'.codeUnits);
         expect(r.text, 'echo:hello');
         expect(fake.runs.map((r) => r.argv).toList(), [
-          ['/system/bin/pm', 'path', 'com.webui.termux.api'],
+          ['/system/bin/pm', 'path', 'com.webui.api.demo'],
           [
             '/system/bin/appops',
             'set',
-            'com.webui.termux.api',
+            'com.webui.api.demo',
             'SYSTEM_ALERT_WINDOW',
             'allow',
           ],
@@ -83,7 +83,7 @@ void main() {
             '/system/bin/sh',
             '/data/adb/modules/demo/webui_app_plane/termux-api',
             '--package',
-            'com.webui.termux.api',
+            'com.webui.api.demo',
             'Share',
             '--es',
             'action',
@@ -93,7 +93,7 @@ void main() {
             '/system/bin/sh',
             '/data/adb/modules/demo/webui_app_plane/termux-api',
             '--package',
-            'com.webui.termux.api',
+            'com.webui.api.demo',
             'Toast',
           ],
         ]);
@@ -149,9 +149,9 @@ void main() {
     test('writeAppFile writes into the app dir for the module', () async {
       final fake = FakeRootChannel();
       final path = await AppPlane(fake.root()).writeAppFile('a/b.png', [1, 2]);
-      expect(path, '/data/data/com.webui.termux.api/files/demo/a_b.png');
+      expect(path, '/data/data/com.webui.api.demo/files/demo/a_b.png');
       final run = fake.runs.single;
-      expect(run.shArgs, ['/data/data/com.webui.termux.api/files/demo', path]);
+      expect(run.shArgs, ['/data/data/com.webui.api.demo/files/demo', path]);
       expect(run.stdin, [1, 2]);
     });
 
@@ -182,27 +182,16 @@ void main() {
     }, testOn: 'linux');
   });
 
-  group('scanMedia', () {
-    test('uses the app MediaScanner with escaped commas', () async {
-      final fake = FakeRootChannel(
-        handler: (run) => run.argv.contains('path')
-            ? const FakeProcessResult(stdout: 'package:/x/base.apk\n')
-            : const FakeProcessResult(stdout: 'Finished scanning 2 file(s)'),
-      );
-      await AppPlane(fake.root()).scanMedia([
-        '/storage/emulated/0/Download/a,b.png',
-        '/storage/emulated/0/Download/c.txt',
-      ]);
-      expect(fake.runs.last.argv.sublist(4), [
-        'MediaScanner',
-        '--esa',
-        'paths',
-        r'/storage/emulated/0/Download/a\,b.png,'
-            '/storage/emulated/0/Download/c.txt',
-      ]);
-    });
+  test('the package is derived from the module id', () {
+    expect(appPlanePackage('demo'), 'com.webui.api.demo');
+    expect(appPlanePackage('my-mod.x'), 'com.webui.api.my_mod_x');
+    expect(appPlanePackage('2fa'), 'com.webui.api.m2fa');
+    expect(AppPlane(FakeRootChannel().root()).package, 'com.webui.api.demo');
+    expect(AppPlane(FakeRootChannel().root(), package: 'x.y').package, 'x.y');
+  });
 
-    test('without the app, broadcasts one scan per file as root', () async {
+  group('scanMedia', () {
+    test('broadcasts one scan per file as root, app or not', () async {
       final fake = FakeRootChannel(
         handler: (run) => run.argv.contains('path')
             ? const FakeProcessResult(exitCode: 1)
