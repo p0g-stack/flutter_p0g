@@ -49,10 +49,19 @@ jobs:
           out=out/${{ matrix.out }}
           find "$out" -maxdepth 3 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
           # Host gen_snapshot: an x86-64 ELF not linked for Android. Runtime:
-          # the ABI's ELF that is (interpreter /system/bin/linker64).
-          hosts=$(find "$out" -maxdepth 3 -type f -name gen_snapshot -exec file {} \; | grep -v 'Android\|linker64' | grep x86-64 || true)
-          gen=$( (echo "$hosts" | grep ', stripped'; echo "$hosts") | head -1 | cut -d: -f1)
-          rt=$(find "$out/exe.stripped" "$out" -maxdepth 1 -type f \( -name dartaotruntime -o -name dartaotruntime_product -o -name dart_precompiled_runtime_product \) -exec file {} \; | grep '${{ matrix.elf }}' | grep 'Android\|linker64' | head -1 | cut -d: -f1)
+          # the ABI's ELF that is (interpreter /system/bin/linker64). Match on
+          # `file -b`: the out/ paths themselves contain "Android". Stripped
+          # copies (exe.stripped/) are listed first.
+          gen= rt=
+          for f in $(find "$out" -maxdepth 3 -type f -name gen_snapshot | awk '{print !index($0, "exe.stripped"), $0}' | sort | cut -d' ' -f2-); do
+            d=$(file -b "$f")
+            case "$d" in *linker64*) ;; *x86-64*) [ -z "$gen" ] && gen=$f ;; esac
+          done
+          for f in $(find "$out" -maxdepth 2 -type f \( -name dartaotruntime -o -name dartaotruntime_product \) | awk '{print !index($0, "exe.stripped"), $0}' | sort | cut -d' ' -f2-); do
+            d=$(file -b "$f")
+            case "$d" in *linker64*'${{ matrix.elf }}'*|*'${{ matrix.elf }}'*linker64*) [ -z "$rt" ] && rt=$f ;; esac
+          done
+          echo "gen=$gen rt=$rt"
           test -n "$gen" && test -n "$rt"
           mkdir kit
           cp "$gen" kit/gen_snapshot
