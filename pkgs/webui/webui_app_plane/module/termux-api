@@ -17,6 +17,12 @@ case "$(uname -m)" in
   *) echo "webui_app_plane: unsupported CPU $(uname -m)" >&2; exit 1 ;;
 esac
 
+# Root shells can start with an empty environment and the Dart VM needs a
+# temp dir (devicelab); same choice as flutter_p0g's launcher.
+[ -n "$TMPDIR" ] || TMPDIR=$moddir/tmp
+export TMPDIR
+mkdir -p "$TMPDIR"
+
 rt=$moddir/flutter_webui/$abi
 aot=$dir/$abi/webui_termux_api.aot
 # A linux (glibc) runtime ships its loader and libraries next to it; an
