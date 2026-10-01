@@ -69,18 +69,32 @@ final class AppPlane {
   /// also reclaim.
   String get handoffRoot => '/data/data/$package/cache/handoff';
 
-  Future<void>? _swept;
-  int _handoffs = 0;
+  /// Packages whose leftover hand-offs this page already removed.
+  static final Map<String, Future<void>> _swept = {};
+
+  /// Forgets which packages were swept; for tests.
+  static void resetSweepsForTesting() => _swept.clear();
+  static int _handoffs = 0;
+
+  /// How old a hand-off folder must be before a sweep removes it. Share's
+  /// file is read by the target app after the call returns, so folders are
+  /// never removed while young.
+  static const int sweepAfterMinutes = 60;
 
   /// A fresh hand-off folder for one call (`<handoffRoot>/<call id>`).
   /// Methods that read or write a `file` extra run as the app's uid, so their
   /// files go here, never in module storage. Every call gets its own folder,
   /// so a call never sees another call's file and two calls never wipe each
-  /// other. The first hand-off of an [AppPlane] removes what earlier pages
-  /// left behind.
+  /// other. Once per page and package, folders older than
+  /// [sweepAfterMinutes] are removed (what earlier pages left behind).
   Future<AppHandoff> handoff() async {
-    await (_swept ??= root
-        .run(['/system/bin/rm', '-rf', handoffRoot])
+    await (_swept[package] ??= root
+        .sh(
+          r'[ -d "$1" ] || exit 0; '
+          r'find "$1" -mindepth 1 -maxdepth 1 -type d -mmin +$2 '
+          r'-exec rm -rf {} +',
+          args: [handoffRoot, '$sweepAfterMinutes'],
+        )
         .then((_) {}, onError: (Object _) {}));
     final id =
         '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
@@ -216,6 +230,25 @@ final class AppHandoff {
       throw AppPlaneException(
         'failed',
         'could not write $file: ${r.errorText.trim()}',
+      );
+    }
+    return file;
+  }
+
+  /// Copies the root-readable file at [source] into [dir] as [name], as
+  /// root, owned and labelled for the app. No bytes cross the page.
+  /// Returns the path.
+  Future<String> copyFrom(String source, String name) async {
+    final file = path(name);
+    final r = await _plane.root.sh(
+      r's=$1; c=$2; shift 2; [ -f "$s" ] || { echo "no file $s" >&2; exit 1; }; '
+      r'cat -- "$s" | /system/bin/sh -c "$c" sh "$@"',
+      args: [source, _script, dir, file],
+    );
+    if (!r.ok) {
+      throw AppPlaneException(
+        'failed',
+        'could not copy $source to $file: ${r.errorText.trim()}',
       );
     }
     return file;

@@ -74,6 +74,26 @@ final class WebUiRoot {
     List<String> args = const [],
     List<int>? stdin,
   }) => run(['/system/bin/sh', '-c', script, 'sh', ...args], stdin: stdin);
+
+  /// Writes [bytes] to [path] as root, creating its folder, replacing any
+  /// file there only once all bytes arrived. The page's side of a save:
+  /// stock `XFile.saveTo` downloads on web and no plugin can redirect it, so
+  /// an app saves page bytes to a `getSaveLocation` path with this (then
+  /// `AppPlane.scanMedia` for shared storage). Throws [RootChannelException]
+  /// (code `write-failed`) when the write fails.
+  Future<void> writeFile(String path, List<int> bytes) async {
+    final r = await sh(
+      r'mkdir -p -- "${1%/*}" && cat > "$1.part" && mv -f -- "$1.part" "$1"',
+      args: [path],
+      stdin: bytes,
+    );
+    if (!r.ok) {
+      throw RootChannelException(
+        'write-failed',
+        'could not write $path: ${r.errorText.trim()}',
+      );
+    }
+  }
 }
 
 /// Output of one root command.

@@ -61,16 +61,18 @@ final class SharePlusWebUiImpl extends SharePlatform {
       } else {
         final file = files.single;
         final names = params.fileNameOverrides;
-        final name = names != null && names.isNotEmpty
-            ? names.first
-            : file.name;
+        // An absolute path is a root path (file_selector_webui, the root
+        // process); anything else (blob:, data:, a bare name) is page data.
+        final rootPath = file.path.startsWith('/');
+        var name = names != null && names.isNotEmpty ? names.first : file.name;
+        if (name.isEmpty && rootPath) name = file.path.split('/').last;
+        if (name.isEmpty) name = 'shared';
         // The target app reads the file after Share returns, so the
-        // hand-off stays until the next page's first hand-off sweeps it.
+        // hand-off stays until a later page's sweep finds it old.
         final handoff = await plane.handoff();
-        final path = await handoff.write(
-          name.isEmpty ? 'shared' : name,
-          await file.readAsBytes(),
-        );
+        final path = rootPath
+            ? await handoff.copyFrom(file.path, name)
+            : await handoff.write(name, await file.readAsBytes());
         final type = file.mimeType;
         r = await plane.call(
           'Share',

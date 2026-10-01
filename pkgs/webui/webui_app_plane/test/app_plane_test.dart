@@ -36,6 +36,40 @@ void main() {
       ]);
     });
 
+    test('writeFile writes page bytes as root, whole or not at all', () async {
+      final fake = FakeRootChannel();
+      await fake.root().writeFile('/storage/emulated/0/Download/a.txt', [104]);
+      final run = fake.runs.single;
+      expect(run.shArgs, ['/storage/emulated/0/Download/a.txt']);
+      expect(run.stdin, [104]);
+      final tmp = await Directory.systemTemp.createTemp('save');
+      addTearDown(() => tmp.delete(recursive: true));
+      final target = '${tmp.path}/new dir/a.txt';
+      final p = await Process.start('sh', ['-c', run.argv[2], 'sh', target]);
+      p.stdin.add('saved'.codeUnits);
+      await p.stdin.close();
+      expect(await p.exitCode, 0);
+      expect(File(target).readAsStringSync(), 'saved');
+      expect(File('$target.part').existsSync(), isFalse);
+    }, testOn: 'linux');
+
+    test('a failed writeFile throws', () async {
+      final fake = FakeRootChannel(
+        handler: (_) =>
+            const FakeProcessResult(exitCode: 1, stderr: 'Read-only'),
+      );
+      await expectLater(
+        fake.root().writeFile('/system/x', [1]),
+        throwsA(
+          isA<RootChannelException>().having(
+            (e) => e.code,
+            'code',
+            'write-failed',
+          ),
+        ),
+      );
+    });
+
     test('a browser tab has no root', () {
       final fake = FakeRootChannel();
       final root = fake.root(FakeBridge.browser());
@@ -147,19 +181,21 @@ void main() {
     });
 
     test('each hand-off gets its own folder in the app cache', () async {
+      AppPlane.resetSweepsForTesting();
       final fake = FakeRootChannel();
       final plane = AppPlane(fake.root());
       final a = await plane.handoff();
       final b = await plane.handoff();
+      // A second plugin's plane on the same page does not sweep again.
+      await AppPlane(fake.root()).handoff();
       expect(a.dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
       expect(a.dir, isNot(b.dir));
-      // The first hand-off sweeps what earlier pages left, once.
-      expect(fake.runs.map((r) => r.argv).toList(), [
-        [
-          '/system/bin/rm',
-          '-rf',
-          '/data/data/com.webui.api.demo/cache/handoff',
-        ],
+      // The first hand-off sweeps old folders earlier pages left, once.
+      expect(fake.runs, hasLength(1));
+      expect(fake.runs.single.argv[2], contains('-mmin +'));
+      expect(fake.runs.single.shArgs, [
+        '/data/data/com.webui.api.demo/cache/handoff',
+        '60',
       ]);
       final path = await a.write('a/b.png', [1, 2]);
       expect(path, '${a.dir}/a_b.png');
@@ -198,6 +234,75 @@ void main() {
       expect(await p.exitCode, 0);
       expect(File('$other/keep').readAsStringSync(), 'another call');
       expect(File('$dir/new.txt').readAsStringSync(), 'fresh');
+    }, testOn: 'linux');
+
+    test('the sweep keeps young hand-offs and removes old ones', () async {
+      AppPlane.resetSweepsForTesting();
+      final fake = FakeRootChannel();
+      await AppPlane(fake.root()).handoff();
+      final tmp = await Directory.systemTemp.createTemp('sweep');
+      addTearDown(() => tmp.delete(recursive: true));
+      final young = Directory('${tmp.path}/young')..createSync();
+      File('${young.path}/f').createSync();
+      final old = Directory('${tmp.path}/old')..createSync();
+      final touch = await Process.run('touch', ['-d', '2 hours ago', old.path]);
+      expect(touch.exitCode, 0);
+      final r = await Process.run('sh', [
+        '-c',
+        fake.runs.single.argv[2],
+        'sh',
+        tmp.path,
+        '60',
+      ]);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      expect(young.existsSync(), isTrue);
+      expect(old.existsSync(), isFalse);
+      // A missing root is fine.
+      final none = await Process.run('sh', [
+        '-c',
+        fake.runs.single.argv[2],
+        'sh',
+        '${tmp.path}/none',
+        '60',
+      ]);
+      expect(none.exitCode, 0);
+    }, testOn: 'linux');
+
+    test('copyFrom copies a root path in without the page', () async {
+      final fake = FakeRootChannel();
+      final h = await AppPlane(fake.root()).handoff();
+      final path = await h.copyFrom('/data/adb/demo/tmp/a.png', 'a.png');
+      expect(path, '${h.dir}/a.png');
+      expect(fake.runs.last.stdin, isEmpty);
+      final tmp = await Directory.systemTemp.createTemp('copy');
+      addTearDown(() => tmp.delete(recursive: true));
+      final src = File('${tmp.path}/src.bin')..writeAsStringSync('bytes');
+      final dir = '${tmp.path}/data/data/pkg/cache/handoff/call1';
+      Directory('${tmp.path}/data/data/pkg/cache').createSync(recursive: true);
+      final args = [...fake.runs.last.shArgs];
+      // The host has no /system/bin/sh.
+      final script = fake.runs.last.argv[2].replaceAll('/system/bin/sh', 'sh');
+      final r = await Process.run('sh', [
+        '-c',
+        script,
+        'sh',
+        src.path,
+        args[1],
+        dir,
+        '$dir/a.png',
+      ]);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      expect(File('$dir/a.png').readAsStringSync(), 'bytes');
+      final missing = await Process.run('sh', [
+        '-c',
+        script,
+        'sh',
+        '${tmp.path}/nope',
+        args[1],
+        dir,
+        '$dir/b.png',
+      ]);
+      expect(missing.exitCode, isNot(0));
     }, testOn: 'linux');
   });
 

@@ -5,7 +5,6 @@ import 'dart:convert';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webui_client/flutter_webui_client.dart';
 import 'package:webui_app_plane/webui_app_plane.dart';
 
 import 'directory_picker.dart';

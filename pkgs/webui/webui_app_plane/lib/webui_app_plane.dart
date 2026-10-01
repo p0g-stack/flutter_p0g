@@ -7,5 +7,9 @@
 library;
 
 export 'src/app_plane.dart';
+
+export 'package:flutter_webui_client/flutter_webui_client.dart'
+    show RootChannelException;
+
 export 'src/root.dart';
 export 'src/termux_api_names.dart';

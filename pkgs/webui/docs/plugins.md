@@ -65,10 +65,12 @@ registers the `Link` platform view).
   `/data/data/<package>/cache/handoff/<call id>/`; `AppHandoff.write` puts a
   file there chowned to the app and `chcon`ed to the app data dir's full
   context (`restorecon` leaves `s0` without the app's MLS categories,
-  devicelab, Android 15 AVD), and `delete` removes the folder after the call.
-  Separate folders mean no stale picks and no two calls wiping each other.
-  The first hand-off of a page removes what earlier pages left; Android may
-  also reclaim the cache dir.
+  devicelab, Android 15 AVD), `copyFrom` does the same from a root path
+  (no bytes through the page), and `delete` removes the folder after the
+  call. Separate folders mean no stale picks and no two calls wiping each
+  other. Once per page and package (whichever plugin asks first), folders
+  older than 60 min are removed, so a Share target still reading its file
+  is never cut off; Android may also reclaim the cache dir.
 - `scanMedia(paths)`: after the app writes a file to shared storage
   (`Download`, `Documents`, a path from the save picker), asks the media
   provider to index it so it shows in Files and Gallery: a root
@@ -78,6 +80,14 @@ registers the `Link` platform view).
   to shared storage itself (`share_plus_webui` writes only into a hand-off
   folder), so the app, or bricks' save flow, calls it after its
   write.
+- `WebUiRoot.writeFile(path, bytes)`: writes page bytes to a path as root
+  (folder created, `<path>.part` then `mv`, so a failed write leaves no
+  half file); `RootChannelException(write-failed)` on failure. This is the
+  WebUI side of a save: stock `XFile.saveTo` lives in `cross_file`, not a
+  platform interface, so no plugin can redirect it and on web it only
+  downloads (no manager handles downloads). An app saves to a
+  `getSaveLocation` path with `writeFile` (or its root process), then
+  `scanMedia`.
 - `testing.dart`: `FakeRootChannel` speaks the real v1 protocol to the real
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
@@ -134,9 +144,10 @@ app's to delete; the module's temp dir is also cleared each boot.
 
 Gaps: the returned paths are real root paths, so the app reads or writes them
 through its root process or the root channel; `XFile.saveTo` on web still
-downloads, and no manager sets a WebView `DownloadListener` (source read), so
-saving bytes from the page needs the activity-results/save work, not this
-plugin. After writing to the returned path, call
+downloads, and no manager sets a WebView `DownloadListener` (source read).
+`saveTo` is `cross_file`'s, not a platform interface, so this plugin cannot
+redirect it: save page bytes with `WebUiRoot.writeFile` (see
+`webui_app_plane`), the seam a bricks save hook calls. After writing to the returned path, call
 `AppPlane.scanMedia([path])` so the file shows in Files and Gallery. Open device checks: chooser accept filters per manager; toybox `ls
 -1ApL` output on Android 10 to 15.
 
@@ -211,7 +222,7 @@ delegate). Open device checks: `am start` and `cmd package query-activities
 | Case | WebUI host with the app | No app / browser tab |
 |---|---|---|
 | text or `uri` | `Share`, text on stdin, `--es action send`, `--es title <subject>` | stock: no `navigator.share` in WebViews, so `mailto:` through url_launcher_webui |
-| one file | copied into a hand-off folder (kept: the target reads it after Share returns), `Share --es file <path> --es action send [--es content-type]` | stock download (does nothing in a manager) |
+| one file | copied into a hand-off folder (kept: the target reads it after Share returns), `Share --es file <path> --es action send [--es content-type]`. An absolute `XFile.path` (from `openFile`, the root process) is copied by root, no bytes through the page; page data (`XFile.fromData`, `blob:`) is written from the page | stock download (does nothing in a manager) |
 | more than one file | `PlatformException(webui-share-multiple-files)` | stock |
 
 Result is `ShareResult.unavailable` (ShareAPI reports no outcome; as Linux).

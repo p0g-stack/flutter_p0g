@@ -34,6 +34,11 @@ FakeRootChannel withApp({String shareOutput = ''}) => FakeRootChannel(
   },
 );
 
+/// The hand-off copy run (not the once-per-page sweep).
+FakeRun copyRun(FakeRootChannel fake) => fake.runs.firstWhere(
+  (r) => r.argv[0] == '/system/bin/sh' && !r.argv[2].contains('-mmin'),
+);
+
 void main() {
   late Stock stock;
   setUp(() => stock = Stock());
@@ -84,7 +89,7 @@ void main() {
           ],
         ),
       );
-      final write = fake.runs.firstWhere((r) => r.argv[1] == '-c');
+      final write = copyRun(fake);
       expect(write.argv.take(2), ['/system/bin/sh', '-c']);
       final dir = write.shArgs.first;
       expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
@@ -105,6 +110,20 @@ void main() {
     },
   );
 
+  test('a root path is copied by root, its bytes never read', () async {
+    final fake = withApp();
+    await sharer(fake).share(
+      ShareParams(files: [XFile('/data/adb/demo/tmp/open-1/report.pdf')]),
+    );
+    final copy = copyRun(fake);
+    final dir = copy.shArgs[2];
+    expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+    expect(copy.shArgs.first, '/data/adb/demo/tmp/open-1/report.pdf');
+    expect(copy.shArgs.last, '$dir/report.pdf');
+    expect(copy.stdin, isEmpty);
+    expect(fake.runs.last.argv, contains('$dir/report.pdf'));
+  });
+
   test('fileNameOverrides names the copy', () async {
     final fake = withApp();
     await sharer(fake).share(
@@ -113,10 +132,7 @@ void main() {
         fileNameOverrides: ['report.pdf'],
       ),
     );
-    expect(
-      fake.runs.firstWhere((r) => r.argv[1] == '-c').shArgs.last,
-      endsWith('/report.pdf'),
-    );
+    expect(copyRun(fake).shArgs.last, endsWith('/report.pdf'));
   });
 
   test('more than one file is refused', () async {
