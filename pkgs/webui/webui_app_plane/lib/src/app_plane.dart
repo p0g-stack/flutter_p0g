@@ -130,4 +130,47 @@ final class AppPlane {
     }
     return r;
   }
+
+  /// Asks the media provider to index [paths] (files the app wrote to shared
+  /// storage such as `Download` or `Documents`), so they show in Files and
+  /// Gallery apps. Call it after the write; directories are not walked.
+  ///
+  /// With the app: Termux:API `MediaScanner` (`MediaScannerConnection`).
+  /// Without it: a root `MEDIA_SCANNER_SCAN_FILE` broadcast per file, which
+  /// MediaProvider still handles (deprecated since Android 10; inferred, not
+  /// device-verified). Neither route reports whether the provider indexed a
+  /// file.
+  Future<void> scanMedia(List<String> paths) async {
+    if (paths.isEmpty) return;
+    if (!root.available) {
+      throw const AppPlaneException(
+        'unavailable',
+        'a media scan needs a WebUI host with the root channel',
+      );
+    }
+    if (await isAvailable()) {
+      // am's string array: comma-separated, `\,` for a literal comma.
+      final list = paths.map((p) => p.replaceAll(',', r'\,')).join(',');
+      await call('MediaScanner', extras: ['--esa', 'paths', list]);
+      return;
+    }
+    for (final path in paths) {
+      final r = await root.run([
+        '/system/bin/am',
+        'broadcast',
+        '--user',
+        'current',
+        '-a',
+        'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+        '-d',
+        Uri.file(path).toString(),
+      ]);
+      if (!r.ok) {
+        throw AppPlaneException(
+          'failed',
+          'media scan of $path exited ${r.exitCode}: ${r.errorText.trim()}',
+        );
+      }
+    }
+  }
 }

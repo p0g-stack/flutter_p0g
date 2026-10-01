@@ -62,6 +62,15 @@ registers the `Link` platform view).
   to the app and `chcon`ed to the app data dir's full context (earlier files
   there are removed first). `restorecon` is not enough: it leaves `s0`
   without the app's MLS categories (devicelab, Android 15 AVD).
+- `scanMedia(paths)`: after the app writes a file to shared storage
+  (`Download`, `Documents`, a path from the save picker), asks the media
+  provider to index it so it shows in Files and Gallery. With the app it is
+  Termux:API `MediaScanner` (`--esa paths`); without it, a root
+  `MEDIA_SCANNER_SCAN_FILE` broadcast per file. No `*_webui` package writes
+  to shared storage itself (`share_plus_webui` writes only into the app's
+  private directory), so the app, or bricks' save flow, calls it after its
+  write. Not device-verified: whether MediaProvider indexes a file through
+  either route on Android 10 to 15.
 - `testing.dart`: `FakeRootChannel` speaks the real v1 protocol to the real
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
@@ -109,7 +118,8 @@ Gaps: the returned paths are real root paths, so the app reads or writes them
 through its root process or the root channel; `XFile.saveTo` on web still
 downloads, and no manager sets a WebView `DownloadListener` (source read), so
 saving bytes from the page needs the activity-results/save work, not this
-plugin. Open device checks: chooser accept filters per manager; toybox `ls
+plugin. After writing to the returned path, call
+`AppPlane.scanMedia([path])` so the file shows in Files and Gallery. Open device checks: chooser accept filters per manager; toybox `ls
 -1ApL` output on Android 10 to 15.
 
 ### path_provider_webui

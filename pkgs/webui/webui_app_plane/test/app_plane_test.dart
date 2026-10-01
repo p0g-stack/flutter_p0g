@@ -181,4 +181,57 @@ void main() {
       expect(File('$dir/new.txt').readAsStringSync(), 'fresh');
     }, testOn: 'linux');
   });
+
+  group('scanMedia', () {
+    test('uses the app MediaScanner with escaped commas', () async {
+      final fake = FakeRootChannel(
+        handler: (run) => run.argv.contains('path')
+            ? const FakeProcessResult(stdout: 'package:/x/base.apk\n')
+            : const FakeProcessResult(stdout: 'Finished scanning 2 file(s)'),
+      );
+      await AppPlane(fake.root()).scanMedia([
+        '/storage/emulated/0/Download/a,b.png',
+        '/storage/emulated/0/Download/c.txt',
+      ]);
+      expect(fake.runs.last.argv.sublist(4), [
+        'MediaScanner',
+        '--esa',
+        'paths',
+        r'/storage/emulated/0/Download/a\,b.png,'
+            '/storage/emulated/0/Download/c.txt',
+      ]);
+    });
+
+    test('without the app, broadcasts one scan per file as root', () async {
+      final fake = FakeRootChannel(
+        handler: (run) => run.argv.contains('path')
+            ? const FakeProcessResult(exitCode: 1)
+            : const FakeProcessResult(stdout: 'Broadcast completed: result=0'),
+      );
+      await AppPlane(fake.root())
+          .scanMedia(['/storage/emulated/0/Download/my file.png']);
+      expect(fake.runs.last.argv, [
+        '/system/bin/am',
+        'broadcast',
+        '--user',
+        'current',
+        '-a',
+        'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+        '-d',
+        'file:///storage/emulated/0/Download/my%20file.png',
+      ]);
+    });
+
+    test('needs the root channel', () async {
+      final fake = FakeRootChannel();
+      await expectLater(
+        AppPlane(fake.root(FakeBridge.browser())).scanMedia(['/x']),
+        throwsA(
+          isA<AppPlaneException>().having((e) => e.code, 'code', 'unavailable'),
+        ),
+      );
+      await AppPlane(fake.root()).scanMedia([]);
+      expect(fake.runs, isEmpty);
+    });
+  });
 }
