@@ -25,7 +25,10 @@ sealed class Place {
 
   /// Points [worker] at this place and returns it. Call before the worker
   /// starts (before its first request).
-  W bind<W extends Worker>(W worker);
+  ///
+  /// [service] names the service on a host that serves several; places that
+  /// run one service per worker ignore it.
+  W bind<W extends Worker>(W worker, {String? service});
 }
 
 /// Squadron's own place for this platform: an isolate on the Dart VM, a Web
@@ -47,7 +50,7 @@ final class LocalPlace extends Place {
   }
 
   @override
-  W bind<W extends Worker>(W worker) {
+  W bind<W extends Worker>(W worker, {String? service}) {
     worker.channelFactory = null;
     return worker;
   }
@@ -119,50 +122,78 @@ final class ProcessPlace extends Place {
   Future<PlaceFacts> facts() async {
     final known = _facts;
     if (known != null) return known;
-    final channel = await open(ExceptionManager(), logger);
+    final channel = await open(
+      ExceptionManager(),
+      logger,
+      service: _anyService,
+    );
     await channel.close();
     return channel.facts;
   }
 
+  // Facts are per host, so any service the host serves will do; null means
+  // "the only one", and a host with several answers with their names.
+  String? _anyService;
+
   @override
-  W bind<W extends Worker>(W worker) {
-    worker.channelFactory = channelFactory;
+  W bind<W extends Worker>(W worker, {String? service}) {
+    _anyService ??= service;
+    worker.channelFactory = channelFactory(service: service);
     return worker;
   }
 
-  /// The Squadron channel factory for this place.
-  ChannelFactory get channelFactory =>
+  /// The Squadron channel factory for [service] at this place.
+  ChannelFactory channelFactory({String? service}) =>
       (exceptionManager, logger, entryPoint, startArguments) =>
-          open(exceptionManager, logger);
+          open(exceptionManager, logger, service: service);
 
-  /// Opens one channel to the host, finding or starting the host first.
+  /// Opens one channel to [service] on the host, finding or starting the host
+  /// first.
   Future<ProcessChannel> open(
     ExceptionManager exceptionManager,
-    Logger? logger,
-  ) async {
+    Logger? logger, {
+    String? service,
+  }) async {
     var endpoint = await _find();
     try {
-      return await _handshake(endpoint, exceptionManager, logger);
+      return await _handshake(endpoint, exceptionManager, logger, service);
+    } on WorkerException catch (e) {
+      // The host is there but does not serve that name: starting another
+      // copy of the same CLI would not help.
+      if (e.message.contains('service')) rethrow;
+      return _retry(endpoint, e, exceptionManager, logger, service);
     } catch (e) {
-      // The host we knew is gone (exited after its grace window, or a stale
-      // session file). Find it again once: this starts a new one.
-      this.logger?.i('Place host at $endpoint unavailable ($e); finding again');
-      _endpoint = null;
-      _finding = null;
-      endpoint = await _find(skipStore: true);
-      return _handshake(endpoint, exceptionManager, logger);
+      return _retry(endpoint, e, exceptionManager, logger, service);
     }
+  }
+
+  Future<ProcessChannel> _retry(
+    ProcessEndpoint endpoint,
+    Object e,
+    ExceptionManager exceptionManager,
+    Logger? logger,
+    String? service,
+  ) async {
+    // The host we knew is gone (exited after its grace window, or a stale
+    // session file). Find it again once: this starts a new one.
+    this.logger?.i('Place host at $endpoint unavailable ($e); finding again');
+    _endpoint = null;
+    _finding = null;
+    endpoint = await _find(skipStore: true);
+    return _handshake(endpoint, exceptionManager, logger, service);
   }
 
   Future<ProcessChannel> _handshake(
     ProcessEndpoint endpoint,
     ExceptionManager exceptionManager,
     Logger? logger,
+    String? service,
   ) async {
     final link = await _connect(endpoint);
     final channel = await ProcessChannel.connect(
       link,
       token: endpoint.token,
+      service: service,
       exceptionManager: exceptionManager,
       logger: logger,
       timeout: handshakeTimeout,

@@ -26,7 +26,7 @@ class FakeLauncher implements ProcessLauncher {
     final port = _nextPort++;
     final token = 'token-$port';
     hosts[port] = PlaceHost(
-      service: EchoWorker(),
+      services: {'echo': EchoWorker()},
       token: token,
       checkFacts: () async => PlaceFacts({'root': true, 'port': port}),
     );
@@ -56,7 +56,7 @@ class FakeLauncher implements ProcessLauncher {
   Future<void> dispose() async {
     for (final h in hosts.values) {
       await h.shutdown();
-      (h.service as Worker).stop();
+      (h.services.values.single as Worker).stop();
     }
   }
 }

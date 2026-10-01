@@ -34,7 +34,7 @@ final place = ProcessPlace(
   store: FileEndpointStore(sessionPath),          // finds a running host; needed when stdout is hidden
   command: ProcessCommand(cliPath, arguments: ['serve', '--session-file', sessionPath]),
 );
-final worker = place.bind(MyServiceWorker());
+final worker = place.bind(MyServiceWorker(), service: 'my');
 final facts = await place.facts();                // checked by the helper process
 if (facts.has('raw_disk')) { ... }
 
@@ -48,13 +48,14 @@ import 'package:squadron_process/io.dart';
 
 Future<void> main(List<String> args) async {
   if (args.firstOrNull == 'serve') {
-    exit(await serve(MyServiceWorker(), args.skip(1).toList(), facts: checkMyFacts));
+    exit(await serve({'my': MyServiceWorker()}, args.skip(1).toList(), facts: checkMyFacts));
   }
 }
 ```
 
-`serve` runs the service in an isolate of the CLI (the generated worker) and
-forwards requests from every client link to it. Values crossing the link use a
+`serve` hosts every named service in the one CLI process (each generated
+worker in its own isolate) and forwards each client link to the service it
+names. Values crossing the link use a
 small binary codec with the value types of Flutter's `StandardMessageCodec`;
 custom types need Squadron marshalers, exactly as for Web Workers.
 

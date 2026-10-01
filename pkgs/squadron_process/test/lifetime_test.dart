@@ -20,7 +20,7 @@ void main() {
   setUp(() {
     service = EchoWorker();
     host = PlaceHost(
-      service: service,
+      services: {'echo': service},
       token: token,
       grace: grace,
       firstLinkGrace: const Duration(milliseconds: 300),

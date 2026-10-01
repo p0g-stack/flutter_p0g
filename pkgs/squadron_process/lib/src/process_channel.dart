@@ -29,19 +29,21 @@ class ProcessChannel implements Channel {
     );
   }
 
-  /// Connects over [link]: sends hello with [token] and waits for the host's
+  /// Connects over [link]: sends hello with [token] and the [service] name
+  /// (null: the host's only service), and waits for the host's
   /// welcome. Throws [WorkerException] if the host refuses or does not answer
   /// within [timeout]; the link is closed in that case.
   static Future<ProcessChannel> connect(
     PlaceLink link, {
     required String token,
+    String? service,
     ExceptionManager? exceptionManager,
     Logger? logger,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final frames = StreamIterator(link.frames);
     try {
-      link.send(Msg.encode([Msg.hello, Msg.version, token]));
+      link.send(Msg.encode([Msg.hello, Msg.version, token, service]));
       if (!await frames.moveNext().timeout(timeout)) {
         throw WorkerException('Place host closed the link during handshake');
       }

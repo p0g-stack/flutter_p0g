@@ -10,10 +10,12 @@ import '../link.dart';
 import '../place.dart';
 import '../protocol.dart';
 
-/// Serves a Squadron service to process-place clients.
+/// Serves Squadron services to process-place clients.
 ///
-/// Requests from every accepted link go to one [service], usually the app's
-/// generated worker (an isolate inside this process) or a `LocalWorker`.
+/// [services] maps a name to the service's invoker, usually the generated
+/// worker (an isolate inside this process) or a `LocalWorker`. Each link names
+/// one service in its hello; a link that names none gets the only service when
+/// there is exactly one.
 /// Nothing Squadron does is redone here: cancellation, streaming and
 /// exceptions are Squadron's, forwarded over the link.
 ///
@@ -25,7 +27,7 @@ import '../protocol.dart';
 /// gives up after [firstLinkGrace].
 class PlaceHost {
   PlaceHost({
-    required this.service,
+    required this.services,
     required this.token,
     Future<PlaceFacts> Function()? checkFacts,
     this.grace = const Duration(seconds: 10),
@@ -34,10 +36,13 @@ class PlaceHost {
     this.logger,
   }) : _checkFacts = checkFacts ?? (() async => const PlaceFacts.none()) {
     if (token.isEmpty) throw ArgumentError.value(token, 'token', 'empty');
+    if (services.isEmpty) {
+      throw ArgumentError.value(services, 'services', 'empty');
+    }
     _armIdle(firstLinkGrace);
   }
 
-  final Invoker service;
+  final Map<String, Invoker> services;
   final String token;
   final Duration grace;
   final Duration firstLinkGrace;
@@ -139,6 +144,7 @@ class _HostLink {
   final PlaceLink link;
   late final StreamSubscription<Uint8List> _sub;
   bool _greeted = false;
+  late final Invoker _service;
   bool _gone = false;
   Timer? _handshake;
 
@@ -234,6 +240,18 @@ class _HostLink {
     if (m[2] is! String || !PlaceHost._sameToken(m[2], host.token)) {
       return _refuse('bad token');
     }
+    final name = m.length > 3 ? m[3] : null;
+    final service = name is String
+        ? host.services[name]
+        : (host.services.length == 1 ? host.services.values.single : null);
+    if (service == null) {
+      return _refuse(
+        name == null
+            ? 'name a service: ${host.services.keys.join(', ')}'
+            : 'unknown service $name',
+      );
+    }
+    _service = service;
     _greeted = true;
     _handshake?.cancel();
     host._linked(this);
@@ -260,7 +278,7 @@ class _HostLink {
     host._running.add(task);
 
     if (!streaming) {
-      host.service
+      _service
           .send(command, args: args, token: task.token)
           .then(
             (r) => _send([Msg.value, id, r]),
@@ -274,7 +292,7 @@ class _HostLink {
       return;
     }
 
-    task.subscription = host.service
+    task.subscription = _service
         .stream(command, args: args, token: task.token)
         .listen(
           (v) => _send([Msg.item, id, v]),

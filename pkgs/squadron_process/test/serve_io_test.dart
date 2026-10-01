@@ -54,7 +54,7 @@ void main() {
       final session = '${dir.path}/run/demo.json';
       final service = EchoWorker();
       final served = await startServe(
-        service,
+        {'echo': service},
         options: ServeOptions(
           sessionFile: session,
           grace: const Duration(milliseconds: 200),

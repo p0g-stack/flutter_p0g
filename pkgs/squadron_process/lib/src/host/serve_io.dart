@@ -133,13 +133,13 @@ class ServedPlace {
   }
 }
 
-/// Starts serve mode for [service] in this process, without exiting.
+/// Starts serve mode for [services] in this process, without exiting.
 ///
 /// Binds 127.0.0.1 only, accepts WebSocket links on `/squadron`, publishes
 /// the endpoint to [ServeOptions.sessionFile] (atomic rename) and returns.
 /// [facts] runs in this process for every handshake.
 Future<ServedPlace> startServe(
-  Invoker service, {
+  Map<String, Invoker> services, {
   ServeOptions options = const ServeOptions(),
   FactsCheck? facts,
   Logger? logger,
@@ -156,7 +156,7 @@ Future<ServedPlace> startServe(
     launchId: options.launchId,
   );
   final host = PlaceHost(
-    service: service,
+    services: services,
     token: token,
     grace: options.grace,
     firstLinkGrace: options.firstLinkGrace,
@@ -191,8 +191,8 @@ Future<ServedPlace> startServe(
   return ServedPlace._(endpoint, host, server, sessionFile);
 }
 
-/// The CLI serve mode: hosts [service] until the lifetime rule stops it,
-/// then stops the service and returns the exit code (0).
+/// The CLI serve mode: hosts [services] (by name) until the lifetime rule
+/// stops it, then stops the workers among them and returns the exit code (0).
 ///
 /// Prints the ready line (the endpoint as JSON) as the first line on stdout;
 /// launchers read it. Logs go to stderr.
@@ -201,13 +201,13 @@ Future<ServedPlace> startServe(
 /// // cli/bin/app.dart
 /// Future<void> main(List<String> args) async {
 ///   if (args.firstOrNull == 'serve') {
-///     exit(await serve(MyServiceWorker(), args.skip(1).toList()));
+///     exit(await serve({'my': MyServiceWorker()}, args.skip(1).toList()));
 ///   }
 ///   ...
 /// }
 /// ```
 Future<int> serve(
-  Invoker service,
+  Map<String, Invoker> services,
   List<String> args, {
   FactsCheck? facts,
   Logger? logger,
@@ -220,7 +220,7 @@ Future<int> serve(
     return 64; // EX_USAGE
   }
   final served = await startServe(
-    service,
+    services,
     options: options,
     facts: facts,
     logger: logger,
@@ -238,7 +238,9 @@ Future<int> serve(
   for (final s in signals) {
     await s.cancel();
   }
-  if (service is Worker) service.stop();
+  for (final s in services.values) {
+    if (s is Worker) s.stop();
+  }
   return 0;
 }
 

@@ -10,7 +10,7 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && args.first == 'serve') {
     exit(
       await serve(
-        EchoWorker(),
+        {'echo': EchoWorker()},
         args.skip(1).toList(),
         facts: () async => {'test.cli': true},
       ),

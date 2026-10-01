@@ -7,7 +7,8 @@ import 'codec.dart';
 ///
 /// ```
 /// client -> host                     host -> client
-/// hello    [0, version, token]       welcome  [10, version, place, facts]
+/// hello    [0, version, token,       welcome  [10, version, place, facts]
+///           service?]
 /// request  [1, id, cmd, args,        refused  [11, reason]
 ///           tokenId?, streaming]     value    [12, id, result]
 /// cancel   [2, tokenId, message?]    error    [13, id, exception]

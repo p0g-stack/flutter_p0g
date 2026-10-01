@@ -8,21 +8,27 @@ CLI needs one subcommand that hands its arguments to `serve`:
 import 'dart:io';
 
 import 'package:squadron_process/io.dart';
-import 'package:demo_core/demo_service.dart';      // the generated DemoServiceWorker
+import 'package:demo_core/demo_service.dart';      // generated DemoServiceWorker
+import 'package:demo_core/files_service.dart';     // generated FilesServiceWorker
 import 'package:demo_core/facts.dart';             // the app's FactsCheck
 
 Future<void> main(List<String> args) async {
   if (args.firstOrNull == 'serve') {
-    exit(await serve(DemoServiceWorker(), args.skip(1).toList(), facts: checkFacts));
+    exit(await serve(
+      {'demo': DemoServiceWorker(), 'files': FilesServiceWorker()},
+      args.skip(1).toList(),
+      facts: checkFacts,
+    ));
   }
   // ... the CLI's other commands
 }
 ```
 
-- `DemoServiceWorker()` is the worker squadron_builder generated for the
-  service. `serve` starts it in an isolate of the CLI and forwards every
-  client's requests to it. Several services: serve a `LocalWorker` or a small
-  facade service that delegates.
+- The map names each service the process serves; the values are the workers
+  squadron_builder generated (each runs in its own isolate of the CLI) or any
+  other Squadron `Invoker`. One process serves them all. A client names the
+  service when it binds a worker; with a single service the name may be
+  left out.
 - `facts` runs in the CLI process for every handshake; whatever map it returns
   is what clients see in `place.facts()`. squadron_process defines no keys.
   For example, an app that wants `root`, `block_devices`, `usb.native`,
@@ -67,11 +73,18 @@ final place = ProcessPlace(
   store: store,                             // reads the session file
   command: ProcessCommand(cliPath, arguments: ['serve', '--session-file', sessionPath]),
 );
-final worker = place.bind(DemoServiceWorker());
+final demo = place.bind(DemoServiceWorker(), service: 'demo');
+final files = place.bind(FilesServiceWorker(), service: 'files');
 ```
 
 `command.arguments` start with `serve` and the options; `ProcessPlace` adds
-`--launch-id` itself.
+`--launch-id` itself. Each bound worker opens its own link to the same
+process. A client that already knows the endpoint (it read the ready line or
+session file itself) passes `ProcessPlace(endpoint: ProcessEndpoint.tryParse(json)!)`
+and no launcher.
+
+In a test or another embedding, `startServe(services, options: ...)` serves
+without printing or exiting and returns the endpoint (`served.endpoint`).
 
 ## Depending on squadron_process
 

@@ -19,7 +19,7 @@ const token = 'secret-token';
 class Rig {
   Rig({Duration grace = const Duration(milliseconds: 200)})
     : host = PlaceHost(
-        service: EchoWorker(),
+        services: {'echo': EchoWorker()},
         token: token,
         grace: grace,
         firstLinkGrace: const Duration(seconds: 5),
@@ -43,7 +43,7 @@ class Rig {
 
   Future<void> dispose() async {
     await host.shutdown('test over');
-    (host.service as Worker).stop();
+    (host.services.values.single as Worker).stop();
   }
 }
 
@@ -139,7 +139,7 @@ void main() {
 
   test('a client that never says hello is dropped', () async {
     final host = PlaceHost(
-      service: EchoWorker(),
+      services: {'echo': EchoWorker()},
       token: token,
       handshakeTimeout: const Duration(milliseconds: 50),
     );
@@ -148,7 +148,7 @@ void main() {
     final frames = await client.frames.toList();
     expect(frames, hasLength(1)); // the refusal
     await host.shutdown();
-    (host.service as Worker).stop();
+    (host.services.values.single as Worker).stop();
   });
 
   test('losing the link fails pending calls on the client', () async {
@@ -168,6 +168,77 @@ void main() {
     );
     w.stop();
   });
+
+  group('one host, several services', () {
+    late PlaceHost host;
+    var launches = 0;
+    setUp(() {
+      launches = 0;
+      host = PlaceHost(
+        services: {'a': EchoWorker(), 'b': EchoWorker()},
+        token: token,
+      );
+    });
+    tearDown(() async {
+      await host.shutdown();
+      for (final w in host.services.values) {
+        (w as Worker).stop();
+      }
+    });
+
+    ProcessPlace place() => ProcessPlace(
+      endpoint: const ProcessEndpoint(port: 1, token: token),
+      connector: (_) async {
+        final (client, server) = PlaceLink.pair();
+        host.accept(server);
+        return client;
+      },
+      launcher: _CountingLauncher(() => launches++),
+      command: const ProcessCommand('/bin/app'),
+    );
+
+    test('each worker reaches the service it names', () async {
+      final p = place();
+      final a = p.bind(EchoWorker(), service: 'a');
+      final b = p.bind(EchoWorker(), service: 'b');
+      expect(await Future.wait([a.echo('to a'), b.echo('to b')]), [
+        'to a',
+        'to b',
+      ]);
+      expect(host.links, 2);
+      a.stop();
+      b.stop();
+    });
+
+    test('an unknown or missing name is refused without a relaunch', () async {
+      final p = place();
+      final c = p.bind(EchoWorker(), service: 'c');
+      await expectLater(
+        c.echo(1),
+        throwsA(
+          isA<WorkerException>().having(
+            (e) => e.message,
+            'message',
+            contains('unknown service c'),
+          ),
+        ),
+      );
+      final unnamed = p.bind(EchoWorker());
+      await expectLater(
+        unnamed.echo(1),
+        throwsA(
+          isA<WorkerException>().having(
+            (e) => e.message,
+            'message',
+            contains('a, b'),
+          ),
+        ),
+      );
+      expect(launches, 0);
+      c.stop();
+      unnamed.stop();
+    });
+  });
 }
 
 Future<void> _until(bool Function() cond) async {
@@ -175,5 +246,15 @@ Future<void> _until(bool Function() cond) async {
   while (!cond()) {
     if (DateTime.now().isAfter(end)) fail('condition not met in time');
     await Future.delayed(const Duration(milliseconds: 10));
+  }
+}
+
+class _CountingLauncher implements ProcessLauncher {
+  _CountingLauncher(this.onLaunch);
+  final void Function() onLaunch;
+  @override
+  Future<LaunchedProcess> launch(ProcessCommand command) {
+    onLaunch();
+    throw StateError('no launch expected');
   }
 }
