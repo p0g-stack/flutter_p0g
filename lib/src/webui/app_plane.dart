@@ -15,9 +15,9 @@ import 'webui_packages.dart';
 /// The app plane's base: the webui-termux-api release every module's APK is
 /// made from, pinned by tag and sha256. Bump it here only.
 const kAppPlaneRepo = 'https://github.com/p0g-stack/webui-termux-api';
-const kAppPlaneTag = 'webui-v0.53.0-webui.2';
-const kAppPlaneAsset = 'webui-termux-api_v0.53.0-webui.2.apk';
-const kAppPlaneSha256 = 'b6925a96aa7e8fdd919c22aa10a177bd72acac9524bfcc80e2708fc705b084e2';
+const kAppPlaneTag = 'webui-v0.53.0-webui.3';
+const kAppPlaneAsset = 'webui-termux-api_v0.53.0-webui.3.apk';
+const kAppPlaneSha256 = '442d227d839e936b9c635b48991c5bf393870d382d689971eba4fdfe88bebeb1';
 
 /// The base APK's package; each module's copy renames it.
 const kAppPlaneBasePackage = 'com.webui.termux.api';
