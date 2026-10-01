@@ -1,3 +1,9 @@
+# 0.8.2
+
+- squadron_process 28c37ce: each service log record reaches a page once,
+  however many workers it binds (5d41a99 sent one copy per link). The launch
+  test binds two workers and checks for one copy.
+
 # 0.8.1
 
 - squadron_process 5d41a99: the host relays service log records over the

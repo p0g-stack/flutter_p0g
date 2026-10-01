@@ -63,10 +63,20 @@ void main() {
       service: 'hello',
     );
     addTearDown(worker.terminate);
+    // A second link from this page: records still arrive once.
+    final other = place.bind(
+      withLogs(HelloServiceWorker()),
+      service: 'hello',
+    );
+    addTearDown(other.terminate);
+    expect(await other.hello('other'), 'Hello, other!');
     expect(await worker.hello('webui'), 'Hello, webui!');
     // The service's own log record, relayed from the host process.
     await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(lines, contains(endsWith('FINE service.hello: hello webui')));
+    expect(
+      lines.where((l) => l.endsWith('FINE service.hello: hello webui')),
+      hasLength(1),
+    );
     expect(await worker.count(2).toList(), [1, 2]);
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

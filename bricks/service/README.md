@@ -23,7 +23,7 @@ format what they touched.
 
 The same methods run in an isolate, a Web Worker or the CLI's `serve`
 process, but they do not cost the same. squadron_process measured
-([doc/benchmark.md](https://github.com/p0g-stack/squadron_process/blob/5d41a990abd60df81fcc4d7cd4841bd146e3f5d2/doc/benchmark.md)):
+([doc/benchmark.md](https://github.com/p0g-stack/squadron_process/blob/28c37ced3034695697802b17ee818a11a36411d3/doc/benchmark.md)):
 a process-place call costs a few hundred microseconds on loopback (about
 250 µs from the VM, 400 µs from a page) against about 30 µs for an isolate,
 and the link moves about 110 MiB/s.
