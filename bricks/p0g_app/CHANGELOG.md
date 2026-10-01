@@ -1,3 +1,10 @@
+# 0.8.4
+
+- `rust`: when wasm-opt is missing or older than binaryen 117, `tool/rust.sh`
+  puts a pass-through wasm-opt first on PATH, as flutter_p0g does. The wasm
+  then ships unoptimized instead of the bootstrap failing where binaryen
+  cannot be downloaded.
+
 # 0.8.3
 
 - flutter-webui 7985489, the commit flutter_p0g builds with. It only adds

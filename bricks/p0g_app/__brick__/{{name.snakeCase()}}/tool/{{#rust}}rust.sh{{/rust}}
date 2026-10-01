@@ -58,8 +58,33 @@ fi
 "$codegen" generate
 (cd rust && cargo build --release)
 if [ "$web" = 1 ]; then
-  # wasm-pack runs wasm-opt from binaryen 117 (an older system wasm-opt
-  # produced a module whose externref table failed to grow at init).
+  # wasm-pack runs wasm-opt from PATH, or downloads binaryen. Before 117 it
+  # breaks the module (its externref table fails to grow at init), and the
+  # download fails offline. Unoptimized output is correct, so without a
+  # good wasm-opt a pass-through one goes first on PATH, as in flutter_p0g.
+  wasm_opt=$( (wasm-opt --version 2>/dev/null || true) | sed -n 's/.*version \([0-9]*\).*/\1/p')
+  if [ "${wasm_opt:-0}" -lt 117 ]; then
+    echo "rust.sh: no wasm-opt 117+ (found ${wasm_opt:-none}); the wasm ships unoptimized."
+    shim=rust/target/wasm-opt-passthrough
+    mkdir -p "$shim"
+    cat > "$shim/wasm-opt" <<'SH'
+#!/bin/sh
+# tool/rust.sh: pass-through wasm-opt (wasm-opt <in> -o <out> <passes...>).
+in=; out=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    --version) echo "wasm-opt version passthrough"; exit 0 ;;
+    -*) shift ;;
+    *) [ -z "$in" ] && in=$1; shift ;;
+  esac
+done
+[ -n "$in" ] && [ -n "$out" ] || exit 0
+[ "$in" = "$out" ] || cp "$in" "$out"
+SH
+    chmod +x "$shim/wasm-opt"
+    PATH="$PWD/$shim:$PATH"
+  fi
   "$codegen" build-web --no-threads --release --dart-root core -o "$PWD/app/web"
 else
   echo "rust.sh: no patched frb, so no wasm; on the web the Dart strategies run."
