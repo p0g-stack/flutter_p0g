@@ -50,6 +50,7 @@ Gaps are listed here, not hidden.
 | Command | What it does | State |
 |---|---|---|
 | `create [dir]` | Adds `webui/` (module.prop, customize.sh, `webroot/config.json` with flutter-webui's `docs/hosts.md` settings) and `aera/` (the app's part of plugin.json), like `flutter create --platforms` | works |
+| `build web` | `flutter build web` for an ordinary browser tab, plus the app's Rust wasm (no threads) and Squadron Web Workers. Stock SDK, defaults and output (`build/web`) | works |
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
 | `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works; debug against the released arm64 kit (kit-3.47.5) |
 | `install [zip\|aerap]` | Module zip: `adb push`, then the first installer present on the device (`ksud`, `apd`, `magisk`). `.aerap` (device in recovery): see below | works against a fake adb; not yet run on a device |
@@ -57,6 +58,35 @@ Gaps are listed here, not hidden.
 | `logs` | Booted: `tail -F` of the module's `webroot/.run/root.log` and newest `proc/*.log` (flutter-webui `docs/root-channel.md`) plus `logcat chromium:V`. Recovery: `/tmp/recovery.log` | not yet run on a device |
 | `run` | `flutter run -d web-server` (DDC, hot reload/restart, debug service) with the patched SDK and the flutter_webui plugin, behind a dev proxy; with adb, reverses the port and points the installed module's page at it | works in Chromium; device path not yet run |
 | `precache` | Flutter's web SDK and flutter-webui (`--webui`, with fallback fonts); `--webui-packages`; `--app-plane` (pinned APK); `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits; `--squadron` | works |
+
+### `build web`
+
+The plain web target: the same app in an ordinary browser tab, with no
+manager and no root. It is stock `flutter build web` (stock web SDK,
+bootstrap, defaults and `build/web`; every flag means what it means there)
+plus the two pieces a p0g app has that the stock build cannot make:
+
+1. If the app has `flutter_rust_bridge.yaml`: the patched frb's
+   `build-web --no-threads` into `web/pkg/`, as in `build webui`. The wasm
+   is single-threaded, so any static host (HTTPS or localhost) serves it
+   without COOP/COEP headers.
+2. Squadron Web Workers, compiled into the output at the `~/workers/...`
+   paths their activators load, as in `build webui`.
+
+In a tab there is no process place: services run in Squadron's own place
+(Web Workers), and facts report no root, block devices or process spawning.
+
+Development needs nothing from this tool: stock `flutter run -d chrome` or
+`-d web-server` serves `web/`, where the bricks bootstrap already put the
+wasm (`tool/rust.sh`, `web/pkg/`) and the workers (`tool/build_workers.sh`,
+`web/workers/`). Hot reload covers the app; after changing a service or
+`rust/src/api/`, re-run that script and hot restart.
+
+Checked with the demo (8bf1eb5) in headless Chromium, served by a plain
+static server with no extra headers: the frb wasm runs in the page and in a
+Squadron Web Worker (`rust_sha2` digest, `rustCrunch` on page 3), and the
+root-process place reports itself unavailable. The same holds under
+`flutter run -d web-server`.
 
 ### `build webui`
 
