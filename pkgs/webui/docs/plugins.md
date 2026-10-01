@@ -75,10 +75,11 @@ registers the `Link` platform view).
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
 
-App: release `webui-v0.53.0-webui.1` of p0g-stack/webui-termux-api,
-`webui-termux-api_v0.53.0-webui.1.apk`, sha256
-`bd0d1153d1d12eef08d3539a7dcd5ec9fc45b96dfc48b55eb6b29d57bcd9537e`, test key
-(see its `WEBUI.md`).
+App: release `webui-v0.53.0-webui.2` of p0g-stack/webui-termux-api,
+`webui-termux-api_v0.53.0-webui.2.apk`, sha256
+`b6925a96aa7e8fdd919c22aa10a177bd72acac9524bfcc80e2708fc705b084e2`, test key
+(see its `WEBUI.md`; webui.2 drops the SMS, contacts, call log and telephony
+methods and their permissions).
 
 ### What flutter_p0g ships for the app plane
 
