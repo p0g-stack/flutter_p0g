@@ -21,8 +21,10 @@ const kMaxMembers = 4096;
 const kMaxMemberSize = 100 * 1024 * 1024;
 
 /// AERA's runtime stream: `AERAWEB1`, u32 count, then per member u16 name
-/// length, u16 mode, u64 size, the name, padding to 4 bytes, the bytes. All
-/// little-endian. Members are sorted by name so equal inputs give equal bytes.
+/// length, u16 mode, u64 size, the name, zeros up to the next 4-byte stream
+/// offset, the bytes (no padding after them). All little-endian, as AERA's
+/// `Extract()` reads it (`aeraui/features/browser/runtime.cpp`). Members are
+/// sorted by name so equal inputs give equal bytes.
 Uint8List runtimeStream(List<RuntimeMember> members) {
   if (members.length > kMaxMembers) {
     throw ArgumentError('${members.length} members; AERA takes at most $kMaxMembers');
@@ -39,14 +41,16 @@ Uint8List runtimeStream(List<RuntimeMember> members) {
     }
     if (m.bytes.length > kMaxMemberSize) throw ArgumentError('${m.name} is over 100 MiB');
     final name = utf8.encode(m.name);
+    if (name.length >= 240) throw ArgumentError('${m.name}: AERA takes names under 240 bytes');
     final header = ByteData(12)
       ..setUint16(0, name.length, Endian.little)
       ..setUint16(2, m.executable ? 0x1ed : 0x1a4, Endian.little) // 0755 : 0644
       ..setUint64(4, m.bytes.length, Endian.little);
     out
       ..add(header.buffer.asUint8List())
-      ..add(name)
-      ..add(Uint8List((4 - name.length % 4) % 4))
+      ..add(name);
+    out
+      ..add(Uint8List((4 - out.length % 4) % 4))
       ..add(m.bytes);
   }
   return out.takeBytes();

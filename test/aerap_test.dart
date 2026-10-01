@@ -8,24 +8,32 @@ import 'package:flutter_p0g/src/aera/kit.dart';
 import 'package:flutter_p0g/src/templates.dart';
 import 'package:test/test.dart';
 
-/// Reads AERA's runtime stream back (spec/aerap.md).
+/// Reads the runtime stream back with AERA's exact rule (`Extract()` in
+/// aeraui/features/browser/runtime.cpp at abf3316): after each name, zeros
+/// up to the next 4-byte offset of the whole stream; nothing after a body.
 List<(String, int, List<int>)> readStream(Uint8List s) {
   final d = ByteData.sublistView(s);
   expect(ascii.decode(s.sublist(0, 8)), 'AERAWEB1');
   final count = d.getUint32(8, Endian.little);
-  var o = 12;
+  var total = 12;
   final out = <(String, int, List<int>)>[];
   for (var i = 0; i < count; i++) {
-    final nameLen = d.getUint16(o, Endian.little);
-    final mode = d.getUint16(o + 2, Endian.little);
-    final size = d.getUint64(o + 4, Endian.little);
-    o += 12;
-    final name = utf8.decode(s.sublist(o, o + nameLen));
-    o += nameLen + (4 - nameLen % 4) % 4;
-    out.add((name, mode, s.sublist(o, o + size)));
-    o += size;
+    final length = d.getUint16(total, Endian.little);
+    final mode = d.getUint16(total + 2, Endian.little);
+    final size = d.getUint64(total + 4, Endian.little);
+    total += 12;
+    expect(length, inInclusiveRange(1, 239));
+    expect(size, lessThanOrEqualTo(100 * 1024 * 1024));
+    expect(mode, anyOf(0, 0x1a4, 0x1ed));
+    final name = utf8.decode(s.sublist(total, total + length));
+    total += length;
+    final padding = (4 - total % 4) % 4;
+    expect(s.sublist(total, total + padding), everyElement(0), reason: 'padding after $name');
+    total += padding;
+    out.add((name, mode, s.sublist(total, total + size)));
+    total += size;
   }
-  expect(o, s.length);
+  expect(total, s.length);
   return out;
 }
 
@@ -47,6 +55,18 @@ void main() {
     expect(members[2].$3, [1, 2, 3]);
   });
 
+  test('runtime stream pads names to the stream offset when bodies are unaligned', () {
+    final members = [
+      for (final (i, size) in [1, 2, 3, 5, 6750, 0, 7].indexed)
+        RuntimeMember('m$i/${'n' * (i + 1)}', List.filled(size, i + 1)),
+    ];
+    final read = readStream(runtimeStream(members));
+    expect(read.map((m) => m.$3.length), [1, 2, 3, 5, 6750, 0, 7]);
+    for (final (i, m) in read.indexed) {
+      expect(m.$3, everyElement(i + 1));
+    }
+  });
+
   test('runtime stream rejects duplicates and escaping names', () {
     expect(
       () => runtimeStream([RuntimeMember('a', []), RuntimeMember('a', [])]),
@@ -54,6 +74,7 @@ void main() {
     );
     expect(() => runtimeStream([RuntimeMember('../x', [])]), throwsArgumentError);
     expect(() => runtimeStream([RuntimeMember('/x', [])]), throwsArgumentError);
+    expect(() => runtimeStream([RuntimeMember('a' * 240, [])]), throwsArgumentError);
   });
 
   test('plugin ids', () {
