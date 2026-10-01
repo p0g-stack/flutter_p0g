@@ -6,6 +6,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../frb/frb.dart';
 import '../squadron.dart';
+import '../webui/flutter_webui.dart' show P0gArtifacts;
 import '../webui/workers.dart';
 
 /// `flutter build web` for a p0g app in an ordinary browser tab: the stock
@@ -29,6 +30,8 @@ class BuildWebP0gCommand extends BuildWebCommand {
 
   @override
   Future<FlutterCommandResult> runCommand() async {
+    // Stock web SDK even when `precache --webui` built the patched one.
+    P0gArtifacts.useStockWebSdk = true;
     final Directory app = project.directory;
     // squadron_process apps need its patched Squadron; set up on first use.
     await ensurePatchedSquadron(app);

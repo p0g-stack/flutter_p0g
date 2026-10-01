@@ -1,4 +1,5 @@
 import 'package:flutter_p0g/src/webui/flutter_webui.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -21,5 +22,22 @@ void main() {
   test('the release page uses the bootstrap without dev.html', () {
     expect(kBootstrapFiles, isNot(contains('dev.html')));
     expect(kBootstrapFiles, containsAll(['index.html', 'flutter_bootstrap.js']));
+  });
+
+  test('web SDK paths move under the patched SDK, others stay', () {
+    final ctx = p.Context(style: p.Style.posix);
+    expect(
+      rebaseWebSdkPath(
+        ctx,
+        '/f/cache/flutter_web_sdk/kernel/x.dill',
+        '/f/cache/flutter_web_sdk',
+        '/p/sdk',
+      ),
+      '/p/sdk/kernel/x.dill',
+    );
+    expect(
+      rebaseWebSdkPath(ctx, '/f/cache/artifacts/x', '/f/cache/flutter_web_sdk', '/p/sdk'),
+      '/f/cache/artifacts/x',
+    );
   });
 }

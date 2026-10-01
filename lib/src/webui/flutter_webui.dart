@@ -6,6 +6,7 @@ import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/web_template.dart';
 import 'package:meta/meta.dart';
+import 'package:path/path.dart' as p;
 
 import '../p0g_cache.dart';
 import 'dart_android.dart';
@@ -207,6 +208,13 @@ File flutterJsFile() => globals.fs.file(
   ),
 );
 
+/// [path] under [patched] when it is [stock] or inside it, else unchanged.
+@visibleForTesting
+String rebaseWebSdkPath(p.Context ctx, String path, String stock, String patched) =>
+    path == stock || ctx.isWithin(stock, path)
+    ? ctx.join(patched, ctx.relative(path, from: stock))
+    : path;
+
 /// Artifacts that point flutter_tools at the patched web SDK when it is built,
 /// leaving the shared Flutter cache untouched.
 class P0gArtifacts implements Artifacts {
@@ -216,13 +224,13 @@ class P0gArtifacts implements Artifacts {
   final String stockWebSdk;
   final Directory patchedWebSdk;
 
+  /// Set by `build web`: the plain web target keeps the stock web SDK for
+  /// the whole run, patched SDK built or not.
+  static bool useStockWebSdk = false;
+
   String _rebase(String path) {
-    if (!patchedWebSdk.childDirectory('kernel').existsSync()) return path;
-    final fs = globals.fs.path;
-    if (path == stockWebSdk || fs.isWithin(stockWebSdk, path)) {
-      return fs.join(patchedWebSdk.path, fs.relative(path, from: stockWebSdk));
-    }
-    return path;
+    if (useStockWebSdk || !patchedWebSdk.childDirectory('kernel').existsSync()) return path;
+    return rebaseWebSdkPath(globals.fs.path, path, stockWebSdk, patchedWebSdk.path);
   }
 
   @override
