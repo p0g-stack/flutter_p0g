@@ -1,3 +1,4 @@
 .mason/
 mason-lock.json
 .dart_tool/
+packages/*/pubspec.lock
