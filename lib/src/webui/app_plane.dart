@@ -105,19 +105,13 @@ Future<Map<String, List<int>>> appPlaneFiles(
 }
 
 /// The key the app plane APK is signed with, as stock Flutter picks one for
-/// an Android build: the release key from `webui/key.properties` (else
-/// `android/key.properties`) when there is one, otherwise the debug key in
-/// `~/.android/debug.keystore`, made on first use.
+/// an Android build: the release key from `android/key.properties` when there
+/// is one, otherwise the debug key in `~/.android/debug.keystore`, made on
+/// first use.
 ApkSigningKey appPlaneSigningKey(Directory app) {
-  for (final (props, bases) in [
-    (app.childDirectory('webui').childFile('key.properties'), [app.childDirectory('webui')]),
-    (
-      app.childDirectory('android').childFile('key.properties'),
-      [app.childDirectory('android').childDirectory('app'), app.childDirectory('android')],
-    ),
-  ]) {
-    if (props.existsSync()) return _releaseKey(props, bases);
-  }
+  final android = app.childDirectory('android');
+  final props = android.childFile('key.properties');
+  if (props.existsSync()) return _releaseKey(props, [android.childDirectory('app'), android]);
   return _debugKey();
 }
 
@@ -163,7 +157,7 @@ ApkSigningKey _debugKey() {
   globals.printStatus(
     '${store.path} is not a PKCS12 keystore; signing with ${own.path} instead. '
     'Modules built on another machine get a different key; configure '
-    'webui/key.properties for releases.',
+    'android/key.properties for releases.',
   );
   return _readOrMakeDebugKey(own) ?? throwToolExit('${own.path} is unreadable.');
 }

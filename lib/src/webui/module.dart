@@ -54,9 +54,12 @@ List<ModuleFile> assembleModule({
 }) {
   final files = <String, List<int>>{};
   webBuild.forEach((path, bytes) {
-    if (!isPrunedWebFile(path, wasm: wasm)) files['webroot/$path'] = bytes;
+    if (!isPrunedWebFile(path, wasm: wasm) && !isSigningSecret(path)) {
+      files['webroot/$path'] = bytes;
+    }
   });
   webuiFolder.forEach((path, bytes) {
+    if (isSigningSecret(path)) return;
     if (_expandsVars(path)) {
       final text = utf8.decode(bytes);
       bytes = utf8.encode(expandBuildVars(text, buildName: buildName, buildNumber: buildNumber));
@@ -91,6 +94,17 @@ List<ModuleFile> assembleModule({
     for (final path in paths)
       ModuleFile(path, files[path]!, executable: isExecutableModulePath(path)),
   ];
+}
+
+/// Signing material that must never ship in a module zip: `key.properties`
+/// and keystores, wherever they sit in the tree.
+bool isSigningSecret(String path) {
+  final name = path.split('/').last.toLowerCase();
+  return name == 'key.properties' ||
+      name.endsWith('.jks') ||
+      name.endsWith('.keystore') ||
+      name.endsWith('.p12') ||
+      name.endsWith('.pfx');
 }
 
 /// [customizeSh] with a block that makes the tool's program directories

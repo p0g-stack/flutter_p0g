@@ -79,6 +79,24 @@ void main() {
       expect(byPath['uninstall.sh'], endsWith('\n$kUninstallLine\n'));
     });
 
+    test('signing keys in webui/ never reach the zip', () {
+      final files = assembleModule(
+        webBuild: {'key.properties': b('x')},
+        webuiFolder: {
+          ...webui,
+          'key.properties': b('storePassword=secret'),
+          'upload.jks': b('k'),
+          'keys/release.P12': b('k'),
+          'a.keystore': b('k'),
+        },
+        buildName: '1',
+        buildNumber: '1',
+      );
+      final paths = files.map((f) => f.path).toList();
+      expect(paths.where((p) => p.contains('key') || p.endsWith('.jks')), isEmpty);
+      expect(isSigningSecret('webroot/keyboard.png'), isFalse);
+    });
+
     test('an invalid module id is refused before it reaches a script', () {
       expect(() => withDataFolder('', 'a b;rm'), throwsStateError);
     });

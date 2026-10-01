@@ -211,9 +211,17 @@ class BuildWebUiCommand extends BuildWebCommand {
 
     final buildName = buildInfo.buildName ?? project.manifest.buildName ?? '1.0.0';
     final buildNumber = buildInfo.buildNumber ?? project.manifest.buildNumber ?? '1';
+    final webuiTree = _readTree(webui);
+    final secrets = [...webuiTree.keys.where(isSigningSecret)];
+    if (secrets.isNotEmpty) {
+      globals.printWarning(
+        'Left out of the module: ${secrets.map((p) => 'webui/$p').join(', ')}. Signing keys '
+        'and key.properties never ship; keep them in android/ (android/key.properties).',
+      );
+    }
     final files = assembleModule(
       webBuild: _readTree(web),
-      webuiFolder: _readTree(webui),
+      webuiFolder: webuiTree,
       extra: extra,
       buildName: buildName,
       buildNumber: buildNumber,

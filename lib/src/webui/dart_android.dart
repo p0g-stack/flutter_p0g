@@ -130,10 +130,12 @@ String launcherScript(String name) =>
     '''
 #!/system/bin/sh
 # $name: Dart AOT snapshot on the bundled Android runtime (flutter_p0g).
-b=\${0%/*}
+b=\$(cd "\${0%/*}" && pwd)
 d=\$b/\$(getprop ro.product.cpu.abi)
 # Root shells may start with an empty environment; the VM needs a TMPDIR.
-export TMPDIR="\$b/../tmp"
+# The module's temp directory, as the root channel sets it.
+m=\${b%/*}
+export TMPDIR="\${TMPDIR:-/data/adb/\${m##*/}/tmp}"
 mkdir -p "\$TMPDIR"
 exec "\$d/dartaotruntime" "\$d/$name.aot" "\$@"
 ''';

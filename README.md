@@ -115,10 +115,10 @@ Gaps are listed here, not hidden.
    permission dialog names the module, and grants and data are per module.
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
-   - `webui/key.properties`, else `android/key.properties` (`storeFile`,
-     `storePassword`, `keyAlias`, `keyPassword`; `storeFile` relative to
-     `webui/`, or to `android/app/` then `android/`). The keystore must be
-     PKCS12 (keytool's default since JDK 9); a JKS one is refused with the
+   - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
+     `keyPassword`; `storeFile` relative to `android/app/`, then `android/`),
+     the file a stock Flutter Android release build reads. The keystore must
+     be PKCS12 (keytool's default since JDK 9); a JKS one is refused with the
      `keytool -importkeystore` line that converts it.
    - Otherwise the debug key in `~/.android/debug.keystore`
      (`$ANDROID_USER_HOME/debug.keystore`), created if missing; a JKS debug
@@ -126,10 +126,12 @@ Gaps are listed here, not hidden.
 
    **Releases need a stable key.** Android keeps an app's permission grants
    and data only while updates carry the same signing key, and debug keys
-   differ per machine. A CI that publishes modules must write a
-   `webui/key.properties` from its secrets (keystore and passwords) before
+   differ per machine. A CI that publishes modules must write
+   `android/key.properties` and the keystore from its secrets (keystore and passwords) before
    `build webui`; changing the key later means users must uninstall the old
-   copy and grant again.
+   copy and grant again. Never put keys in `webui/`: it is zipped into the
+   module, so the build leaves out `key.properties` and keystores (`.jks`,
+   `.keystore`, `.p12`, `.pfx`) found there and warns.
 9. If the app or its workspace root has `cli/` (the bricks layout): compiles it
    for the device into `bin/`, with the frb `.so` from `rust/` beside it
    (`--device-rust-libs=<dir>` takes libraries built elsewhere, laid out as
