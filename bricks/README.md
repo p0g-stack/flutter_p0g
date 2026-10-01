@@ -1,60 +1,23 @@
-# template-app
+# bricks
 
-The bare surfaces app. It builds on every target and is what new apps are
-stamped from.
+> This repo was `template-app`; it is being renamed to `bricks`.
 
-Targets: KernelSU WebUI / WebUI X module, plain web, AERA `.aerap`, Linux,
-Android. Same `lib/` and `rust/` for all of them.
+[Mason](https://pub.dev/packages/mason) bricks for p0g-stack apps. Platform
+folders are not here: `flutterp0g_tool create .` adds `webui/` and `aera/` to
+any Flutter app, the way `flutter create --platforms` does.
 
-## Scope
+## Bricks
 
-In: the minimal Dart entry, a `rust/` workspace with core, worker and the
-flutter_rust_bridge crate, one `surfaces.yaml`, CI that builds every target,
-`docs/` sketches of the patterns a stamped app will need.
+| Brick | Stamps |
+|---|---|
+| `p0g_app` | a pub workspace: `core/` (pure Dart, the logic), `app/` (Flutter GUI on core), `cli/` (Dart CLI on core, `dart compile exe`; also the WebUI root process in serve mode), optional `rust/` via frb for crates the core uses; Squadron + `squadron_process`; logging convention |
+| `service` | a Squadron service exposed to both the GUI and the CLI |
+| `strategy` | a strategy with `available(facts)` (e.g. on-device `dd` vs host `fastboot fetch`) |
 
-Out: features. One example op and one example job, nothing more. Anything
-reusable moves to `surfaces`; anything illustrative moves to `surfaces/example`.
-
-## Proposed nest
-
-```
-surfaces.yaml         single source: id, name, version, worker, rust dirs; generates the Dart constants
-lib/
-  main.dart           WebUiBinding on webui targets, stock binding elsewhere; one page
-  native/             loads the frb crate on dart:io; frb sync web mode on web
-rust/
-  Cargo.toml          workspace; surfaces-core/-ops pinned by rev
-  core/               app logic + Handler; every op declares its Effect
-  worker/             fn main() { surfaces_ops::worker::main(AppOps) }
-  native/             frb crate
-bootstrap/            from flutter-webui; index.html host hooks
-android/ linux/       flutter create output, pruned
-docs/
-  backends.md         the swappable-backend sketch: trait, available(), preference order, tiers
-.github/workflows/    ci: analyze, test, codegen check, build all targets, e2e; release
-```
-
-## Rules
-
-- `surfaces.yaml` is the only place the app id lives.
-- Dart and Rust pin the same `surfaces` commit; `surfaces doctor` and the
-  startup handshake both check it.
-- `rust_builder` and generated frb code are produced by the CLI, not vendored
-  per app.
-- The template's example ops are `Effect::Read`, so a stamped app starts safe.
-
-## Stamping an app
-
-Keep this layout; add only under `lib/`, `rust/core` and `rust/worker`. App
-backends live behind a trait in `rust/core` and depend only on
-`surfaces-core` and `surfaces-ops`; `docs/backends.md` shows the shape,
-including a host-provided transport (USB via `nusb` natively, WebUSB from Dart
-on the web) under a host-neutral protocol.
+A new app: `mason make p0g_app`, then `flutterp0g_tool create .`, write the
+core, then `flutterp0g_tool build webui` / `aera`.
 
 ## License
 
 LGPL-3.0-or-later with the LGPL-3.0 linking exception
 (`LICENSE`, `LICENSE.exception`; SPDX `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception`).
-Apps may link this library statically or dynamically, private apps included,
-without releasing their own code or shipping relinking material. Changes to
-the library itself stay LGPL.
