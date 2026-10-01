@@ -1,3 +1,11 @@
+# 0.7.1
+
+- `rust` on the web: the Rust wasm loads on the first Rust call, not at
+  start. The `native` fact asks whether the wasm is there (a HEAD request,
+  `nativeShipped()`); a strategy that calls Rust awaits `loadNative()` first
+  (the `digest` example does). Native places still load the library for the
+  fact, which is cheap.
+
 # 0.7.0
 
 - `Availability.waiting`: a strategy that would run once the user acts

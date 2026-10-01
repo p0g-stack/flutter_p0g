@@ -61,7 +61,8 @@ fallback. `loadNative()` (`core/lib/src/native/`) loads the library once per
 isolate, Web Worker or process: `P0G_NATIVE_LIB`, then beside the executable
 (`bin/<abi>/` where flutter_p0g packs it, or beside a `dart compile exe`
 binary), then a Linux bundle's `lib/`, then `rust/target/` in the workspace.
-On the web it is frb's wasm under `pkg/`, which `flutter_p0g build webui`
+On the web it is frb's wasm under `pkg/`, checked with a HEAD request for the
+`native` fact and instantiated on the first Rust call, which `flutter_p0g build webui`
 builds; a plain `flutter build web` has none, and the Dart strategy runs.
 The hello service's `sha256`, the CLI's `digest` command and the app's
 SHA-256 button go through it. `tool/rust.sh` (run by bootstrap) uses

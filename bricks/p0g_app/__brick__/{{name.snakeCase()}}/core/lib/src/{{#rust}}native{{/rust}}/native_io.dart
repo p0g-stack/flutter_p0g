@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
+import 'native.dart' show loadNative;
+
 /// Native: the first library found, in this order.
 ///
 /// 1. `P0G_NATIVE_LIB`, a full path.
@@ -42,3 +44,6 @@ Iterable<String> _workspaceBuilds(String name) sync* {
     dir = parent;
   }
 }
+
+/// Native: loading the library is cheap, so the fact is the real load.
+Future<bool> nativeShipped(String stem) => loadNative();

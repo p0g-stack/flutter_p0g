@@ -20,7 +20,7 @@ Future<Map<String, Object?>> checkFacts() async {
     Fact.processSpawn: false,
     Fact.fsPersistent: await _persisted(nav),
     Fact.net: nav != null && (nav['onLine'] as JSBoolean?)?.toDart == true,
-{{#rust}}    Fact.native: await loadNative(),
+{{#rust}}    Fact.native: await nativeShipped(),
 {{/rust}}  };
 }
 

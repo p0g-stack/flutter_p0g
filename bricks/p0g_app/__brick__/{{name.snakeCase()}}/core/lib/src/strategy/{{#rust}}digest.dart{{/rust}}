@@ -28,8 +28,12 @@ final class RustSha256 extends ReadStrategy<String, String> {
   Set<String> get requires => const {Fact.native};
 
   @override
-  Future<String> run(String input, PlaceInfo place) async =>
-      sha256Hex(data: utf8.encode(input));
+  Future<String> run(String input, PlaceInfo place) async {
+    // The first Rust call in a place loads the library (on the web, the
+    // wasm); the `native` fact only said it is there.
+    if (!await loadNative()) throw StateError('the Rust library did not load');
+    return sha256Hex(data: utf8.encode(input));
+  }
 }
 
 final class DartSha256 extends ReadStrategy<String, String> {
