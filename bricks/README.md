@@ -18,7 +18,12 @@ any Flutter app, the way `flutter create --platforms` does.
 `core_imports_flutter` and `strategy_reads_platform` make the two main
 conventions `dart analyze` warnings.
 
-A new app:
+A new app, step by step to a WebUI module: [docs/new-app.md](docs/new-app.md).
+A worked objective, CBM's partition fetch (`dd` on the device against
+`fastboot fetch` from a computer):
+[docs/samples/partition-fetch.md](docs/samples/partition-fetch.md).
+
+In short:
 
 ```sh
 dart pub global activate mason_cli

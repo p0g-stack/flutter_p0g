@@ -1,3 +1,11 @@
+# 0.6.1
+
+- `rust`: a Squadron Web Worker loads the wasm from `../pkg/` (it runs from
+  `workers/`), so the `native` fact holds there too. `tool/rust.sh` builds
+  release, the profile the loader tries first, so a stale release build no
+  longer shadows a fresh debug one.
+- `cli/test/webui_launch_test.dart` is format-clean as stamped.
+
 # 0.6.0
 
 - `analysis_options.yaml` turns on the p0g_lints plugin (this repo,

@@ -16,8 +16,7 @@ import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 /// `<module>/bin/{{name.snakeCase()}} serve` detached. Here bin/{{name.snakeCase()}} runs the CLI
 /// from source instead of the AOT snapshot flutter_p0g ships.
 void main() {
-  test('the hello service runs in the CLI launched through the root channel',
-      () async {
+  test('hello runs in the CLI launched through the root channel', () async {
     final module = await Directory.systemTemp.createTemp('p0g_module');
     RootChannelServer? server;
     RootChannel? channel;
@@ -41,9 +40,8 @@ void main() {
         File('${module.path}/webroot/.run/session.json'),
         origin: managerOrigin,
       ),
-      start: () async => server ??= await RootChannelServer.start(
-        moduleDir: module,
-      ),
+      start: () async =>
+          server ??= await RootChannelServer.start(moduleDir: module),
     );
 
     final place = webUiProcessPlace(

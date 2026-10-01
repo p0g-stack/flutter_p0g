@@ -56,7 +56,7 @@ TOML
 fi
 
 "$codegen" generate
-(cd rust && cargo build)
+(cd rust && cargo build --release)
 if [ "$web" = 1 ]; then
   # wasm-pack runs wasm-opt from binaryen 117 (an older system wasm-opt
   # produced a module whose externref table failed to grow at init).

@@ -99,6 +99,23 @@ mason make strategy -o "$app" --name flash --strategies '["dd"]' --write true
 )
 echo "::endgroup::"
 
+echo "::group::sample: partition fetch (docs/samples)"
+printf '{"name":"cbm","description":"Canoe Boot Manager sample.","org":"dev.p0g","rust":false}' > "$out/cbm.json"
+mason make p0g_app -c "$out/cbm.json" -o "$out" --on-conflict overwrite
+mason make service -o "$out/cbm" --name partitions
+mason make strategy -o "$out/cbm" --name fetch_partition --strategies '["dd", "fastboot fetch"]' --write false
+(
+  cd "$out/cbm"
+  git apply "$root/docs/samples/partition-fetch.patch"
+  PLATFORMS=web bash tool/bootstrap.sh
+  dart format --output=none --set-exit-if-changed core cli app/lib app/test
+  dart analyze --fatal-infos
+  (cd core && dart test)
+  (cd cli && dart test)
+  dart run cli/bin/cbm.dart partitions --how
+)
+echo "::endgroup::"
+
 echo "::group::p0g_app (rust)"
 make_app ci_rust true
 (
@@ -114,7 +131,7 @@ make_app ci_rust true
   # workspace so only that copy can be found.
   mkdir -p build
   dart compile exe cli/bin/ci_rust.dart -o build/ci_rust
-  cp rust/target/debug/libci_rust_native.so build/
+  cp rust/target/release/libci_rust_native.so build/
   (cd / && "$out/ci_rust/build/ci_rust" digest abc | grep -q rust_sha2)
   (cd app && flutter build web)
 )

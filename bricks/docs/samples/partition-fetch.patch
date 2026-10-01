@@ -1,0 +1,343 @@
+diff --git a/cli/lib/src/commands/partitions_command.dart b/cli/lib/src/commands/partitions_command.dart
+index 7631439..7d93068 100644
+--- a/cli/lib/src/commands/partitions_command.dart
++++ b/cli/lib/src/commands/partitions_command.dart
+@@ -1,21 +1,37 @@
+ import 'package:args/command_runner.dart';
+ import 'package:cbm_core/cbm_core.dart';
+ 
+-/// Calls [PartitionsService] in-process.
++/// Fetches a partition with [PartitionsService], in this process.
+ class PartitionsCommand extends Command<int> {
++  PartitionsCommand() {
++    argParser
++      ..addOption('out', abbr: 'o', defaultsTo: '.', help: 'Where to write.')
++      ..addFlag('how', help: 'Only say which strategy would run, and why.');
++  }
++
+   @override
+   String get name => 'partitions';
+ 
+   @override
+-  String get description => 'Call the partitions service.';
++  String get description => 'Fetch a partition image (dd or fastboot fetch).';
+ 
+   @override
+-  String get invocation => '${runner!.executableName} partitions <input>';
++  String get invocation =>
++      '${runner!.executableName} partitions [--how] <partition>';
+ 
+   @override
+   Future<int> run() async {
+-    final input = argResults!.rest.join(' ');
+-    print(await PartitionsService().echo(input));
++    final service = PartitionsService();
++    if (argResults!.flag('how')) {
++      print(await service.howToFetch());
++      return 0;
++    }
++    if (argResults!.rest.length != 1) usageException('Name one partition.');
++    final r = await service.fetch(
++      argResults!.rest.single,
++      argResults!.option('out')!,
++    );
++    print('${r['path']}  ${r['strategy']}');
+     return 0;
+   }
+ }
+diff --git a/core/lib/src/facts/check_io.dart b/core/lib/src/facts/check_io.dart
+index 6555160..e2683c7 100644
+--- a/core/lib/src/facts/check_io.dart
++++ b/core/lib/src/facts/check_io.dart
+@@ -16,6 +16,7 @@ Future<Map<String, Object?>> checkFacts() async {
+     Fact.processSpawn: await _canSpawn(),
+     Fact.fsPersistent: await _canWriteWorkingDir(),
+     Fact.net: await _hasNetwork(),
++    Fact.fastboot: await _canRun('fastboot', ['--version']),
+   };
+ }
+ 
+@@ -98,3 +99,11 @@ Future<bool> _hasNetwork() async {
+     return false;
+   }
+ }
++
++Future<bool> _canRun(String tool, List<String> args) async {
++  try {
++    return (await Process.run(tool, args)).exitCode == 0;
++  } catch (_) {
++    return false;
++  }
++}
+diff --git a/core/lib/src/facts/check_web.dart b/core/lib/src/facts/check_web.dart
+index 7d08d39..a167b6d 100644
+--- a/core/lib/src/facts/check_web.dart
++++ b/core/lib/src/facts/check_web.dart
+@@ -19,6 +19,7 @@ Future<Map<String, Object?>> checkFacts() async {
+     Fact.processSpawn: false,
+     Fact.fsPersistent: await _persisted(nav),
+     Fact.net: nav != null && (nav['onLine'] as JSBoolean?)?.toDart == true,
++    Fact.fastboot: false,
+   };
+ }
+ 
+diff --git a/core/lib/src/facts/facts.dart b/core/lib/src/facts/facts.dart
+index d7c7ed8..ad29b5a 100644
+--- a/core/lib/src/facts/facts.dart
++++ b/core/lib/src/facts/facts.dart
+@@ -31,6 +31,8 @@ abstract final class Fact {
+   /// The place has a network interface other than loopback that is up.
+   static const net = 'net';
+ 
++  /// The place can run the `fastboot` tool (it is on PATH and starts).
++  static const fastboot = 'tool.fastboot';
+ 
+   static const all = [
+     root,
+@@ -40,6 +42,7 @@ abstract final class Fact {
+     processSpawn,
+     fsPersistent,
+     net,
++    fastboot,
+   ];
+ }
+ 
+diff --git a/core/lib/src/service/partitions_service.dart b/core/lib/src/service/partitions_service.dart
+index 665a73b..14822d2 100644
+--- a/core/lib/src/service/partitions_service.dart
++++ b/core/lib/src/service/partitions_service.dart
+@@ -3,6 +3,8 @@ import 'dart:async';
+ import 'package:logging/logging.dart';
+ import 'package:squadron/squadron.dart';
+ 
++import '../facts/facts.dart';
++import '../strategy/fetch_partition.dart';
+ import 'partitions_service.activator.g.dart';
+ 
+ part 'partitions_service.worker.g.dart';
+@@ -27,4 +29,22 @@ base class PartitionsService {
+     _log.fine('echo $input');
+     return input;
+   }
++
++  /// Which way this place would fetch a partition, and what it passed over.
++  @squadronMethod
++  Future<String> howToFetch() async =>
++      fetchPartition.selectRead(await PlaceInfo.current()).why;
++
++  /// Copies [partition]'s image into [outDir], the way this place can: `dd`
++  /// in the root process on the device, `fastboot fetch` on a computer.
++  @squadronMethod
++  Future<Map<String, String>> fetch(String partition, String outDir) async {
++    final place = await PlaceInfo.current();
++    final request = FetchRequest(partition, outDir);
++    final strategy = fetchPartition.selectRead(place).chosen?.name ?? 'none';
++    return {
++      'path': await fetchPartition.run(request, place),
++      'strategy': strategy,
++    };
++  }
+ }
+diff --git a/core/lib/src/strategy/fetch_partition.dart b/core/lib/src/strategy/fetch_partition.dart
+index e5070fa..cde48a0 100644
+--- a/core/lib/src/strategy/fetch_partition.dart
++++ b/core/lib/src/strategy/fetch_partition.dart
+@@ -1,42 +1,98 @@
++import 'dart:io';
++
+ import '../facts/facts.dart';
+ import 'objective.dart';
+ import 'strategy.dart';
+ 
+-/// Fetch partition: its strategies, in preference order. The first
+-/// whose `available(facts)` holds in the place runs.
+-final fetchPartition = Objective<String, String>('fetch_partition', const [
+-  FetchPartitionDd(),
+-  FetchPartitionFastbootFetch(),
+-]);
++/// What to fetch, and where to put the image.
++final class FetchRequest {
++  const FetchRequest(this.partition, this.outDir);
++
++  /// The partition's name, as in `/dev/block/by-name/` (`boot_a`, `init_boot`).
++  final String partition;
++  final String outDir;
++
++  String get outPath => '$outDir/$partition.img';
++}
++
++/// Fetch partition: copy one partition's image to a file. On the device, as
++/// root, `dd` reads the block device; from a computer with the device in
++/// fastboot(d), `fastboot fetch` pulls it over USB. Same objective, two
++/// places: which one runs is decided by the facts of the place the partitions
++/// service runs in, never by the platform.
++final fetchPartition = Objective<FetchRequest, String>(
++  'fetch_partition',
++  const [FetchPartitionDd(), FetchPartitionFastbootFetch()],
++);
++
++/// On the device: `dd` from `/dev/block/by-name/<partition>`.
++final class FetchPartitionDd extends ReadStrategy<FetchRequest, String> {
++  const FetchPartitionDd({this.byName = '/dev/block/by-name'});
+ 
+-/// Fetch partition via dd.
+-final class FetchPartitionDd extends ReadStrategy<String, String> {
+-  const FetchPartitionDd();
++  /// Where the device's partitions are listed by name.
++  final String byName;
+ 
+   @override
+   String get name => 'dd';
+ 
+-  /// The facts this strategy cannot run without, e.g. `{Fact.root}`.
+   @override
+-  Set<String> get requires => const {};
++  Set<String> get requires => const {
++    Fact.root,
++    Fact.blockDevices,
++    Fact.processSpawn,
++  };
+ 
+   @override
+-  Future<String> run(String input, PlaceInfo place) =>
+-      throw UnimplementedError('fetch_partition via dd');
++  Future<String> run(FetchRequest input, PlaceInfo place) async {
++    final r = await Process.run('dd', [
++      'if=$byName/${input.partition}',
++      'of=${input.outPath}',
++      'bs=4M',
++    ]);
++    if (r.exitCode != 0) {
++      throw ProcessException('dd', const [], '${r.stderr}', r.exitCode);
++    }
++    return input.outPath;
++  }
+ }
+ 
+-/// Fetch partition via fastboot fetch.
+-final class FetchPartitionFastbootFetch extends ReadStrategy<String, String> {
++/// From a computer: `fastboot fetch <partition> <file>` (needs fastbootd on
++/// the device, and only some partitions can be fetched).
++final class FetchPartitionFastbootFetch
++    extends ReadStrategy<FetchRequest, String> {
+   const FetchPartitionFastbootFetch();
+ 
+   @override
+   String get name => 'fastboot_fetch';
+ 
+-  /// The facts this strategy cannot run without, e.g. `{Fact.root}`.
+   @override
+-  Set<String> get requires => const {};
++  Set<String> get requires => const {
++    Fact.fastboot,
++    Fact.usbNative,
++    Fact.processSpawn,
++  };
++
++  /// A place with root and block devices is the device itself; fastboot
++  /// would talk to some other device, so don't offer it there.
++  @override
++  Availability available(Facts facts) {
++    final base = super.available(facts);
++    if (!base.ok) return base;
++    return facts.has(Fact.root) && facts.has(Fact.blockDevices)
++        ? Availability(name, note: 'this place is the device')
++        : base;
++  }
+ 
+   @override
+-  Future<String> run(String input, PlaceInfo place) =>
+-      throw UnimplementedError('fetch_partition via fastboot_fetch');
++  Future<String> run(FetchRequest input, PlaceInfo place) async {
++    final r = await Process.run('fastboot', [
++      'fetch',
++      input.partition,
++      input.outPath,
++    ]);
++    if (r.exitCode != 0) {
++      throw ProcessException('fastboot', const [], '${r.stderr}', r.exitCode);
++    }
++    return input.outPath;
++  }
+ }
+diff --git a/core/test/fetch_partition_test.dart b/core/test/fetch_partition_test.dart
+index 9411283..c3b66f4 100644
+--- a/core/test/fetch_partition_test.dart
++++ b/core/test/fetch_partition_test.dart
+@@ -1,18 +1,56 @@
++@TestOn('vm')
++library;
++
++import 'dart:io';
++
+ import 'package:test/test.dart';
+ import 'package:cbm_core/cbm_core.dart';
+ 
+ void main() {
+-  const place = PlaceInfo('test', Facts.none());
++  PlaceInfo place(Set<String> facts) =>
++      PlaceInfo('test', Facts({for (final f in facts) f: true}));
++
++  test('on the device, as root, dd is chosen', () {
++    final device = place({Fact.root, Fact.blockDevices, Fact.processSpawn});
++    expect(fetchPartition.selectRead(device).chosen, isA<FetchPartitionDd>());
++  });
++
++  test('on a computer with fastboot, fastboot fetch is chosen', () {
++    final host = place({Fact.processSpawn, Fact.usbNative, Fact.fastboot});
++    final selection = fetchPartition.selectRead(host);
++    expect(selection.chosen, isA<FetchPartitionFastbootFetch>());
++    expect(selection.why, startsWith('dd skipped (missing root, '));
++  });
++
++  test('fastboot is not offered on the device itself', () {
++    final both = place({
++      Fact.root,
++      Fact.blockDevices,
++      Fact.processSpawn,
++      Fact.usbNative,
++      Fact.fastboot,
++    });
++    final fastboot = const FetchPartitionFastbootFetch();
++    expect(fastboot.available(both.facts).reason, 'this place is the device');
++  });
+ 
+-  test('every strategy says whether it fits', () {
+-    for (final s in fetchPartition.strategies) {
+-      expect(s.available(const Facts.none()).strategy, s.name);
+-    }
++  test('a browser tab has no way to fetch', () {
++    expect(
++      () => fetchPartition.run(
++        const FetchRequest('boot_a', '/tmp'),
++        place({Fact.usbWeb}),
++      ),
++      throwsA(isA<NoStrategyAvailable>()),
++    );
+   });
+ 
+-  test('the first available strategy, in order, is chosen', () {
+-    final selection = fetchPartition.selectRead(place);
+-    final firstOk = selection.considered.where((c) => c.$2.ok).firstOrNull;
+-    expect(selection.chosen, firstOk?.$1);
++  test('dd copies the partition image', () async {
++    final dir = await Directory.systemTemp.createTemp('cbm');
++    addTearDown(() => dir.delete(recursive: true));
++    final byName = await Directory('${dir.path}/by-name').create();
++    await File('${byName.path}/boot_a').writeAsBytes(List.filled(4096, 7));
++    final path = await FetchPartitionDd(byName: byName.path)
++        .run(FetchRequest('boot_a', dir.path), place({}));
++    expect(await File(path).readAsBytes(), List.filled(4096, 7));
+   });
+ }
+diff --git a/core/test/partitions_service_test.dart b/core/test/partitions_service_test.dart
+index 03f2bce..4d02a00 100644
+--- a/core/test/partitions_service_test.dart
++++ b/core/test/partitions_service_test.dart
+@@ -10,5 +10,6 @@ void main() {
+     final worker = PartitionsServiceWorker();
+     addTearDown(worker.terminate);
+     expect(await worker.echo('worker'), 'worker');
++    expect(await worker.howToFetch(), contains('dd'));
+   }, testOn: 'vm');
+ }
