@@ -25,7 +25,6 @@ String installScript(String remoteZip) {
 }
 
 /// POSIX single-quote quoting.
-@visibleForTesting
 String shellQuote(String s) => "'${s.replaceAll("'", r"'\''")}'";
 
 /// Pushes a module zip to a device over adb and installs it with the root

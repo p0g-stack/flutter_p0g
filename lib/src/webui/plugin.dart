@@ -102,6 +102,12 @@ Future<T> withWebuiPlugin<T>(
     throwToolExit('flutter-webui is not resolved. Run `flutter_p0g precache --webui`.');
   }
 
+  // A run killed before it could restore leaves its backup: restore it first.
+  final backup = appConfigFile.parent.childFile('package_config.json.flutter_p0g');
+  if (backup.existsSync()) {
+    globals.printTrace('Restoring the package config a previous build left overlaid.');
+    backup.copySync(appConfigFile.path);
+  }
   final original = appConfigFile.readAsBytesSync();
   final overlay = overlayPackageConfig(
     _json(original),
@@ -122,11 +128,13 @@ Future<T> withWebuiPlugin<T>(
         ..writeAsStringSync(webuiEntrypoint(appImport));
 
   globals.printTrace('WebUI plugin packages added: ${overlay.added.join(', ')}');
+  backup.writeAsBytesSync(original);
   appConfigFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(overlay.config));
   try {
     return await body(entry.path);
   } finally {
     appConfigFile.writeAsBytesSync(original);
+    backup.deleteSync();
   }
 }
 

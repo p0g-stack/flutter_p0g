@@ -21,7 +21,9 @@ class P0gCommandRunner extends CommandRunner<void> implements FlutterCommandRunn
         hide: !verboseHelp,
         help: 'Use a locally built web SDK (engine out directory name).',
       )
-      ..addFlag(FlutterGlobalOptions.kPrintDtd, negatable: false, hide: true);
+      ..addFlag(FlutterGlobalOptions.kPrintDtd, negatable: false, hide: true)
+      ..addFlag(FlutterGlobalOptions.kContinuousIntegrationFlag, negatable: false, hide: true)
+      ..addOption(FlutterGlobalOptions.kDebugLogsDirectoryFlag, hide: true);
   }
 
   @override

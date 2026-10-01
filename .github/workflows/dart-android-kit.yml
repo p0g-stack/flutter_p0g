@@ -14,6 +14,8 @@ on:
       dart_version:
         description: Dart release (must match the pinned Flutter's dart-sdk/version)
         default: 3.13.4
+permissions:
+  contents: write # the dart-android-<version> release
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -24,7 +24,7 @@ P0gCommandRunner createRunner({bool verboseHelp = false}) {
     ..addCommand(CreateCommand())
     ..addCommand(P0gBuildCommand(verboseHelp: verboseHelp))
     ..addCommand(InstallCommand())
-    ..addCommand(RunCommand())
+    ..addCommand(RunCommand(verboseHelp: verboseHelp))
     ..addCommand(PrecacheCommand());
 }
 
@@ -36,18 +36,35 @@ Future<void> main(List<String> args) async {
 
   await runInP0gContext(() async {
     final runner = createRunner(verboseHelp: help && verbose);
-    var code = 0;
-    try {
-      await runner.run(args);
-    } on ToolExit catch (e) {
-      if (e.message != null) globals.printError(e.message!);
-      code = e.exitCode ?? 1;
-    } on UsageException catch (e) {
-      globals.printError(e.message);
-      globals.printStatus(e.usage);
-      code = 64;
-    }
-    await exitWithHooks(code, shutdownHooks: globals.shutdownHooks);
+    // Errors outside the command's own future (the resident runner's
+    // terminal handler) end the tool the same way, running shutdown hooks,
+    // as flutter_tools' runner zone does.
+    final done = Completer<int>();
+    runZonedGuarded(
+      () async {
+        await runner.run(args);
+        if (!done.isCompleted) done.complete(0);
+      },
+      (error, stack) {
+        if (done.isCompleted) return;
+        done.complete(switch (error) {
+          ToolExit(:final message, :final exitCode) => () {
+            if (message != null) globals.printError(message);
+            return exitCode ?? 1;
+          }(),
+          UsageException(:final message, :final usage) => () {
+            globals.printError(message);
+            globals.printStatus(usage);
+            return 64;
+          }(),
+          _ => () {
+            globals.printError('$error\n$stack');
+            return 1;
+          }(),
+        });
+      },
+    );
+    await exitWithHooks(await done.future, shutdownHooks: globals.shutdownHooks);
   }, verbose: verbose);
 }
 

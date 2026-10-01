@@ -10,6 +10,8 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/hook_runner.dart';
 import 'package:flutter_tools/src/isolated/build_targets.dart';
 import 'package:flutter_tools/src/isolated/mustache_template.dart';
+import 'package:flutter_tools/src/isolated/resident_web_runner.dart';
+import 'package:flutter_tools/src/web/web_runner.dart';
 import 'package:unified_analytics/unified_analytics.dart';
 
 import 'webui/flutter_webui.dart';
@@ -36,6 +38,7 @@ Future<V> runInP0gContext<V>(FutureOr<V> Function() fn, {bool verbose = false}) 
         patchedWebSdk: patchedWebSdk(),
       ),
       FlutterHookRunner: () => FlutterHookRunnerNative(),
+      WebRunnerFactory: () => DwdsWebRunnerFactory(),
       Logger: () {
         final Logger base = StdoutLogger(
           terminal: globals.terminal,

@@ -69,7 +69,6 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
 /// Pulls the `_flutter.buildConfig = {...};` block flutter_tools wrote into
 /// the stock `flutter_bootstrap.js`, so the bootstrap's own template can be
 /// filled with the same config.
-@visibleForTesting
 String? extractBuildConfig(String builtBootstrap) {
   final m = RegExp(
     r'if \(!window\._flutter\) \{\n  window\._flutter = \{\};\n\}\n'
@@ -83,11 +82,11 @@ String? extractBuildConfig(String builtBootstrap) {
 String fillIndexHtml(String html, {required String moduleId, required String title}) => html
     .replaceFirst(
       '<meta name="webui-module-id" content="">',
-      '<meta name="webui-module-id" content="${_attr(moduleId)}">',
+      '<meta name="webui-module-id" content="${htmlAttr(moduleId)}">',
     )
     .replaceFirst(RegExp('<title>[^<]*</title>'), '<title>${_text(title)}</title>');
 
-String _attr(String s) =>
+String htmlAttr(String s) =>
     s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 String _text(String s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
 
@@ -98,19 +97,12 @@ void applyBootstrap(Directory web, {required String moduleId, required String ti
   final built = web.childFile('flutter_bootstrap.js');
   final config = extractBuildConfig(built.readAsStringSync());
   if (config == null) throwToolExit('Could not find the build config in ${built.path}.');
-  final flutterJs = globals.fs.file(
-    globals.fs.path.join(
-      globals.artifacts!.getHostArtifact(HostArtifact.flutterJsDirectory).path,
-      'flutter.js',
-    ),
-  );
+  final flutterJs = flutterJsFile();
   built.writeAsStringSync(
-    WebTemplate(boot.childFile('flutter_bootstrap.js').readAsStringSync()).withSubstitutions(
-      baseHref: '',
-      serviceWorkerVersion: null,
-      flutterJsFile: flutterJs,
+    fillBootstrap(
+      boot.childFile('flutter_bootstrap.js').readAsStringSync(),
+      flutterJs: flutterJs,
       buildConfig: config,
-      logger: globals.logger,
     ),
   );
   web
@@ -126,6 +118,25 @@ void applyBootstrap(Directory web, {required String moduleId, required String ti
     boot.childFile(name).copySync(web.childFile(name).path);
   }
 }
+
+/// flutter-webui's `flutter_bootstrap.js` template, filled as flutter_tools
+/// fills `web/flutter_bootstrap.js`.
+String fillBootstrap(String template, {required File flutterJs, required String buildConfig}) =>
+    WebTemplate(template).withSubstitutions(
+      baseHref: '',
+      serviceWorkerVersion: null,
+      flutterJsFile: flutterJs,
+      buildConfig: buildConfig,
+      logger: globals.logger,
+    );
+
+/// flutter.js from the web SDK in use.
+File flutterJsFile() => globals.fs.file(
+  globals.fs.path.join(
+    globals.artifacts!.getHostArtifact(HostArtifact.flutterJsDirectory).path,
+    'flutter.js',
+  ),
+);
 
 /// Artifacts that point flutter_tools at the patched web SDK when it is built,
 /// leaving the shared Flutter cache untouched.

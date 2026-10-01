@@ -32,7 +32,7 @@ Gaps are listed here, not hidden.
 |---|---|---|
 | `create --platforms` | `create` adds `webui/` | `create` adds `aera/` |
 | `build <target>` (all flags) | `build webui`: every `build web` flag | `build aera`: every `build bundle` flag; debug, profile, release |
-| `run` + hot reload / restart | gap: needs flutter-webui's dev loader (plan: web dev server over adb reverse, a dev module pointing at it) | gap: needs flutter-aera's debug engine with the VM service URL in its log |
+| `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` (needs its no-`<base>` fix); device path (adb reverse, page swap) not yet run on a device | gap: needs flutter-aera's debug engine with the VM service URL in its log |
 | `attach` | gap | gap (follows the debug engine) |
 | `install` | `install`: adb + ksud / apd / magisk; activates on reboot | gap: no `.aerap` install path yet |
 | `devices` | gap (adb devices with a root manager probe) | gap |
@@ -48,7 +48,7 @@ Gaps are listed here, not hidden.
 | `build webui` | `flutter build web` with WebUI defaults, then the module zip. Every `build web` flag works | works |
 | `build aera` | `flutter build bundle` (+ AOT `libapp.so` for profile/release) packed with flutter-aera's runtime kit into a `.aerap` | works; debug against the released arm64 kit (kit-3.47.5) |
 | `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
-| `run` | dev loop with hot restart | stub: waits on flutter-webui's bootstrap |
+| `run` | `flutter run -d web-server` (DDC, hot reload/restart, debug service) with the patched SDK and the flutter_webui plugin, behind a dev proxy; with adb, reverses the port and points the installed module's page at it | works in Chromium; device path not yet run |
 | `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits | works; the kit releases and `--app-plane` wait on CI |
 
 ### `build webui`
@@ -108,6 +108,22 @@ swaps in another source with the same layout (`VERSION`, `gen_snapshot`,
 `dartaotruntime`). The pipeline is checked end to end with a host-arch kit;
 the Android kit itself is not built yet. `--cli-format=exe` is kept for a Dart
 SDK that can compile Android executables directly.
+
+### `run`
+
+1. flutter_tools' `web-server` device on a free loopback port, built like
+   `build webui` (patched web SDK, the flutter_webui plugin, no CDN).
+2. A dev proxy on `--dev-port` (8800) in front of it: CORS for the manager's
+   origin, flutter-webui's `flutter_webui.js`/`.css` and its
+   `flutter_bootstrap.js` with the loader based at the dev server
+   (`entrypointBaseUrl`, `assetBase`, `canvasKitBaseUrl`), `fonts/` from
+   Google Fonts through the host (Roboto from the engine when offline),
+   DWDS's reload paths made absolute, WebSockets passed through.
+3. With a device on adb (`--serial`): `adb reverse tcp:8800`, and the
+   installed module's `index.html` becomes flutter-webui's `dev.html` pointed
+   at the proxy (the release page kept as `index.release.html`, put back on
+   exit). Without one, open `dev.html?dev=http://127.0.0.1:8800/` from any
+   page that serves flutter-webui's bootstrap.
 
 ### `build aera`
 
