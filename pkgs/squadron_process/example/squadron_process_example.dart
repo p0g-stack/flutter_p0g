@@ -19,9 +19,8 @@ class GreeterService implements WorkerService {
   @override
   late final OperationsMap operations = OperationsMap({
     greetCmd: (req) => 'Hello, ${req.args[0]}!',
-    countCmd: (req) => Stream.fromIterable(
-      List.generate(req.args[0] as int, (i) => i + 1),
-    ),
+    countCmd: (req) =>
+        Stream.fromIterable(List.generate(req.args[0] as int, (i) => i + 1)),
   });
 }
 
@@ -44,10 +43,9 @@ class GreeterWorker extends Worker {
 Future<void> main() async {
   // Host side: what `my_app serve` does, minus printing and exiting.
   final hosted = GreeterWorker();
-  final served = await startServe(
-    {'greeter': hosted},
-    facts: () async => {'example': true},
-  );
+  final served = await startServe({
+    'greeter': hosted,
+  }, facts: () async => {'example': true});
 
   // Client side: bind a worker to the process place and use it as usual.
   final place = ProcessPlace(endpoint: served.endpoint);

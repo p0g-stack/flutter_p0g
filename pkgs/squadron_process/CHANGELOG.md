@@ -13,4 +13,6 @@
 - Launchers: `IoProcessLauncher`, `ElevatedLauncher` (`PkexecLauncher`,
   `SuLauncher`, `MacAdminLauncher`, `WindowsRunAsLauncher`), launch ids and
   `FileEndpointStore` for front-ends that hide stdout.
+- Benchmark of isolate, Web Worker and process places on the VM and in
+  Chromium (`benchmark/`, `tool/bench.sh`, doc/benchmark.md).
 - `squadron_patch` executable and the Squadron 7.4.4 channel-factory patch.

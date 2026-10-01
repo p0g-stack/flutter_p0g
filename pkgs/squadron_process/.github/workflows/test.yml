@@ -15,7 +15,7 @@ jobs:
       - name: Patched Squadron
         run: tool/squadron.sh
       - run: dart pub get
-      - run: dart format --output=none --set-exit-if-changed lib test bin example
+      - run: dart format --output=none --set-exit-if-changed lib test bin example benchmark
       - run: dart analyze --fatal-infos
       - name: VM
         run: dart test -p vm

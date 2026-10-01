@@ -103,6 +103,10 @@ custom types need Squadron marshalers, exactly as for Web Workers.
 | `isolate` / `web_worker` | `LocalPlace` | its `check`, run in the current context |
 | `process` | `ProcessPlace` | the host's `facts` check, run in the host and sent in the handshake |
 
+A process-place call costs a few hundred microseconds on loopback, and bulk
+streams move about 110 MiB/s; an isolate is roughly ten times faster on both.
+Numbers and method: [doc/benchmark.md](doc/benchmark.md).
+
 ## Facts
 
 Platform hints (`kIsWeb`, `Platform.isX`) say what the OS is, not what this

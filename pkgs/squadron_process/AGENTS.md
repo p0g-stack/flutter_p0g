@@ -24,14 +24,20 @@ Self-contained; no external base file.
 - Pinned: Flutter 3.47.5 / Dart 3.13.4, Squadron 7.4.4 (`third_party/squadron/PIN`).
   Run `tool/squadron.sh` before `dart pub get`. A change to Squadron is a new
   or edited patch in `third_party/squadron/patches/` (git format-patch), with
-  Squadron's own VM suite still passing.
+  Squadron's own VM suite still passing. `patches/upstream/` holds the same
+  patch as the upstream proposal (CI checks they match) plus its rationale;
+  regenerate both together, from one commit whose tests live in Squadron's
+  own suite. Nothing is sent upstream until squadron_process is proven
+  standalone.
 - Tests the way Flutter tests platforms: unit tests against fakes
   (`PlaceLink.pair`, fake launchers and stores). The one real-process test
   runs `test/support/serve_main.dart`; no device or browser e2e here
   (that is devicelab).
 - The wire protocol is versioned (`Msg.version`); both ends come from the same
   app build, so bump it on any incompatible change rather than negotiating.
-- Keep README and doc/launchers.md true to what the code does.
+- Keep README and doc/launchers.md true to what the code does. Rerun
+  `tool/bench.sh` and update doc/benchmark.md when the codec, channel or host
+  hot path changes.
 - Commit directly to main until a stable/parity release is declared.
 - Stable surface (used by bricks since 2026-10-01): `serve(Map<String, Invoker>,
   args, facts:)`, `ProcessPlace(launcher:, store:, command:)` and
