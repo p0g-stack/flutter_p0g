@@ -1,0 +1,339 @@
+diff --git a/frb_dart/lib/src/cli/build_web/entrypoint.dart b/frb_dart/lib/src/cli/build_web/entrypoint.dart
+index 577567513..c978ad7ce 100644
+--- a/frb_dart/lib/src/cli/build_web/entrypoint.dart
++++ b/frb_dart/lib/src/cli/build_web/entrypoint.dart
+@@ -71,6 +71,16 @@ class Config {
+   )
+   late String? wasmPackRustflags;
+ 
++  /// {@macro flutter_rust_bridge.cli}
++  @CliOption(
++    help:
++        'Build multi-threaded WASM (nightly Rust, -Z build-std, needs cross-origin isolation). '
++        'With --no-threads, build single-threaded WASM on stable Rust that runs without COOP/COEP headers; '
++        'the crate must disable the `thread-pool` feature of flutter_rust_bridge',
++    defaultsTo: true,
++  )
++  late bool threads;
++
+   /// {@macro flutter_rust_bridge.cli}
+   @CliOption(
+     help:
+@@ -127,6 +137,7 @@ BuildWebArgs parseBuildWebConfigToArgs(Config config) {
+     wasmBindgenArgs: config.wasmBindgenArgs,
+     wasmPackRustupToolchain: config.wasmPackRustupToolchain,
+     wasmPackRustflags: config.wasmPackRustflags,
++    threads: config.threads,
+     dartCompileJsEntrypoint: config.dartCompileJsEntrypoint,
+     dartCompileWasmEntrypoint: config.dartCompileWasmEntrypoint,
+   );
+diff --git a/frb_dart/lib/src/cli/build_web/entrypoint.g.dart b/frb_dart/lib/src/cli/build_web/entrypoint.g.dart
+index 3833c2008..964cff3fc 100644
+--- a/frb_dart/lib/src/cli/build_web/entrypoint.g.dart
++++ b/frb_dart/lib/src/cli/build_web/entrypoint.g.dart
+@@ -18,6 +18,7 @@ Config _$parseConfigResult(ArgResults result) => Config()
+   ..wasmBindgenArgs = result['wasm-bindgen-args'] as List<String>
+   ..wasmPackRustupToolchain = result['wasm-pack-rustup-toolchain'] as String?
+   ..wasmPackRustflags = result['wasm-pack-rustflags'] as String?
++  ..threads = result['threads'] as bool
+   ..dartCompileJsEntrypoint = result['dart-compile-js-entrypoint'] as String?
+   ..dartCompileWasmEntrypoint =
+       result['dart-compile-wasm-entrypoint'] as String?;
+@@ -48,6 +49,12 @@ ArgParser _$populateConfigParser(ArgParser parser) => parser
+     help:
+         'Override WebAssembly target Rust compiler flags when running wasm-pack',
+   )
++  ..addFlag(
++    'threads',
++    help:
++        'Build multi-threaded WASM (nightly Rust, -Z build-std, needs cross-origin isolation). With --no-threads, build single-threaded WASM on stable Rust that runs without COOP/COEP headers; the crate must disable the `thread-pool` feature of flutter_rust_bridge',
++    defaultsTo: true,
++  )
+   ..addOption(
+     'dart-compile-js-entrypoint',
+     help:
+diff --git a/frb_dart/lib/src/cli/build_web/executor.dart b/frb_dart/lib/src/cli/build_web/executor.dart
+index 1ae3338c2..e368acca2 100644
+--- a/frb_dart/lib/src/cli/build_web/executor.dart
++++ b/frb_dart/lib/src/cli/build_web/executor.dart
+@@ -80,6 +80,9 @@ class BuildWebArgs {
+   /// {@macro flutter_rust_bridge.cli}
+   final List<String> features;
+ 
++  /// {@macro flutter_rust_bridge.cli}
++  final bool threads;
++
+   /// {@macro flutter_rust_bridge.cli}
+   const BuildWebArgs({
+     required this.output,
+@@ -93,6 +96,7 @@ class BuildWebArgs {
+     required this.dartCompileJsEntrypoint,
+     required this.dartCompileWasmEntrypoint,
+     this.features = const [],
++    this.threads = true,
+   });
+ }
+ 
+@@ -232,6 +236,7 @@ Future<void> _executeWasmPack(
+ }) async {
+   final rustflagsResolution = computeWasmPackRustflagsResolution(
+     argsOverride: args.wasmPackRustflags,
++    threads: args.threads,
+   );
+   if (rustflagsResolution.warning != null) {
+     print(rustflagsResolution.warning);
+@@ -252,17 +257,18 @@ Future<void> _executeWasmPack(
+       args.rustCrateDir,
+       '--',
+       // cargo build args
+-      '-Z',
+-      'build-std=std,panic_abort',
++      if (args.threads) ...['-Z', 'build-std=std,panic_abort'],
+       ...args.cargoBuildArgs,
+       // migrate to `cargoBuildArgs`
+       // if (config.cliOpts.noDefaultFeatures) '--no-default-features',
+       // if (config.cliOpts.features != null) '--features=${config.cliOpts.features}'
+     ],
+     env: {
+-      'RUSTUP_TOOLCHAIN': args.wasmPackRustupToolchain ?? 'nightly',
+-      'CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS':
+-          rustflagsResolution.rustflags,
++      if (args.threads || args.wasmPackRustupToolchain != null)
++        'RUSTUP_TOOLCHAIN': args.wasmPackRustupToolchain ?? 'nightly',
++      if (rustflagsResolution.rustflags != null)
++        'CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS':
++            rustflagsResolution.rustflags!,
+       if (stdout.supportsAnsiEscapes) 'CARGO_TERM_COLOR': 'always',
+     },
+     removedParentEnvKeys: computeWasmPackRemovedParentEnvKeys(
+@@ -273,8 +279,9 @@ Future<void> _executeWasmPack(
+ 
+ /// Resolved WebAssembly rustflags for a `wasm-pack` invocation.
+ class WasmPackRustflagsResolution {
+-  /// The target-specific rustflags value that will be passed to `wasm-pack`.
+-  final String rustflags;
++  /// The target-specific rustflags value that will be passed to `wasm-pack`,
++  /// or null to leave cargo's own configuration untouched.
++  final String? rustflags;
+ 
+   /// Optional warning shown when user-provided overrides drop required defaults.
+   final String? warning;
+@@ -311,7 +318,12 @@ bool _containsDefaultWasmPackRustflags(String rustflags) {
+ /// Resolves the effective `wasm-pack` rustflags and any warning to display.
+ WasmPackRustflagsResolution computeWasmPackRustflagsResolution({
+   required String? argsOverride,
++  bool threads = true,
+ }) {
++  // Single-threaded builds need no special flags and must not force shared memory.
++  if (!threads) {
++    return WasmPackRustflagsResolution(rustflags: argsOverride, warning: null);
++  }
+   if (argsOverride == null) {
+     return WasmPackRustflagsResolution(
+       rustflags: buildWebDefaultWasmPackRustflags,
+diff --git a/frb_dart/test/build_web_executor_test.dart b/frb_dart/test/build_web_executor_test.dart
+index cbd2f8742..6dad0aeaa 100644
+--- a/frb_dart/test/build_web_executor_test.dart
++++ b/frb_dart/test/build_web_executor_test.dart
+@@ -51,6 +51,96 @@ void main() {
+     expect(resolution.warning, isNull);
+   });
+ 
++  test('no-threads path passes no rustflags unless overridden', () {
++    expect(
++      computeWasmPackRustflagsResolution(argsOverride: null, threads: false),
++      isA<WasmPackRustflagsResolution>()
++          .having((r) => r.rustflags, 'rustflags', isNull)
++          .having((r) => r.warning, 'warning', isNull),
++    );
++    expect(
++      computeWasmPackRustflagsResolution(
++        argsOverride: '--cfg demo',
++        threads: false,
++      ),
++      isA<WasmPackRustflagsResolution>()
++          .having((r) => r.rustflags, 'rustflags', '--cfg demo')
++          .having((r) => r.warning, 'warning', isNull),
++    );
++  });
++
++  test('executeBuildWeb with no threads skips nightly and build-std', () async {
++    final crateDir = await Directory.systemTemp.createTemp(
++      'frb_build_web_test_',
++    );
++    addTearDown(() => crateDir.delete(recursive: true));
++    await File('${crateDir.path}/Cargo.toml').writeAsString('[package]\n');
++    final calls = <_CommandCall>[];
++
++    await executeBuildWeb(
++      BuildWebArgs(
++        output: 'web',
++        release: true,
++        verbose: false,
++        rustCrateDir: crateDir.path,
++        cargoBuildArgs: const [],
++        wasmBindgenArgs: const [],
++        wasmPackRustupToolchain: null,
++        wasmPackRustflags: null,
++        dartCompileJsEntrypoint: null,
++        dartCompileWasmEntrypoint: null,
++        threads: false,
++      ),
++      runCommandImpl:
++          (
++            command,
++            arguments, {
++            pwd,
++            env,
++            shell = true,
++            silent = false,
++            checkExitCode,
++            printCommandInStderr = false,
++            removedParentEnvKeys = const [],
++            timeout,
++          }) async {
++            calls.add(
++              _CommandCall(
++                command: command,
++                arguments: arguments,
++                pwd: pwd,
++                env: env,
++                silent: silent,
++                removedParentEnvKeys: removedParentEnvKeys,
++              ),
++            );
++            return RunCommandOutput(
++              stdout: command == 'cargo'
++                  ? jsonEncode({
++                      'targets': [
++                        {
++                          'kind': ['cdylib'],
++                          'name': 'demo_crate',
++                        },
++                      ],
++                    })
++                  : '',
++              stderr: '',
++              exitCode: 0,
++            );
++          },
++    );
++
++    final wasmPack = calls.singleWhere((call) => call.command == 'wasm-pack');
++    expect(wasmPack.arguments, isNot(contains('-Z')));
++    expect(wasmPack.arguments, isNot(contains('build-std=std,panic_abort')));
++    expect(wasmPack.env, isNot(contains('RUSTUP_TOOLCHAIN')));
++    expect(
++      wasmPack.env,
++      isNot(contains('CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS')),
++    );
++  });
++
+   test('override path returns override unchanged', () {
+     const override = '-C target-feature=+atomics';
+ 
+diff --git a/frb_dart/test/entrypoint_test.dart b/frb_dart/test/entrypoint_test.dart
+index 007564bd8..c819a2864 100644
+--- a/frb_dart/test/entrypoint_test.dart
++++ b/frb_dart/test/entrypoint_test.dart
+@@ -66,9 +66,17 @@ void main() {
+     expect(config.wasmBindgenArgs, isEmpty);
+     expect(config.wasmPackRustupToolchain, isNull);
+     expect(config.wasmPackRustflags, isNull);
++    expect(config.threads, isTrue);
+     expect(config.dartCompileJsEntrypoint, isNull);
+   });
+ 
++  test('build-web parser maps --no-threads', () {
++    final config = build_web.parseConfig(['--no-threads']);
++
++    expect(config.threads, isFalse);
++    expect(build_web.parseBuildWebConfigToArgs(config).threads, isFalse);
++  });
++
+   test('build-web parser maps every supported option', () {
+     final config = build_web.parseConfig([
+       '--dart-root',
+diff --git a/frb_rust/src/handler/handler.rs b/frb_rust/src/handler/handler.rs
+index 1f5d73cd4..c26c8e9cc 100644
+--- a/frb_rust/src/handler/handler.rs
++++ b/frb_rust/src/handler/handler.rs
+@@ -32,6 +32,20 @@ pub trait Handler {
+             + 'static,
+         Rust2DartCodec: BaseCodec;
+ 
++    /// Without the `thread-pool` feature there is no thread to run a plain function on,
++    /// so calling this is a compile-time error (it is only reached by generated code).
++    #[cfg(not(feature = "thread-pool"))]
++    #[doc(hidden)]
++    fn wrap_normal<Rust2DartCodec, PrepareFn, TaskFn>(&self, _: TaskInfo, _: PrepareFn)
++    where
++        PrepareFn: FnOnce() -> TaskFn,
++        TaskFn: FnOnce(TaskContext) -> Result<Rust2DartCodec::Message, Rust2DartCodec::Message>,
++        Rust2DartCodec: BaseCodec,
++    {
++        #[allow(clippy::let_unit_value)]
++        let () = ThreadPoolFeatureRequired::<Rust2DartCodec>::ERROR;
++    }
++
+     /// Same as [`wrap`][Handler::wrap], but the Rust function will be called synchronously and
+     /// need not implement [Send].
+     fn wrap_sync<Rust2DartCodec, SyncTaskFn>(
+@@ -67,6 +81,18 @@ pub trait Handler {
+     fn dart_fn_handle_output(&self, call_id: i32, message: Dart2RustMessageSse);
+ }
+ 
++#[cfg(not(feature = "thread-pool"))]
++struct ThreadPoolFeatureRequired<T>(std::marker::PhantomData<T>);
++
++#[cfg(not(feature = "thread-pool"))]
++impl<T> ThreadPoolFeatureRequired<T> {
++    const ERROR: () = panic!(
++        "flutter_rust_bridge: a plain (non-async, non-sync) function needs the `thread-pool` feature. \
++         Without it (e.g. single-threaded web builds, `build-web --no-threads`), mark the function \
++         `#[frb(sync)]`, make it `async fn`, or set `default_dart_async: false` in the codegen config."
++    );
++}
++
+ /// Supporting information for a task
+ #[derive(Clone)]
+ pub struct TaskInfo {
+diff --git a/frb_rust/src/thread_pool/stub.rs b/frb_rust/src/thread_pool/stub.rs
+index facc5c169..4e12dc295 100644
+--- a/frb_rust/src/thread_pool/stub.rs
++++ b/frb_rust/src/thread_pool/stub.rs
+@@ -4,3 +4,17 @@ pub trait BaseThreadPool {}
+ pub struct SimpleThreadPool;
+ 
+ impl BaseThreadPool for SimpleThreadPool {}
++
++// The generated default handler uses a thread-local pool on the web.
++impl BaseThreadPool for &'static std::thread::LocalKey<SimpleThreadPool> {}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn web_default_handler_pool_type_is_a_thread_pool() {
++        fn assert_pool<T: BaseThreadPool>() {}
++        assert_pool::<&'static std::thread::LocalKey<SimpleThreadPool>>();
++    }
++}
+diff --git a/website/docs/manual/miscellaneous/02-web-cross-origin.md b/website/docs/manual/miscellaneous/02-web-cross-origin.md
+index 69e06d518..e10472912 100644
+--- a/website/docs/manual/miscellaneous/02-web-cross-origin.md
++++ b/website/docs/manual/miscellaneous/02-web-cross-origin.md
+@@ -75,7 +75,11 @@ most browsers will ignore cross-origin headers for security reasons.
+ The main idea is to restrict ourselves to only use the main thread and never use other threads,
+ which will stop the need for shared buffers, thus removing the need of cross-origin headers.
+ 
+-To achieve this, simply configure `default_dart_async: false` (which makes every `pub fn` automatically `#[frb(sync)] pub fn`), and then use `pub fn / pub async fn` as usual.
++To achieve this:
++
++1. Disable the `thread-pool` feature of `flutter_rust_bridge` in your `Cargo.toml`, e.g. `flutter_rust_bridge = { version = "...", default-features = false, features = ["anyhow", "dart-opaque", "log", "portable-atomic", "rust-async", "user-utils", "wasm-start"] }`.
++2. Configure `default_dart_async: false` (which makes every `pub fn` automatically `#[frb(sync)] pub fn`), and then use `pub fn / pub async fn` as usual. A function that would still need the thread pool (e.g. `#[frb(dart_async)]` on a non-async `fn`) is reported as a compile error.
++3. Build with `flutter_rust_bridge_codegen build-web --no-threads`. This skips the threaded rustflags and `-Z build-std`, so a stable Rust toolchain is enough and the WASM memory is not shared.
+ 
+ Note that Rust's async system, such as `pub async fn` and [async spawns](../../guides/cross-platform/async), still works well here, because it runs on the main thread by default on the Web platform (though it is multi-threaded on native platforms).
+ 

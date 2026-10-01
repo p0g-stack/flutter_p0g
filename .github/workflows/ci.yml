@@ -1,0 +1,24 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart analyze --fatal-infos
+      - run: flutter test
+      - name: frb series applies to the pinned commit
+        run: |
+          git init -q /tmp/frb && cd /tmp/frb
+          git remote add origin https://github.com/fzyzcjy/flutter_rust_bridge
+          git fetch -q --depth 1 origin 848e438c561491adcc16cbf8b33bb61e541bd475
+          git checkout -q FETCH_HEAD
+          for p in "$GITHUB_WORKSPACE"/patches/frb/*.patch; do git apply --check "$p" && git apply "$p"; done
