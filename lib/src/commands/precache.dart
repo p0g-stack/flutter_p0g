@@ -2,6 +2,7 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../frb/frb.dart';
+import '../webui/dart_android.dart';
 
 /// Fetches or builds what the p0g targets need beyond stock Flutter.
 class PrecacheCommand extends FlutterCommand {
@@ -16,6 +17,12 @@ class PrecacheCommand extends FlutterCommand {
         'frb',
         help: 'Build flutter_rust_bridge with the patches in patches/frb (needs git and cargo).',
       )
+      ..addFlag(
+        'dart-android',
+        help: 'The Android Dart kit (host gen_snapshot + device dartaotruntime) for cli/.',
+      )
+      ..addOption('dart-android-kit', help: 'Kit .tar.gz path or https URL (default: the release).')
+      ..addOption('dart-android-sha256', help: 'Expected sha256 of the kit archive.')
       ..addFlag('aera', help: 'AERA engine and runtime kits (not released yet).')
       ..addFlag('app-plane', help: 'The webui-termux-api APK (not released yet).');
   }
@@ -32,6 +39,12 @@ class PrecacheCommand extends FlutterCommand {
       await globals.cache.updateAll({DevelopmentArtifact.web, DevelopmentArtifact.universal});
     }
     if (boolArg('frb')) await precacheFrb();
+    if (boolArg('dart-android') || argResults!.wasParsed('dart-android-kit')) {
+      await precacheDartAndroid(
+        source: stringArg('dart-android-kit'),
+        sha256Hex: stringArg('dart-android-sha256'),
+      );
+    }
     if (boolArg('aera')) globals.printWarning('AERA kits: no release yet (flutter-aera CI).');
     if (boolArg('app-plane')) globals.printWarning('webui-termux-api: no release yet.');
     return FlutterCommandResult.success();

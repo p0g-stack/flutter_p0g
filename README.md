@@ -30,7 +30,7 @@ flutter_p0g install --reboot  # adb + the device's ksud / apd / magisk
 | `build aera` | `.aerap` | stub: waits on the layout and engine kits from flutter-aera |
 | `install [zip]` | `adb push`, then the first installer present on the device: `ksud`, `apd`, `magisk` | works, not yet run on a device |
 | `run` | dev loop with hot restart | stub: waits on flutter-webui's bootstrap |
-| `precache` | Flutter's web SDK; `--frb` builds the patched frb | web and frb work; `--aera`, `--app-plane` wait on releases |
+| `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` installs the Android Dart kit | web, frb and kit install work; the kit release, `--aera`, `--app-plane` wait on CI |
 
 ### `build webui`
 
@@ -53,12 +53,25 @@ errors and no requests outside the module, served at `/` with no COOP/COEP.
 
 ### The root process
 
-The app's `cli/` is meant to be a `dart compile exe` binary running as root on
-bionic. Dart 3.13 can't produce one from this host: `dart compile exe
---target-os android` is rejected, and the `linux-arm64` output links glibc
-(`/lib/ld-linux-aarch64.so.1`), which Android doesn't have. So `build webui`
-fails with that explanation when `cli/` is present. Apps without `cli/`
-(stock apps) are unaffected.
+The app's `cli/` runs as root on the device. Stock Dart can't target Android
+from a desktop host (`dart compile exe` and `aot-snapshot` reject
+`--target-os android`; the linux-arm64 output links glibc), and an AOT
+snapshot only loads in a runtime of its own Dart version, OS and build flags.
+So by default (`--cli-format=aot`) the build:
+
+1. compiles `cli/` to AOT kernel with the SDK's own `gen_kernel --aot
+   --target-os android` and product platform,
+2. turns it into an android-arm64 ELF with the kit's host `gen_snapshot`,
+3. ships `bin/<abi>/<name>.aot`, `bin/<abi>/dartaotruntime` and a
+   `bin/<name>` launcher that picks the device ABI.
+
+The kit (`precache --dart-android`) is both halves built from the pinned
+Dart release with `tools/build.py --os android` by
+`.github/workflows/dart-android-kit.yml`; `--dart-android-kit=<path|url>`
+swaps in another source with the same layout (`VERSION`, `gen_snapshot`,
+`dartaotruntime`). The pipeline is checked end to end with a host-arch kit;
+the Android kit itself is not built yet. `--cli-format=exe` is kept for a Dart
+SDK that can compile Android executables directly.
 
 ## frb patches
 

@@ -1,0 +1,44 @@
+# Builds the Android Dart kit that `flutter_p0g precache --dart-android`
+# fetches: gen_snapshot (linux-x64 host, emits android-arm64 AOT) and
+# dartaotruntime (android-arm64, bionic), from the Dart release inside the
+# pinned Flutter. Same recipe Termux uses for its dart package
+# (tools/build.py --os android), but keeping the host gen_snapshot.
+name: dart-android-kit
+on:
+  workflow_dispatch:
+    inputs:
+      dart_version:
+        description: Dart release (must match the pinned Flutter's dart-sdk/version)
+        default: 3.13.4
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Fetch Dart SDK sources
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$PWD/depot_tools" >> "$GITHUB_PATH"
+          export PATH="$PWD/depot_tools:$PATH"
+          mkdir dart && cd dart
+          git clone --branch "${{ inputs.dart_version }}" --depth 1 --no-tags https://dart.googlesource.com/sdk.git sdk
+          gclient config --name sdk --custom-var download_android_deps=True --unmanaged https://dart.googlesource.com/sdk.git
+          gclient sync --jobs 8 --no-history
+      - name: Build
+        working-directory: dart/sdk
+        run: ./tools/build.py --no-rbe --mode release --arch arm64 --os android gen_snapshot dart_precompiled_runtime_product
+      - name: Pack
+        working-directory: dart/sdk
+        run: |
+          out=out/ReleaseAndroidARM64
+          mkdir kit
+          cp "$(find "$out" -path '*x64*' -name gen_snapshot -type f | head -1)" kit/gen_snapshot
+          cp "$out/dart_precompiled_runtime_product" kit/dartaotruntime
+          echo "${{ inputs.dart_version }}" > kit/VERSION
+          file kit/gen_snapshot kit/dartaotruntime
+          tar czf "dart-android-arm64-${{ inputs.dart_version }}.tar.gz" -C kit VERSION gen_snapshot dartaotruntime
+          sha256sum dart-android-arm64-*.tar.gz
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dart-android-${{ inputs.dart_version }}
+          files: dart/sdk/dart-android-arm64-${{ inputs.dart_version }}.tar.gz

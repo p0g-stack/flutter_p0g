@@ -9,6 +9,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../frb/frb.dart';
 import '../webui/cli_exe.dart';
+import '../webui/dart_android.dart';
 import '../webui/module.dart';
 
 /// `flutter build web` with WebUI defaults, then the module zip.
@@ -18,7 +19,17 @@ import '../webui/module.dart';
 /// is registered (no manager runs one).
 class BuildWebUiCommand extends BuildWebCommand {
   BuildWebUiCommand({required super.verboseHelp})
-    : super(logger: globals.logger, fileSystem: globals.fs);
+    : super(logger: globals.logger, fileSystem: globals.fs) {
+    argParser.addSeparator('WebUI options');
+    argParser.addOption(
+      'cli-format',
+      allowed: ['aot', 'exe'],
+      defaultsTo: 'aot',
+      help:
+          'How cli/ ships: an AOT snapshot plus the Android Dart runtime kit, '
+          'or a single executable (for a Dart SDK that can target Android).',
+    );
+  }
 
   @override
   String get name => 'webui';
@@ -68,13 +79,18 @@ class BuildWebUiCommand extends BuildWebCommand {
     final cli = CliPackage.find(app);
     if (cli != null) {
       globals.printStatus('Compiling ${cli.dir.path} for the device...');
-      final exe = out.childDirectory('bin').childFile(cli.name);
-      await compileCli(cli, exe);
-      extra['bin/${cli.name}'] = exe.readAsBytesSync();
+      if (stringArg('cli-format') == 'exe') {
+        final exe = out.childDirectory('bin').childFile(cli.name);
+        await compileCli(cli, exe);
+        extra['bin/${cli.name}'] = exe.readAsBytesSync();
+      } else {
+        final kit = DartAndroidKit.forVersion(sdkDartVersion());
+        extra.addAll(await compileCliAot(cli, kit, out.childDirectory('cli')));
+      }
       final rust = cli.dir.parent.childDirectory('rust');
       if (rust.childFile('Cargo.toml').existsSync()) {
         for (final so in await buildRustForCli(rust, out.childDirectory('jniLibs'))) {
-          extra['bin/${so.basename}'] = so.readAsBytesSync();
+          extra['bin/$kAbi/${so.basename}'] = so.readAsBytesSync();
         }
       }
     }
