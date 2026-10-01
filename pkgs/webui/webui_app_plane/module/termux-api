@@ -18,8 +18,10 @@ case "$(uname -m)" in
 esac
 
 # Root shells can start with an empty environment and the Dart VM needs a
-# temp dir (devicelab); same choice as flutter_p0g's launcher.
-[ -n "$TMPDIR" ] || TMPDIR=$moddir/tmp
+# temp dir (devicelab). Keep the one the root channel passes, else the
+# module's temp dir (/data/adb/<id>/tmp, cleared each boot), as flutter_p0g's
+# launcher does.
+[ -n "$TMPDIR" ] || TMPDIR=/data/adb/${moddir##*/}/tmp
 export TMPDIR
 mkdir -p "$TMPDIR"
 

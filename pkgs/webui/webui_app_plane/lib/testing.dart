@@ -68,12 +68,17 @@ final class FakeRootChannel {
   /// Set to make [connect] fail as an unreachable channel does.
   bool unavailable = false;
 
-  /// Connects the real client to this fake.
+  /// Connects the real client to this fake: `root start` prints this
+  /// fake's session, or fails while [unavailable].
   Future<RootChannel> connect() => RootChannel.connect(
     transport: _FakeTransport(this),
-    start: () async {},
-    timeout: const Duration(milliseconds: 200),
-    poll: const Duration(milliseconds: 10),
+    start: () async => unavailable
+        ? const ExecResult(1, '', 'root channel did not start')
+        : ExecResult(
+            0,
+            '${jsonEncode(SessionInfo(protocol: protocolVersion, version: channelVersion, port: 1, token: 'test', pid: 1, boot: 'boot', started: DateTime.utc(2026)).toJson())}\n',
+            '',
+          ),
   );
 
   /// A [WebUiRoot] on [bridge] (KernelSU by default) using this channel.
@@ -87,21 +92,6 @@ final class _FakeTransport implements ChannelTransport {
   _FakeTransport(this.fake);
 
   final FakeRootChannel fake;
-
-  @override
-  Future<String?> readSession() async => fake.unavailable
-      ? null
-      : jsonEncode(
-          SessionInfo(
-            protocol: protocolVersion,
-            version: channelVersion,
-            port: 1,
-            token: 'test',
-            pid: 1,
-            boot: 'boot',
-            started: DateTime.utc(2026),
-          ).toJson(),
-        );
 
   @override
   Future<ChannelSocket> connect(Uri uri) async => _FakeSocket(fake);
