@@ -50,10 +50,23 @@ void main() {
     expect(s, contains(r'exec "$d/dartaotruntime" "$d/counterd.aot" "$@"'));
   });
 
-  test('default kit URL names the Dart version', () {
+  test('kit ABI defaults to arm64-v8a; unknown ABIs are rejected', () {
+    expect(kitAbi(kit({})), 'arm64-v8a');
+    expect(kitAbi(kit({'ABI': 'x86_64\n'})), 'x86_64');
     expect(
-      defaultKitUrl('3.13.4'),
-      endsWith('/dart-android-3.13.4/dart-android-arm64-3.13.4.tar.gz'),
+      validateKitArchive(
+        kit({'VERSION': '3.13.4', 'ABI': 'mips', 'gen_snapshot': 'x', 'dartaotruntime': 'y'}),
+        '3.13.4',
+      ),
+      contains('mips'),
+    );
+  });
+
+  test('default kit URL names the ABI and Dart version', () {
+    expect(defaultKitUrl('3.13.4', 'x86_64'), endsWith('/dart-android-x86_64-3.13.4.tar.gz'));
+    expect(
+      defaultKitUrl('3.13.4', 'arm64-v8a'),
+      endsWith('/dart-android-3.13.4/dart-android-arm64-v8a-3.13.4.tar.gz'),
     );
   });
 }

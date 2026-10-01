@@ -73,9 +73,13 @@ Future<void> compileCli(CliPackage cli, File outFile) async {
   throwToolExit('dart compile exe failed:\n$result');
 }
 
-/// The frb native library the CLI loads, built for the device with
-/// cargo-ndk. Returns the `.so` files to ship beside the executable.
-Future<List<File>> buildRustForCli(Directory rustDir, Directory outDir) async {
+/// The frb native library the CLI loads, built per ABI with cargo-ndk.
+/// Returns the `.so` files for each ABI.
+Future<Map<String, List<File>>> buildRustForCli(
+  Directory rustDir,
+  Directory outDir,
+  List<String> abis,
+) async {
   final ndk = await globals.processUtils.run(['cargo', 'ndk', '--version']);
   if (ndk.exitCode != 0) {
     throwToolExit(
@@ -86,16 +90,22 @@ Future<List<File>> buildRustForCli(Directory rustDir, Directory outDir) async {
   final code = await globals.processUtils.stream([
     'cargo',
     'ndk',
-    '-t',
-    'arm64-v8a',
+    for (final abi in abis) ...['-t', abi],
     '-o',
     outDir.path,
     'build',
-    '--release',
+    '--release', //
   ], workingDirectory: rustDir.path);
   if (code != 0) throwToolExit('cargo ndk build failed (exit $code).');
-  final abi = outDir.childDirectory('arm64-v8a');
-  return abi.existsSync()
-      ? abi.listSync().whereType<File>().where((f) => f.path.endsWith('.so')).toList()
-      : [];
+  return {
+    for (final abi in abis)
+      abi: outDir.childDirectory(abi).existsSync()
+          ? outDir
+                .childDirectory(abi)
+                .listSync()
+                .whereType<File>()
+                .where((f) => f.path.endsWith('.so'))
+                .toList()
+          : <File>[],
+  };
 }

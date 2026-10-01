@@ -1,8 +1,9 @@
-# Builds the Android Dart kit that `flutter_p0g precache --dart-android`
-# fetches: gen_snapshot (linux-x64 host, emits android-arm64 AOT) and
-# dartaotruntime (android-arm64, bionic), from the Dart release inside the
-# pinned Flutter. Same recipe Termux uses for its dart package
-# (tools/build.py --os android), but keeping the host gen_snapshot.
+# Builds the Android Dart kits that `flutter_p0g precache --dart-android`
+# fetches, one per device ABI: gen_snapshot (linux-x64 host, emits Android
+# AOT for that ABI) and dartaotruntime (Android, bionic), from the Dart
+# release inside the pinned Flutter. Same recipe Termux uses for its dart
+# package (tools/build.py --os android), keeping the host gen_snapshot.
+# x86_64 is for emulators (devicelab's AVD).
 name: dart-android-kit
 on:
   workflow_dispatch:
@@ -14,6 +15,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            arch: arm64
+            out: ReleaseAndroidARM64
+            elf: aarch64
+          - abi: x86_64
+            arch: x64
+            out: ReleaseAndroidX64
+            elf: x86-64
     steps:
       - name: Fetch Dart SDK sources
         run: |
@@ -26,24 +39,31 @@ jobs:
           gclient sync --jobs 8 --no-history
       - name: Build
         working-directory: dart/sdk
-        run: ./tools/build.py --no-rbe --mode release --arch arm64 --os android gen_snapshot dartaotruntime
+        run: ./tools/build.py --no-rbe --mode release --arch ${{ matrix.arch }} --os android gen_snapshot dartaotruntime
       - name: Pack
         working-directory: dart/sdk
         run: |
-          out=out/ReleaseAndroidARM64
-          mkdir kit
+          out=out/${{ matrix.out }}
           find "$out" -maxdepth 2 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
-          # Host gen_snapshot (x86-64 ELF) and the device runtime (aarch64 ELF).
-          gen=$(find "$out" -maxdepth 2 -type f -name 'gen_snapshot' -exec file {} \; | grep x86-64 | head -1 | cut -d: -f1)
-          rt=$(find "$out" -maxdepth 2 -type f \( -name 'dartaotruntime' -o -name 'dartaotruntime_product' -o -name 'dart_precompiled_runtime_product' \) -exec file {} \; | grep aarch64 | head -1 | cut -d: -f1)
+          # Host gen_snapshot: an x86-64 ELF not linked for Android. Runtime:
+          # the ABI's ELF that is (interpreter /system/bin/linker64).
+          gen=$(find "$out" -maxdepth 2 -type f -name gen_snapshot -exec file {} \; | grep -v 'Android\|linker64' | grep x86-64 | head -1 | cut -d: -f1)
+          rt=$(find "$out" -maxdepth 2 -type f \( -name dartaotruntime -o -name dartaotruntime_product -o -name dart_precompiled_runtime_product \) -exec file {} \; | grep '${{ matrix.elf }}' | grep 'Android\|linker64' | head -1 | cut -d: -f1)
           test -n "$gen" && test -n "$rt"
+          mkdir kit
           cp "$gen" kit/gen_snapshot
           cp "$rt" kit/dartaotruntime
           echo "${{ inputs.dart_version }}" > kit/VERSION
+          echo "${{ matrix.abi }}" > kit/ABI
           file kit/gen_snapshot kit/dartaotruntime
-          tar czf "dart-android-arm64-${{ inputs.dart_version }}.tar.gz" -C kit VERSION gen_snapshot dartaotruntime
-          sha256sum dart-android-arm64-*.tar.gz
+          name=dart-android-${{ matrix.abi }}-${{ inputs.dart_version }}.tar.gz
+          tar czf "$name" -C kit VERSION ABI gen_snapshot dartaotruntime
+          sha256sum "$name" | tee "$name.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dart-android-${{ matrix.abi }}-${{ inputs.dart_version }}
+          path: dart/sdk/dart-android-*.tar.gz*
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: dart-android-${{ inputs.dart_version }}
-          files: dart/sdk/dart-android-arm64-${{ inputs.dart_version }}.tar.gz
+          files: dart/sdk/dart-android-*.tar.gz*

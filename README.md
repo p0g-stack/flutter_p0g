@@ -87,7 +87,7 @@ So by default (`--cli-format=aot`) the build:
 3. ships `bin/<abi>/<name>.aot`, `bin/<abi>/dartaotruntime` and a
    `bin/<name>` launcher that picks the device ABI.
 
-The kit (`precache --dart-android`) is both halves built from the pinned
+The kits (`precache --dart-android [--dart-android-abi=arm64-v8a,x86_64]`), one per ABI, are both halves built from the pinned
 Dart release with `tools/build.py --os android` by
 `.github/workflows/dart-android-kit.yml`; `--dart-android-kit=<path|url>`
 swaps in another source with the same layout (`VERSION`, `gen_snapshot`,

@@ -81,6 +81,7 @@ class BuildWebUiCommand extends BuildWebCommand {
 
     final extra = <String, List<int>>{};
     final cli = CliPackage.find(app);
+    var abis = <String, DartAndroidKit>{};
     if (cli != null) {
       globals.printStatus('Compiling ${cli.dir.path} for the device...');
       if (stringArg('cli-format') == 'exe') {
@@ -88,14 +89,23 @@ class BuildWebUiCommand extends BuildWebCommand {
         await compileCli(cli, exe);
         extra['bin/${cli.name}'] = exe.readAsBytesSync();
       } else {
-        final kit = DartAndroidKit.forVersion(sdkDartVersion());
-        extra.addAll(await compileCliAot(cli, kit, out.childDirectory('cli')));
+        abis = DartAndroidKit.installed(sdkDartVersion());
+        extra.addAll(await compileCliAot(cli, abis, out.childDirectory('cli')));
       }
+      // cli/ and rust/ are one unit per ABI: the frb library sits beside
+      // that ABI's snapshot and runtime. Rust never ships as its own binary.
       final rust = cli.dir.parent.childDirectory('rust');
       if (rust.childFile('Cargo.toml').existsSync()) {
-        for (final so in await buildRustForCli(rust, out.childDirectory('jniLibs'))) {
-          extra['bin/$kAbi/${so.basename}'] = so.readAsBytesSync();
-        }
+        final libs = await buildRustForCli(
+          rust,
+          out.childDirectory('jniLibs'),
+          abis.isEmpty ? const [kDefaultAbi] : abis.keys.toList(),
+        );
+        libs.forEach((abi, files) {
+          for (final so in files) {
+            extra['bin/$abi/${so.basename}'] = so.readAsBytesSync();
+          }
+        });
       }
     }
 

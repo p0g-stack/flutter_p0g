@@ -18,13 +18,17 @@ import 'cli_exe.dart';
 /// the two halves, both built from the pinned Dart release with
 /// `tools/build.py --os android --arch arm64`:
 ///
-/// - `gen_snapshot`: runs on the host, emits android-arm64 AOT ELF.
+/// - `gen_snapshot`: runs on the host, emits Android AOT ELF for the ABI.
 /// - `dartaotruntime`: runs on the device (bionic), loads that ELF.
 ///
 /// The kernel step uses the Flutter SDK's own `gen_kernel` and product
 /// platform, which already accept `--target-os android`.
-/// The one ABI built today; the module layout is per ABI so more can follow.
-const kAbi = 'arm64-v8a';
+
+/// Android ABIs a kit can be built for, with Dart's `--arch` name.
+const kDartArchForAbi = {'arm64-v8a': 'arm64', 'x86_64': 'x64'};
+
+/// The default device ABI.
+const kDefaultAbi = 'arm64-v8a';
 
 class DartAndroidKit {
   DartAndroidKit(this.dir);
@@ -38,8 +42,18 @@ class DartAndroidKit {
   bool get isComplete =>
       genSnapshot.existsSync() && runtime.existsSync() && versionFile.existsSync();
 
-  static DartAndroidKit forVersion(String dartVersion) =>
-      DartAndroidKit(p0gCacheDir().childDirectory('dart-android').childDirectory(dartVersion));
+  static Directory rootFor(String dartVersion) =>
+      p0gCacheDir().childDirectory('dart-android').childDirectory(dartVersion);
+
+  static DartAndroidKit forAbi(String dartVersion, String abi) =>
+      DartAndroidKit(rootFor(dartVersion).childDirectory(abi));
+
+  /// Kits installed for [dartVersion], by ABI.
+  static Map<String, DartAndroidKit> installed(String dartVersion) => {
+    for (final abi in kDartArchForAbi.keys)
+      if (DartAndroidKit.forAbi(dartVersion, abi).isComplete)
+        abi: DartAndroidKit.forAbi(dartVersion, abi),
+  };
 }
 
 /// The Dart release inside the pinned Flutter.
@@ -50,9 +64,16 @@ String sdkDartVersion() => globals.fs
 
 /// Where `precache --dart-android` looks when no kit is given: this repo's
 /// release for the Dart version, built by .github/workflows/dart-android-kit.yml.
-String defaultKitUrl(String dartVersion) =>
+String defaultKitUrl(String dartVersion, String abi) =>
     'https://github.com/p0g-stack/flutter_p0g/releases/download/dart-android-$dartVersion/'
-    'dart-android-arm64-$dartVersion.tar.gz';
+    'dart-android-$abi-$dartVersion.tar.gz';
+
+/// A kit's ABI: its `ABI` member, else arm64-v8a (the first kits had none).
+@visibleForTesting
+String kitAbi(Archive archive) {
+  final f = archive.findFile('ABI');
+  return f == null ? kDefaultAbi : String.fromCharCodes(f.content as List<int>).trim();
+}
 
 /// Checks a kit archive's members before anything is written.
 @visibleForTesting
@@ -61,6 +82,7 @@ String? validateKitArchive(Archive archive, String dartVersion) {
   for (final need in ['VERSION', 'gen_snapshot', 'dartaotruntime']) {
     if (!names.contains(need)) return 'kit lacks $need';
   }
+  if (!kDartArchForAbi.containsKey(kitAbi(archive))) return 'unknown ABI ${kitAbi(archive)}';
   final version = String.fromCharCodes(archive.findFile('VERSION')!.content as List<int>).trim();
   if (version != dartVersion) {
     return 'kit is for Dart $version, but this Flutter carries Dart $dartVersion; '
@@ -71,14 +93,18 @@ String? validateKitArchive(Archive archive, String dartVersion) {
 
 /// Installs the kit from a local `.tar.gz` or an https URL, checking
 /// [sha256Hex] when given.
-Future<void> precacheDartAndroid({String? source, String? sha256Hex}) async {
+/// Without [source], fetches the release kit for [abi].
+Future<void> precacheDartAndroid({
+  String? source,
+  String? sha256Hex,
+  String abi = kDefaultAbi,
+}) async {
   final version = sdkDartVersion();
-  final kit = DartAndroidKit.forVersion(version);
-  if (kit.isComplete && source == null) {
-    globals.printStatus('Dart $version Android kit: up to date.');
+  if (source == null && DartAndroidKit.forAbi(version, abi).isComplete) {
+    globals.printStatus('Dart $version Android kit ($abi): up to date.');
     return;
   }
-  source ??= defaultKitUrl(version);
+  source ??= defaultKitUrl(version, abi);
   final bytes = await fetchBytes(source);
   final digest = sha256.convert(bytes).toString();
   if (sha256Hex != null && sha256Hex != digest) {
@@ -87,13 +113,14 @@ Future<void> precacheDartAndroid({String? source, String? sha256Hex}) async {
   final archive = decodeTarGz(bytes);
   final problem = validateKitArchive(archive, version);
   if (problem != null) throwToolExit('Dart Android kit: $problem.');
+  final kit = DartAndroidKit.forAbi(version, kitAbi(archive));
   if (kit.dir.existsSync()) kit.dir.deleteSync(recursive: true);
   kit.dir.createSync(recursive: true);
   for (final f in archive.files.where((f) => f.isFile)) {
     final out = kit.dir.childFile(f.name)..writeAsBytesSync(f.content as List<int>);
-    if (f.name != 'VERSION') globals.os.chmod(out, '755');
+    if (f.name != 'VERSION' && f.name != 'ABI') globals.os.chmod(out, '755');
   }
-  globals.printStatus('Dart $version Android kit installed (sha256 $digest).');
+  globals.printStatus('Dart $version Android kit (${kitAbi(archive)}) installed (sha256 $digest).');
 }
 
 /// The module's `bin/<name>`: starts the snapshot for the device's ABI
@@ -107,20 +134,20 @@ d=\${0%/*}/\$(getprop ro.product.cpu.abi)
 exec "\$d/dartaotruntime" "\$d/$name.aot" "\$@"
 ''';
 
-/// Compiles [cli] to android-arm64 AOT with [kit]; returns the module files.
+/// Compiles [cli] to Android AOT once per kit (ABI); returns the module
+/// files: the launcher, and `bin/<abi>/{<name>.aot,dartaotruntime}` each.
 Future<Map<String, List<int>>> compileCliAot(
   CliPackage cli,
-  DartAndroidKit kit,
+  Map<String, DartAndroidKit> kits,
   Directory work,
 ) async {
-  if (!kit.isComplete) {
+  if (kits.isEmpty) {
     throwToolExit('cli/ needs the Dart Android kit. Run `flutter_p0g precache --dart-android`.');
   }
   final fs = globals.fs;
   final sdk = fs.path.join(Cache.flutterRoot!, 'bin', 'cache', 'dart-sdk');
   work.createSync(recursive: true);
   final dill = work.childFile('${cli.name}.dill');
-  final aot = work.childFile('${cli.name}.aot');
   final packages = cli.dir.childDirectory('.dart_tool').childFile('package_config.json');
   final workspacePackages = cli.dir.parent
       .childDirectory('.dart_tool')
@@ -148,10 +175,18 @@ Future<Map<String, List<int>>> compileCliAot(
     dill.path,
     cli.entrypoint.path,
   ]);
-  await run([kit.genSnapshot.path, '--snapshot_kind=app-aot-elf', '--elf=${aot.path}', dill.path]);
-  return {
-    'bin/${cli.name}': launcherScript(cli.name).codeUnits,
-    'bin/$kAbi/${cli.name}.aot': aot.readAsBytesSync(),
-    'bin/$kAbi/dartaotruntime': kit.runtime.readAsBytesSync(),
-  };
+  // The kernel is the same for every ABI; only gen_snapshot differs.
+  final files = <String, List<int>>{'bin/${cli.name}': launcherScript(cli.name).codeUnits};
+  for (final MapEntry(key: abi, value: kit) in kits.entries) {
+    final aot = work.childDirectory(abi).childFile('${cli.name}.aot')..parent.createSync();
+    await run([
+      kit.genSnapshot.path,
+      '--snapshot_kind=app-aot-elf',
+      '--elf=${aot.path}',
+      dill.path,
+    ]);
+    files['bin/$abi/${cli.name}.aot'] = aot.readAsBytesSync();
+    files['bin/$abi/dartaotruntime'] = kit.runtime.readAsBytesSync();
+  }
+  return files;
 }

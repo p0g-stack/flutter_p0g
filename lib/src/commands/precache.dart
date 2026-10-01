@@ -24,6 +24,12 @@ class PrecacheCommand extends FlutterCommand {
       )
       ..addOption('dart-android-kit', help: 'Kit .tar.gz path or https URL (default: the release).')
       ..addOption('dart-android-sha256', help: 'Expected sha256 of the kit archive.')
+      ..addMultiOption(
+        'dart-android-abi',
+        allowed: kDartArchForAbi.keys,
+        defaultsTo: [kDefaultAbi],
+        help: 'Device ABIs to fetch release kits for (x86_64 for emulators).',
+      )
       ..addOption(
         'aera-kit',
         help: 'Install a flutter-aera runtime kit .tar.gz (path or https URL).',
@@ -45,10 +51,13 @@ class PrecacheCommand extends FlutterCommand {
     }
     if (boolArg('frb')) await precacheFrb();
     if (boolArg('dart-android') || argResults!.wasParsed('dart-android-kit')) {
-      await precacheDartAndroid(
-        source: stringArg('dart-android-kit'),
-        sha256Hex: stringArg('dart-android-sha256'),
-      );
+      if (stringArg('dart-android-kit') case final kit?) {
+        await precacheDartAndroid(source: kit, sha256Hex: stringArg('dart-android-sha256'));
+      } else {
+        for (final abi in stringsArg('dart-android-abi')) {
+          await precacheDartAndroid(abi: abi);
+        }
+      }
     }
     if (stringArg('aera-kit') case final kit?) {
       await precacheAeraKit(kit, sha256Hex: stringArg('aera-kit-sha256'));
