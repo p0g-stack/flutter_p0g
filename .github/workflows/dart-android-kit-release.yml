@@ -1,0 +1,32 @@
+# Publishes the kits a dart-android-kit run uploaded as artifacts as the
+# dart-android-<version> release, without rebuilding them.
+name: dart-android-kit-release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: dart-android-kit run whose artifacts to publish
+        required: true
+      dart_version:
+        description: Dart release of those kits
+        default: 3.13.4
+permissions:
+  actions: read
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          pattern: dart-android-*-${{ inputs.dart_version }}
+          merge-multiple: true
+          path: kits
+      - run: cd kits && ls -la && sha256sum -c *.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dart-android-${{ inputs.dart_version }}
+          target_commitish: ${{ github.sha }}
+          files: kits/dart-android-*.tar.gz*
