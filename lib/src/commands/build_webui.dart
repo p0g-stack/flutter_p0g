@@ -12,6 +12,7 @@ import '../webui/cli_exe.dart';
 import '../webui/dart_android.dart';
 import '../webui/flutter_webui.dart';
 import '../webui/module.dart';
+import '../webui/plugin.dart';
 import '../webui/workers.dart';
 
 /// `flutter build web` with WebUI defaults, then the module zip.
@@ -53,6 +54,13 @@ class BuildWebUiCommand extends BuildWebCommand {
     return super.stringArg(name, global: global);
   }
 
+  /// The generated entrypoint that registers the flutter_webui plugin,
+  /// while the web build runs.
+  String? _webuiEntrypoint;
+
+  @override
+  String get targetFile => _webuiEntrypoint ?? super.targetFile;
+
   @override
   Future<FlutterCommandResult> runCommand() async {
     final Directory app = project.directory;
@@ -71,7 +79,16 @@ class BuildWebUiCommand extends BuildWebCommand {
     // first use, like flutter's own artifacts).
     await precacheFlutterWebui();
 
-    final result = await super.runCommand();
+    // The flutter_webui web plugin (engine handlers), added for this build
+    // only: apps depend on flutter_webui_client alone.
+    final result = await withWebuiPlugin(app, super.targetFile, (entrypoint) async {
+      _webuiEntrypoint = entrypoint;
+      try {
+        return await super.runCommand();
+      } finally {
+        _webuiEntrypoint = null;
+      }
+    });
 
     final fs = globals.fs;
     final Directory web = fs.directory(

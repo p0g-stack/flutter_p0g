@@ -61,6 +61,13 @@ Gaps are listed here, not hidden.
    bootstrap replaces the page (`index.html` with the module id and name,
    `flutter_bootstrap.js` filled with the build config, `flutter_webui.js`,
    `flutter_webui.css`).
+   The flutter_webui web plugin (the engine handlers) is added for the build
+   only, since apps depend on `flutter_webui_client` alone: its packages
+   (from flutter-webui's own resolution) join the package config while the
+   build runs, and the target becomes a generated main that calls
+   `FlutterWebUi.registerWith` before the app's `main()`, as flutter-tizen
+   registers its embedding plugins. Packages the app already resolves stay
+   its own.
 3. `flutter build web`, defaulting to `--no-web-resources-cdn` (CanvasKit and
    fonts bundled; managers can't rely on a CDN) and no service worker.
 4. Prunes what a manager never loads: `*.symbols`, the service worker,
@@ -91,10 +98,11 @@ So by default (`--cli-format=aot`) the build:
    --target-os android` and product platform,
 2. turns it into an android-arm64 ELF with the kit's host `gen_snapshot`,
 3. ships `bin/<abi>/<name>.aot`, `bin/<abi>/dartaotruntime` and a
-   `bin/<name>` launcher that picks the device ABI.
+   `bin/<name>` launcher that picks the device ABI and sets `TMPDIR` to the
+   module's `tmp/` (root shells can start with an empty environment).
 
 The kits (`precache --dart-android [--dart-android-abi=arm64-v8a,x86_64]`), one per ABI, are both halves built from the pinned
-Dart release with `tools/build.py --os android` by
+Dart release with `tools/build.py --mode product --os android` by
 `.github/workflows/dart-android-kit.yml`; `--dart-android-kit=<path|url>`
 swaps in another source with the same layout (`VERSION`, `gen_snapshot`,
 `dartaotruntime`). The pipeline is checked end to end with a host-arch kit;

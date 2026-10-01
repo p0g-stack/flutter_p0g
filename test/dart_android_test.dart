@@ -46,7 +46,8 @@ void main() {
   test('launcher picks the ABI directory and passes arguments through', () {
     final s = launcherScript('counterd');
     expect(s, startsWith('#!/system/bin/sh\n'));
-    expect(s, contains(r'd=${0%/*}/$(getprop ro.product.cpu.abi)'));
+    expect(s, contains(r'd=$b/$(getprop ro.product.cpu.abi)'));
+    expect(s, contains(r'export TMPDIR="$b/../tmp"'));
     expect(s, contains(r'exec "$d/dartaotruntime" "$d/counterd.aot" "$@"'));
   });
 
