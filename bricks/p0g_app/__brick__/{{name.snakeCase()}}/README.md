@@ -35,7 +35,8 @@ P0G_CLI=$PWD/build/{{name.snakeCase()}} flutter run -d linux -t app/lib/main.dar
 - **Places.** A service is a Squadron service in `core/lib/src/service/`. It
   runs in Squadron's own place (an isolate, a Web Worker) or in the process
   place: this app's CLI in `serve` mode (hosting every service), through squadron_process,
-  started by a launcher (`P0G_CLI` on a desktop, flutter-webui's root channel
+  started by a launcher (`P0G_CLI` on a desktop, flutter-webui's root channel through
+  `core/lib/src/places/webui_launcher.dart`
   on WebUI). The app binds each worker to the place the user picked.
 - **Facts.** `core/lib/src/facts/` owns the fact keys and the checks that
   decide them (`check_io.dart`, `check_web.dart`). Each place runs the check

@@ -31,20 +31,20 @@ What it stamps:
   `flutter create` for linux and web, web workers, format) and
   `build_workers.sh`.
 
-squadron_process and flutter_webui are git dependencies pinned by commit.
+squadron_process and flutter_webui_client are git dependencies pinned by commit.
 squadron_process needs Squadron with its channel-factory patch: bootstrap
 runs `dart run squadron_process:squadron_patch`, which fetches the patched
 copy into `.dart_tool/` and writes `pubspec_overrides.yaml` (gitignored),
 until it is upstream or flutter_p0g handles it. squadron_process's API is used
-only in `cli/.../serve_command.dart`, `app/lib/places/` and
-`core/lib/src/facts/facts.dart`.
+only in `cli/.../serve_command.dart`, `app/lib/places/`,
+`core/lib/src/places/` and `core/lib/src/facts/facts.dart`.
 
-The WebUI launcher (`app/lib/places/webui_launcher.dart`) starts the CLI
-through flutter-webui's root channel, behind `WebUiRoot`, the few calls of
-flutter_webui's `RootChannel` it uses. The app does not depend on
-flutter_webui, a web plugin that needs flutter-webui's patched engine (a stock
-`flutter build web` would not compile); the WebUI target sets `webUiRoot`
-from its own glue. Its contract with the root channel is
+The WebUI launcher (`core/lib/src/places/webui_launcher.dart`) starts the CLI
+through flutter-webui's root channel with `flutter_webui_client`, plain Dart
+that builds on a stock SDK. The app never depends on the `flutter_webui` web
+plugin (engine handlers only); flutter_p0g adds it when it builds for WebUI.
+`cli/test/webui_launch_test.dart` runs the launch against the real
+`flutter_webui_root` on the VM. Its contract with the root channel is
 [docs/webui-launch.md](../../docs/webui-launch.md). In a plain browser there is
 no process place, and services run in Web Workers.
 

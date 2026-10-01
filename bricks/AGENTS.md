@@ -24,6 +24,8 @@ Self-contained; no external base file.
   generated workspace; bootstrap regenerates it.
 - squadron_process is generic: the fact keys and checks, the WebUI launcher
   and its contract (`docs/webui-launch.md`) are ours. Its API is used only in
-  `cli/.../serve_command.dart`, `app/lib/places/` and
+  `cli/.../serve_command.dart`, `app/lib/places/`, `core/lib/src/places/` and
   `core/lib/src/facts/facts.dart`; keep that seam that small. Bump its pinned
-  commit in all three pubspecs together.
+  commit in all three pubspecs together. The same goes for flutter-webui's
+  commit (core, app and cli pubspecs). Never depend on the `flutter_webui`
+  web plugin from the app: flutter_p0g adds it at build time.

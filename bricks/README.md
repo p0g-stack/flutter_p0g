@@ -39,7 +39,7 @@ README lists its variables; `bricks/<brick>/CHANGELOG.md` its versions.
 ## Pins
 
 Flutter 3.47.5 (Dart 3.13), Squadron 7.4.4 (patched, via squadron_process)
-with squadron_builder 9.3.2, squadron_process by commit,
+with squadron_builder 9.3.2, squadron_process and flutter-webui (`flutter_webui_client`) by commit,
 flutter_rust_bridge 2.14.0-beta.2 (the base of flutter_p0g's frb patches),
 mason_cli 0.1.4.
 

@@ -9,6 +9,7 @@ export 'package:logging/logging.dart' show Level, LogRecord, Logger;
 
 export 'src/facts/facts.dart';
 export 'src/log.dart';
+export 'src/places/webui_launcher.dart';
 export 'src/service/hello_service.dart';
 export 'src/strategy/objective.dart';
 export 'src/strategy/strategy.dart';

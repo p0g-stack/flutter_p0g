@@ -14,6 +14,11 @@ dependencies:
     git:
       url: https://github.com/p0g-stack/squadron_process
       ref: 52ee2f66b0928dbcb2a33a39a04d9f7e72f697f8
+  flutter_webui_client:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      path: packages/flutter_webui_client
+      ref: 3049dc94adb1df919ccdab1ab305759601a772c3
 {{#rust}}  flutter_rust_bridge: 2.14.0-beta.2
 {{/rust}}
 dev_dependencies:

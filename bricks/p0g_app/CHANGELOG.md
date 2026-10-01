@@ -1,3 +1,13 @@
+# 0.4.0
+
+- The WebUI launcher moves to `core/lib/src/places/webui_launcher.dart` and
+  depends on flutter-webui's `flutter_webui_client` (git, 3049dc9), plain
+  Dart on a stock SDK. `WebUiRoot` and the `webUiRoot` global are gone: on
+  web, `openProcessPlace` uses `WebUi.host.moduleDir` and
+  `WebUi.connectRootChannel`; a closed channel is reopened on next use.
+- New `cli/test/webui_launch_test.dart`: the hello service in the CLI started
+  through the real `flutter_webui_root` channel (dev dependency) on the VM.
+
 # 0.3.0
 
 - squadron_process 52ee2f6: one `serve` process hosts every service by name
