@@ -33,3 +33,8 @@ Self-contained; no external base file.
   app build, so bump it on any incompatible change rather than negotiating.
 - Keep README and docs/launchers.md true to what the code does.
 - Commit directly to main until a stable/parity release is declared.
+- Stable surface (used by bricks since 2026-10-01): `serve(Map<String, Invoker>,
+  args, facts:)`, `ProcessPlace(launcher:, store:, command:)` and
+  `place.bind(worker, service:)`, plus the serve CLI options and ready-line
+  JSON in docs/serve.md. Change them only additively; anything else bumps the
+  minor version and is announced to consumers first.
