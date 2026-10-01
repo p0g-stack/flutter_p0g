@@ -3,7 +3,10 @@
 # AOT for that ABI) and dartaotruntime (Android, bionic), from the Dart
 # release inside the pinned Flutter. Same recipe Termux uses for its dart
 # package (tools/build.py --os android), keeping the host gen_snapshot.
-# x86_64 is for emulators (devicelab's AVD).
+# x86_64 is for emulators (devicelab's AVD). Product mode, to match the
+# product kernel build webui snapshots. The `gen_snapshot` target alone
+# builds the Android one; the host cross-compiler comes from the
+# runtime_precompiled group (gen_snapshot($host_toolchain), under clang_x64/).
 name: dart-android-kit
 on:
   workflow_dispatch:
@@ -21,11 +24,11 @@ jobs:
         include:
           - abi: arm64-v8a
             arch: arm64
-            out: ReleaseAndroidARM64
+            out: ProductAndroidARM64
             elf: aarch64
           - abi: x86_64
             arch: x64
-            out: ReleaseAndroidX64
+            out: ProductAndroidX64
             elf: x86-64
     steps:
       - name: Fetch Dart SDK sources
@@ -39,16 +42,17 @@ jobs:
           gclient sync --jobs 8 --no-history
       - name: Build
         working-directory: dart/sdk
-        run: ./tools/build.py --no-rbe --mode release --arch ${{ matrix.arch }} --os android gen_snapshot dartaotruntime
+        run: ./tools/build.py --no-rbe --mode product --arch ${{ matrix.arch }} --os android dartaotruntime runtime_precompiled
       - name: Pack
         working-directory: dart/sdk
         run: |
           out=out/${{ matrix.out }}
-          find "$out" -maxdepth 2 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
+          find "$out" -maxdepth 3 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
           # Host gen_snapshot: an x86-64 ELF not linked for Android. Runtime:
           # the ABI's ELF that is (interpreter /system/bin/linker64).
-          gen=$(find "$out" -maxdepth 2 -type f -name gen_snapshot -exec file {} \; | grep -v 'Android\|linker64' | grep x86-64 | head -1 | cut -d: -f1)
-          rt=$(find "$out" -maxdepth 2 -type f \( -name dartaotruntime -o -name dartaotruntime_product -o -name dart_precompiled_runtime_product \) -exec file {} \; | grep '${{ matrix.elf }}' | grep 'Android\|linker64' | head -1 | cut -d: -f1)
+          hosts=$(find "$out" -maxdepth 3 -type f -name gen_snapshot -exec file {} \; | grep -v 'Android\|linker64' | grep x86-64 || true)
+          gen=$( (echo "$hosts" | grep ', stripped'; echo "$hosts") | head -1 | cut -d: -f1)
+          rt=$(find "$out/exe.stripped" "$out" -maxdepth 1 -type f \( -name dartaotruntime -o -name dartaotruntime_product -o -name dart_precompiled_runtime_product \) -exec file {} \; | grep '${{ matrix.elf }}' | grep 'Android\|linker64' | head -1 | cut -d: -f1)
           test -n "$gen" && test -n "$rt"
           mkdir kit
           cp "$gen" kit/gen_snapshot
