@@ -154,6 +154,31 @@ install starts with an empty `/data/adb/<id>` (install marker
 each boot, uninstall.sh removes the folder. The paths are for the app's root
 process; the page cannot open them.
 
+### permission_handler_webui
+
+Runtime permissions belong to the module's own app (`com.webui.api.<seg>`,
+labelled with the module's name), so Android's own dialog asks and names the
+module. Stock `Permission.camera.request()`, `.status` and
+`openAppSettings()` work unchanged; nothing is stored on our side and no
+dialog of ours exists.
+
+| Call | WebUI host with the app | No app / browser tab |
+|---|---|---|
+| status | `Permission --esa permissions <names>`: granted or denied | stock (browser prompts) |
+| request | `Permission ... --ez request true` (waits up to 5 min for the user): granted, denied, or permanentlyDenied when Android will not ask again | stock |
+| `openAppSettings()` | root `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:<app>` | stock |
+| location service | root `settings get secure location_mode` | stock |
+| `shouldShowRequestPermissionRationale` | false (Android answers it only to an activity on screen) | stock |
+
+Mapped: camera (`CAMERA`), microphone and speech (`RECORD_AUDIO`),
+location and locationWhenInUse (fine or coarse), locationAlways
+(`ACCESS_BACKGROUND_LOCATION`), sensors (`BODY_SENSORS`), storage (read and
+write external storage). Everything else is not declared by the app and is
+`denied`. Retry and "don't ask again" are Android's; what to show after
+`permanentlyDenied` (usually "allow it in Settings" plus `openAppSettings()`)
+is the app's, as on Flutter Android. Needs webui-termux-api webui.4 (the
+`Permission` method).
+
 ### shared_preferences_webui
 
 `SharedPreferences`, `SharedPreferencesAsync` and `SharedPreferencesWithCache`

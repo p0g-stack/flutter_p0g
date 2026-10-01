@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # webui_app_plane: call one Termux:API method as root, like termux-api from
 # termux-api-package. Lives at <moddir>/webui_app_plane/termux-api.
-# Usage: sh termux-api [--package <pkg>] <Method> [am extras...]
+# Usage: sh termux-api [--package <pkg>] [--wait <seconds>] <Method> [am extras...]
 #   stdin goes to the method, its answer comes out on stdout.
 # Runs bin/webui_termux_api.dart (<abi>/webui_termux_api.aot) on the Dart
 # runtime flutter-webui ships in <moddir>/flutter_webui/<abi>/.

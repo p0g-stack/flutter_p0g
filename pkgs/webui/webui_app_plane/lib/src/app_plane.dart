@@ -21,7 +21,7 @@ final class AppPlaneException implements Exception {
 /// (Termux:API repackaged, renamed per module to [appPlanePackage] and placed
 /// by the module) called as root through the root channel.
 ///
-/// A call runs `<moddir>/webui_app_plane/termux-api <Method> [extras]`, the
+/// A call runs `<moddir>/webui_app_plane/termux-api [--wait s] <Method> [extras]`, the
 /// Dart port of termux-api from termux-api-package (`bin/webui_termux_api.dart`),
 /// with the method's stdin and stdout.
 final class AppPlane {
@@ -89,11 +89,14 @@ final class AppPlane {
   }
 
   /// Calls [method] with am-style [extras] (`--es name value`, `--ez name
-  /// true`, ...), sending [input] on its stdin. Returns its stdout.
+  /// true`, ...), sending [input] on its stdin. Returns its stdout. [wait]
+  /// is how long the app may take to answer (the launcher's default, 10 s,
+  /// when null); methods that wait on the user pass more.
   Future<RootResult> call(
     String method, {
     List<String> extras = const [],
     List<int>? input,
+    Duration? wait,
   }) async {
     if (!root.available) {
       throw const AppPlaneException(
@@ -112,6 +115,7 @@ final class AppPlane {
       '${root.moduleDir}/webui_app_plane/termux-api',
       '--package',
       package,
+      if (wait != null) ...['--wait', '${wait.inSeconds}'],
       method,
       ...extras,
     ], stdin: input);
