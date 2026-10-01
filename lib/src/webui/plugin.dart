@@ -123,6 +123,11 @@ Set<String> closureOf(Map<String, Object?> graph, String root) {
   return seen;
 }
 
+/// `*_webui` packages every module gets, though no stock plugin package
+/// names them: clipboard_webui backs Flutter's own `Clipboard` (a plain web
+/// plugin, no `implements:`), so its `registerWith` must run.
+const kAlwaysWebuiPackages = ['clipboard_webui'];
+
 /// The `*_webui` packages the app needs as direct dependencies: those
 /// implementing a plugin in [appClosure] that [appDirect] doesn't name.
 /// Flutter registers one web implementation per plugin, and a `*_webui` one
@@ -130,20 +135,24 @@ Set<String> closureOf(Map<String, Object?> graph, String root) {
 /// `docs/plugins.md`). So does a `*_webui` package that another added one
 /// depends on (by [addedDependencies], e.g. url_launcher_webui through
 /// share_plus_webui), or else Flutter finds two web implementations of its
-/// plugin; repeated until nothing new comes in.
+/// plugin; repeated until nothing new comes in. [always] are added to every
+/// app ([kAlwaysWebuiPackages]).
 @visibleForTesting
 List<String> webuiPackagesFor(
   Set<String> appClosure,
   Set<String> appDirect,
   Map<String, String> implementations, {
   Map<String, List<String>> addedDependencies = const {},
+  Set<String> always = const {},
 }) {
-  final closure = {...appClosure};
+  final closure = {...appClosure, ...always};
   final picked = <String>{};
   while (true) {
     final next = {
       for (final MapEntry(key: plugin, value: impl) in implementations.entries)
         if ((closure.contains(plugin) || closure.contains(impl)) && !appDirect.contains(impl)) impl,
+      for (final impl in always)
+        if (!appDirect.contains(impl)) impl,
     };
     if (next.length == picked.length) break;
     picked.addAll(next);
@@ -239,6 +248,10 @@ Future<T> withWebuiPlugin<T>(
     flutterProject.manifest.dependencies,
     webuiImplementations(),
     addedDependencies: mergedDependencies(sources),
+    always: {
+      for (final p in kAlwaysWebuiPackages)
+        if (webuiPackagesSource().childDirectory('packages').childDirectory(p).existsSync()) p,
+    },
   );
   final overlay = overlayPackageConfig(_json(originals[appConfigFile]!), sources, [
     kWebuiPlugin,

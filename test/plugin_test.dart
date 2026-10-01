@@ -198,6 +198,21 @@ void main() {
     );
   });
 
+  test('always-added packages come in and bring what they reach', () {
+    expect(
+      webuiPackagesFor(
+        {'flutter'},
+        const {},
+        {'url_launcher': 'url_launcher_webui'},
+        addedDependencies: {
+          'clipboard_webui': ['flutter_webui', 'webui_app_plane'],
+        },
+        always: {'clipboard_webui'},
+      ),
+      ['clipboard_webui'],
+    );
+  });
+
   test('entrypoint registers the plugin then runs the app', () {
     final code = webuiEntrypoint('package:counter/main.dart');
     expect(code, contains("import 'package:counter/main.dart' as app;"));
