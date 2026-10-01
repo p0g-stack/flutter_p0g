@@ -1,4 +1,7 @@
-include: package:flutter_lints/flutter.yaml
+# The workspace root file carries the p0g_lints plugin.
+include:
+  - package:flutter_lints/flutter.yaml
+  - ../analysis_options.yaml
 
 analyzer:
   exclude:

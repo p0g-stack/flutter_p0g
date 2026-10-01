@@ -34,16 +34,19 @@ P0G_CLI=$PWD/build/{{name.snakeCase()}} flutter run -d linux -t app/lib/main.dar
 
 - **Places.** A service is a Squadron service in `core/lib/src/service/`. It
   runs in Squadron's own place (an isolate, a Web Worker) or in the process
-  place: this app's CLI in `serve` mode (hosting every service), through squadron_process,
-  started by a launcher (`P0G_CLI` on a desktop, flutter-webui's root channel through
-  `core/lib/src/places/webui_launcher.dart`
-  on WebUI). The app binds each worker to the place the user picked.
+  place: this app's CLI in `serve` mode (hosting every service), through
+  squadron_process, started by a launcher (`P0G_CLI` on a desktop,
+  flutter-webui's root channel on WebUI, see
+  `core/lib/src/places/webui_launcher.dart`). The app binds each worker to
+  the place the user picked.
 - **Facts.** `core/lib/src/facts/` owns the fact keys and the checks that
   decide them (`check_io.dart`, `check_web.dart`). Each place runs the check
   where it is, so the page and the root process report different facts.
 - **Strategies.** An `Objective` holds strategies in preference order; the
   first whose `available(facts)` holds runs. Never decide with `kIsWeb` or
   `Platform`: WebUI says web, AERA says Linux, neither says root.
+  `dart analyze` warns (p0g_lints `strategy_reads_platform`), as it does for
+  Flutter imports in core (`core_imports_flutter`).
   Host-versus-device choices are strategies of one objective.
 - **Device writes.** A `WriteStrategy` plans first (no side effects); the UI or
   CLI shows the steps and makes a `Confirmation`; `Objective.apply` writes

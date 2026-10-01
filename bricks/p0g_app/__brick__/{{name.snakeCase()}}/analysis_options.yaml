@@ -5,3 +5,13 @@ analyzer:
     - "**/*.g.dart"
 {{#rust}}    - "core/lib/src/rust/**"
 {{/rust}}
+
+# p0g conventions as warnings: core never imports Flutter, strategies never
+# read kIsWeb or Platform (p0g-stack/bricks packages/p0g_lints). Members with
+# their own analysis_options.yaml include this file to get them.
+plugins:
+  p0g_lints:
+    git:
+      url: https://github.com/p0g-stack/bricks
+      path: packages/p0g_lints
+      ref: 8e3d47fe48f1a2f405b0b76b15b08ccea6bbd2c3

@@ -10,6 +10,10 @@ Self-contained; no external base file.
   CLI (and the app), never shipped as its own binary or CLI, so the shell
   interface is ours everywhere. The `rust/` template stays a library crate.
 - Strategies decide with `available(facts)`, never `kIsWeb` / `Platform`.
+  `packages/p0g_lints` enforces this and the core rule; a new convention
+  that a machine can check becomes a rule there. The brick pins p0g_lints by
+  commit in the root `analysis_options.yaml`; CI swaps in this checkout's
+  copy, so bump the pin after a p0g_lints change lands.
 - Every call logs which strategy ran, in which place, with which facts.
 - `demo` is generated from `p0g_app`; CI regenerates it and diffs, so a brick
   change and its demo change land together.

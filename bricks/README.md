@@ -14,6 +14,10 @@ any Flutter app, the way `flutter create --platforms` does.
 | `service` | a Squadron service exposed to both the GUI (a panel) and the CLI (a command and `serve`) |
 | `strategy` | an objective and its strategies, chosen by `available(facts)` (e.g. on-device `dd` vs host `fastboot fetch`); device writes plan, confirm, receipt |
 
+`packages/p0g_lints` is an analyzer plugin the generated workspace turns on:
+`core_imports_flutter` and `strategy_reads_platform` make the two main
+conventions `dart analyze` warnings.
+
 A new app:
 
 ```sh

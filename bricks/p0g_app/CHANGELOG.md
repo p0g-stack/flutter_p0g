@@ -1,3 +1,10 @@
+# 0.6.0
+
+- `analysis_options.yaml` turns on the p0g_lints plugin (this repo,
+  `packages/p0g_lints`, pinned by commit): `core_imports_flutter` and
+  `strategy_reads_platform` are warnings. `app/analysis_options.yaml`
+  includes the root file so they apply in the app too.
+
 # 0.5.0
 
 - `rust`: a working crate end to end. `sha256_hex` (the `sha2` crate) behind
