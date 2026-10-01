@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  dynamic_color: ^2.1.0
+  material_ui: ^1.0.0
   squadron: ^7.4.4
   squadron_process:
     git:

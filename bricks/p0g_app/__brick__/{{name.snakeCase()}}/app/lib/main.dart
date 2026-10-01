@@ -3,6 +3,7 @@ import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 
 import 'home.dart';
 import 'places/places.dart';
+import 'theme.dart';
 
 void main() {
   final lines = LogLines();
@@ -21,14 +22,13 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '{{name.titleCase()}}',
-      theme: ThemeData(colorSchemeSeed: Colors.teal),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
+    return hostColors(
+      (light, dark) => MaterialApp(
+        title: '{{name.titleCase()}}',
+        theme: themeFor(Brightness.light, light),
+        darkTheme: themeFor(Brightness.dark, dark),
+        home: HomePage(places: places, lines: lines),
       ),
-      home: HomePage(places: places, lines: lines),
     );
   }
 }

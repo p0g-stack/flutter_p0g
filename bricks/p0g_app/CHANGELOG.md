@@ -1,3 +1,12 @@
+# 0.7.2
+
+- The app takes the host's colours through the stock `dynamic_color`
+  builder: Material You on Android, the accent colour on desktop, and, once
+  flutter_p0g adds `dynamic_color_webui`, the manager's colours in a WebUI.
+  Without them (a plain tab, AERA, tests) it keeps its own scheme from
+  `seed` in `app/lib/theme.dart`. To opt out, have `hostColors` call
+  `builder(null, null)` and drop `dynamic_color`.
+
 # 0.7.1
 
 - `rust` on the web: the Rust wasm loads on the first Rust call, not at
