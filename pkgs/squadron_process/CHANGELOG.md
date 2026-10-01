@@ -20,7 +20,9 @@
   messages after the handshake; the client rejects a malformed welcome.
 - Service log records reach the client worker's `channelLogger` over the
   process link (`log` frame), as from an isolate or Web Worker; the hosted
-  worker's own `channelLogger` still gets them.
+  worker's own `channelLogger` still gets them. Each client process gets a
+  record once, however many workers it bound (`clientId` in the hello,
+  `processClientId`, `ProcessPlace(clientId:)`).
 - Benchmark of isolate, Web Worker and process places on the VM and in
   Chromium (`benchmark/`, `tool/bench.sh`, doc/benchmark.md).
 - `squadron_patch` executable and the Squadron 7.4.4 channel-factory patch.

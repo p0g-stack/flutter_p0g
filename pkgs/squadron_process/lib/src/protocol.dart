@@ -8,7 +8,7 @@ import 'codec.dart';
 /// ```
 /// client -> host                     host -> client
 /// hello    [0, version, token,       welcome  [10, version, place, facts]
-///           service?]
+///           service?, clientId?]
 /// request  [1, id, cmd, args,        refused  [11, reason]
 ///           tokenId?, streaming]     value    [12, id, result]
 /// cancel   [2, tokenId, message?]    error    [13, id, exception]
@@ -19,7 +19,8 @@ import 'codec.dart';
 /// ```
 ///
 /// `log` relays a log record of the service the link is bound to (what
-/// Squadron's own channels deliver to a worker's `channelLogger`). `level` is
+/// Squadron's own channels deliver to a worker's `channelLogger`), once per
+/// client: to one link per `clientId` (a link without one is its own client). `level` is
 /// package:logger's `Level.value`; `timeUs` is microseconds since the epoch.
 /// A client that does not know it ignores it.
 ///

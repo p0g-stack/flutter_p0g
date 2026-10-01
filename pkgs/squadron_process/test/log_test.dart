@@ -80,20 +80,62 @@ void main() {
     w.stop();
   });
 
-  test('every client of the service gets them; none needs a logger', () async {
+  test('several links from one client get each record once', () async {
+    // One page binding the service in several places: one client id.
     final a = Capture(), b = Capture();
     final wa = place().bind(EchoWorker()..channelLogger = a);
     final wb = place().bind(EchoWorker()..channelLogger = b);
     final quiet = place().bind(EchoWorker());
     await Future.wait([wa.echo(0), wb.echo(0), quiet.echo(0)]);
-    await quiet.log('to all');
+    expect(host.links, 3);
+    await wb.log('once');
     await settle();
-    expect(a.records.map((r) => r.$2), contains('to all'));
-    expect(b.records.map((r) => r.$2), contains('to all'));
+    final got = [...a.records, ...b.records].where((r) => r.$2 == 'once');
+    expect(got, hasLength(1));
     for (final w in [wa, wb, quiet]) {
       w.stop();
     }
   });
+
+  test('each client gets each record once; none needs a logger', () async {
+    ProcessPlace placeAs(String id) => ProcessPlace(
+      endpoint: const ProcessEndpoint(port: 1, token: token),
+      clientId: id,
+      connector: (_) async {
+        final (c, s) = PlaceLink.pair();
+        host.accept(s);
+        return c;
+      },
+    );
+    final a = Capture(), b = Capture();
+    final wa = placeAs('client-a').bind(EchoWorker()..channelLogger = a);
+    final wb = placeAs('client-b').bind(EchoWorker()..channelLogger = b);
+    final quiet = placeAs('client-c').bind(EchoWorker());
+    await Future.wait([wa.echo(0), wb.echo(0), quiet.echo(0)]);
+    await quiet.log('to all');
+    await settle();
+    expect(a.records.where((r) => r.$2 == 'to all'), hasLength(1));
+    expect(b.records.where((r) => r.$2 == 'to all'), hasLength(1));
+    for (final w in [wa, wb, quiet]) {
+      w.stop();
+    }
+  });
+
+  test(
+    'when a client\'s receiving link closes, another of its links takes over',
+    () async {
+      final a = Capture(), b = Capture();
+      final wa = place().bind(EchoWorker()..channelLogger = a);
+      final wb = place().bind(EchoWorker()..channelLogger = b);
+      await Future.wait([wa.echo(0), wb.echo(0)]);
+      wa.stop();
+      await settle();
+      await wb.log('still here');
+      await settle();
+      expect(b.records.where((r) => r.$2 == 'still here'), hasLength(1));
+      wb.stop();
+    },
+  );
 
   test('records go only to links bound to the service that logged', () async {
     final other = EchoWorker();

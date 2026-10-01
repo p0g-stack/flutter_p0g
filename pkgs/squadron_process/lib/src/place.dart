@@ -83,6 +83,7 @@ final class ProcessPlace extends Place {
     this.readyTimeout = const Duration(seconds: 120),
     this.storePollInterval = const Duration(milliseconds: 250),
     this.logger,
+    this.clientId,
   }) : _endpoint = endpoint,
        _connect = connector ?? connectWebSocket,
        assert(
@@ -104,6 +105,10 @@ final class ProcessPlace extends Place {
   final Duration readyTimeout;
   final Duration storePollInterval;
   final Logger? logger;
+
+  /// Who this client is to the host; defaults to [processClientId]. Links
+  /// with one id get a service's log records once between them.
+  final String? clientId;
   final LinkConnector _connect;
 
   ProcessEndpoint? _endpoint;
@@ -209,6 +214,7 @@ final class ProcessPlace extends Place {
       await _connect(endpoint),
       token: endpoint.token,
       service: service,
+      clientId: clientId,
       timeout: handshakeTimeout,
     );
     _facts = handshake.facts;

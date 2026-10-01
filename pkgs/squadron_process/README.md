@@ -139,9 +139,13 @@ its own requests, cancellations and streams.
 
 Log records a service sends with Squadron's cross-worker logging reach the
 client worker's `channelLogger`, as they do from an isolate or a Web Worker.
-The host relays each record over the link (a `log` frame) to every client
+The host relays each record over the link (a `log` frame) once to every client
 bound to that service, and still passes it to the hosted worker's own
-`channelLogger` if it has one. Set loggers before the workers start.
+`channelLogger` if it has one. A client is one process (one page on the web,
+`processClientId`): if it binds the service in several places, one of its
+links gets the record. Since one hosted service serves every client, a client
+also sees records from work other clients started. Set loggers before the
+workers start.
 
 ## Launchers
 

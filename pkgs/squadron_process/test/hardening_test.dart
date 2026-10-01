@@ -71,6 +71,10 @@ void main() {
         enc([Msg.hello, Msg.version, token, 7]),
         'bad service name',
       ),
+      'a client id that is not a string': (
+        enc([Msg.hello, Msg.version, token, null, 7]),
+        'bad client id',
+      ),
       'an oversized hello': (
         enc([Msg.hello, Msg.version, token, 'x' * 5000]),
         'bad hello',

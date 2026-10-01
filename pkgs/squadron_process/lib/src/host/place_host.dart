@@ -102,10 +102,13 @@ class PlaceHost {
     _done.complete();
   }
 
-  /// Sends a log record of service [name] to every link bound to it.
+  /// Sends a log record of service [name] to each client bound to it, once:
+  /// a client with several links to the service (one per worker) would
+  /// otherwise log every record once per link.
   void _relayLog(String name, List frame) {
+    final sent = <Object>{};
     for (final l in _links) {
-      if (l._serviceName == name) l._send(frame);
+      if (l._serviceName == name && sent.add(l._client)) l._send(frame);
     }
   }
 
@@ -165,6 +168,10 @@ class _HostLink {
   bool _helloSeen = false;
   late final Invoker _service;
   String? _serviceName;
+
+  /// The client this link belongs to: its hello's client id, or the link
+  /// itself if it sent none.
+  late final Object _client;
   bool _gone = false;
   Timer? _handshake;
 
@@ -290,6 +297,10 @@ class _HostLink {
     }
     final name = m.length > 3 ? m[3] : null;
     if (name != null && name is! String) return _refuse('bad service name');
+    final clientId = m.length > 4 ? m[4] : null;
+    if (clientId != null && (clientId is! String || clientId.length > 128)) {
+      return _refuse('bad client id');
+    }
     final service = name is String
         ? host.services[name]
         : (host.services.length == 1 ? host.services.values.single : null);
@@ -302,6 +313,7 @@ class _HostLink {
     }
     _service = service;
     _serviceName = name is String ? name : host.services.keys.single;
+    _client = clientId ?? this;
     _greeted = true;
     _handshake?.cancel();
     host._linked(this);

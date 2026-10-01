@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:logger/web.dart';
@@ -30,11 +31,20 @@ class ProcessHandshake {
     PlaceLink link, {
     required String token,
     String? service,
+    String? clientId,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final frames = StreamIterator(link.frames);
     try {
-      link.send(Msg.encode([Msg.hello, Msg.version, token, service]));
+      link.send(
+        Msg.encode([
+          Msg.hello,
+          Msg.version,
+          token,
+          service,
+          clientId ?? processClientId,
+        ]),
+      );
       if (!await frames.moveNext().timeout(timeout)) {
         throw WorkerException('Place host closed the link during handshake');
       }
@@ -72,6 +82,18 @@ class ProcessHandshake {
     }
   }
 }
+
+/// Identifies this client process (on the web, this page or worker) to a
+/// place host: links with the same id are one client. The host sends a
+/// service's log records once per client, however many links it opened.
+/// Random per isolate; not a secret.
+final String processClientId = () {
+  final r = Random.secure();
+  return List.generate(
+    12,
+    (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+}();
 
 /// Opens a fresh, handshaken link to the same service, for a channel whose
 /// link dropped.
