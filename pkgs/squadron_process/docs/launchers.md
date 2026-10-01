@@ -61,3 +61,6 @@ directory. An elevated host can write there; other users cannot read it.
   the peer (for instance the connecting socket's uid) can add that in its own
   launcher and host setup.
 - The launch id is not a secret.
+- Endpoints are IP literals (the host binds 127.0.0.1); a ready line or
+  session file naming a hostname is ignored. Some runtimes cannot resolve
+  names at all, for instance a glibc-loaded Dart runtime on Android.

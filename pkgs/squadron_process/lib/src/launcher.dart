@@ -10,6 +10,9 @@ class ProcessEndpoint {
     this.host = '127.0.0.1',
   });
 
+  /// An IP literal, never a hostname: the host binds loopback, and some
+  /// runtimes cannot resolve names at all (a glibc-loaded Dart runtime on
+  /// Android has no working DNS).
   final String host;
   final int port;
   final String token;
@@ -40,8 +43,10 @@ class ProcessEndpoint {
       if (m is! Map || m['squadron_process'] != 1) return null;
       final port = m['port'], token = m['token'];
       if (port is! int || token is! String || token.isEmpty) return null;
+      final host = (m['host'] as String?) ?? '127.0.0.1';
+      if (!_isIpLiteral(host)) return null;
       return ProcessEndpoint(
-        host: (m['host'] as String?) ?? '127.0.0.1',
+        host: host,
         port: port,
         token: token,
         pid: m['pid'] as int?,
@@ -55,6 +60,10 @@ class ProcessEndpoint {
   @override
   String toString() => 'ProcessEndpoint($host:$port, pid $pid)';
 }
+
+bool _isIpLiteral(String h) =>
+    RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(h) ||
+    (h.contains(':') && RegExp(r'^[0-9a-fA-F:.]+$').hasMatch(h));
 
 /// The command that starts a place host: the app's own CLI in serve mode.
 class ProcessCommand {

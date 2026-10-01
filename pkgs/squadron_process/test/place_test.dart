@@ -210,6 +210,19 @@ void main() {
     expect(parsed.pid, 7);
     expect(parsed.uri.toString(), 'ws://127.0.0.1:1234/squadron');
     expect(ProcessEndpoint.tryParse('hello'), isNull);
+    // Hostnames are refused: endpoints are IP literals.
+    expect(
+      ProcessEndpoint.tryParse(
+        '{"squadron_process":1,"host":"localhost","port":1,"token":"a"}',
+      ),
+      isNull,
+    );
+    expect(
+      ProcessEndpoint.tryParse(
+        '{"squadron_process":1,"host":"::1","port":1,"token":"a"}',
+      )!.uri.host,
+      '::1',
+    );
     expect(ProcessEndpoint.tryParse('{"port":1,"token":"a"}'), isNull);
     expect(ProcessEndpoint.tryParse('{"squadron_process":1,"port":1}'), isNull);
   });
