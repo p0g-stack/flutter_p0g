@@ -89,6 +89,12 @@ and its crate at `frb_rust` (`[patch.crates-io]`) with
 rust-async, user-utils, wasm-start`. Exports must be `#[frb(sync)]` or
 `async fn`, or set `default_dart_async: false`.
 
+## Squadron patches (planned)
+
+`squadron_process` needs Squadron 7.4.4 with a `Worker.channelFactory` patch.
+Its series will live in `patches/squadron/` and be applied and cached like
+frb's; until then the app overrides the dependency itself.
+
 ## Layout
 
 ```
@@ -99,6 +105,7 @@ lib/src/webui/             module assembly and zip, cli/ compile
 lib/src/frb/               pinned frb, patch apply, build-web
 lib/src/templates.dart     webui/ and aera/ platform folders
 patches/frb/               the frb series
+patches/squadron/          the Squadron series (planned)
 test/                      unit tests (no e2e)
 ```
 
