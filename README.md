@@ -37,7 +37,7 @@ Gaps are listed here, not hidden.
 |---|---|---|
 | `create --platforms` | `create` adds `webui/` | `create` adds `aera/` |
 | `build <target>` (all flags) | `build webui`: every `build web` flag | `build aera`: every `build bundle` flag; debug, profile, release |
-| `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` (needs its no-`<base>` fix); device path (adb reverse, page swap) not yet run on a device | gap: needs flutter-aera's debug engine with the VM service URL in its log |
+| `run` + hot reload / restart | works in Chromium through flutter-webui's `dev.html` on the manager origin; device path (adb reverse, page swap) not yet run on a device | gap: needs flutter-aera's debug engine with the VM service URL in its log |
 | `attach` | gap | gap (follows the debug engine) |
 | `install` | `install`: adb + ksud / apd / magisk; activates on reboot | `install`: into AERA's plugin store as its Plugin Manager does, `--open` over AERA's RPC; not yet run on a device |
 | `devices` | `devices`: adb devices with the root manager probe `install` uses | `devices`: recovery with AERA's RPC channel |
@@ -56,7 +56,7 @@ Gaps are listed here, not hidden.
 | `devices` | `adb devices -l`, each probed for a root manager (booted) or AERA's RPC channel (recovery) | works against a fake adb |
 | `logs` | Booted: `tail -F` of the module's `webroot/.run/root.log` and newest `proc/*.log` (flutter-webui `docs/root-channel.md`) plus `logcat chromium:V`. Recovery: `/tmp/recovery.log` | not yet run on a device |
 | `run` | `flutter run -d web-server` (DDC, hot reload/restart, debug service) with the patched SDK and the flutter_webui plugin, behind a dev proxy; with adb, reverses the port and points the installed module's page at it | works in Chromium; device path not yet run |
-| `precache` | Flutter's web SDK; `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits | works; the kit releases and `--app-plane` wait on CI |
+| `precache` | Flutter's web SDK and flutter-webui (`--webui`, with fallback fonts); `--webui-packages`; `--app-plane` (pinned APK); `--frb` builds the patched frb; `--dart-android` and `--aera-kit` install kits; `--squadron` | works |
 
 ### `build webui`
 
@@ -75,6 +75,13 @@ Gaps are listed here, not hidden.
    `FlutterWebUi.registerWith` before the app's `main()`, as flutter-tizen
    registers its embedding plugins. Packages the app already resolves stay
    its own.
+   For each plugin the app uses that webui-packages implements (`*_webui`,
+   pinned, `precache --webui-packages`), the build also makes the `*_webui`
+   package a direct dependency: Flutter registers one web implementation per
+   plugin, and a `*_webui` one wins over the stock `*_web` only as a direct
+   dependency (webui-packages `docs/plugins.md`). The package config, the
+   package graph and the manifest flutter_tools sees all carry it while the
+   build runs; `pubspec.yaml` and the lockfile are not touched.
 3. `flutter build web`, defaulting to `--no-web-resources-cdn` (CanvasKit and
    fonts bundled; managers can't rely on a CDN) and no service worker.
 4. Prunes what a manager never loads: `*.symbols`, the service worker,
@@ -82,10 +89,25 @@ Gaps are listed here, not hidden.
 5. Squadron Web Workers: every generated `*.web.g.dart` in the app or its
    workspace packages is compiled (`dart compile js`, `wasm` with `--wasm`)
    to the `~/workers/...` path its activator loads, inside `webroot/`.
-6. If the app or its workspace root has `cli/` (the bricks layout): compiles it
-   for the device into `bin/`, with the frb `.so` from `rust/` beside it.
+6. web_ui's fallback fonts (Roboto, Noto Sans, emoji, symbols, math; about
+   3 MB, fetched once by `precache --webui`) in `webroot/fonts/`, where the
+   bootstrap points the engine: a manager WebView has no system fonts.
+7. flutter-webui's root channel (`docs/root-channel.md`): `flutter_webui/root`
+   and, per ABI, `flutter_webui/<abi>/{flutter_webui_root.aot,dartaotruntime}`
+   (compiled as below). `customize.sh` gets a generated block making the
+   tool's program directories executable.
+8. With `webui_app_plane` in the build (a `*_webui` plugin brings it): the app
+   plane, `webui_app_plane/termux-api`, `webui_app_plane/<abi>/webui_termux_api.aot`
+   and the webui-termux-api APK at
+   `system/product/app/WebuiTermuxApi/WebuiTermuxApi.apk`, pinned by tag and
+   sha256 in `lib/src/webui/app_plane.dart` (`precache --app-plane`). Every
+   module must carry the same APK, so the pin moves only there.
+9. If the app or its workspace root has `cli/` (the bricks layout): compiles it
+   for the device into `bin/`, with the frb `.so` from `rust/` beside it
+   (`--device-rust-libs=<dir>` takes libraries built elsewhere, laid out as
+   `<dir>/<abi>/*.so`; `--no-device-rust` ships without them).
    See "The root process" below.
-7. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
+10. Zips: web build in `webroot/`, then `webui/` on top (its `webroot/` overlays
    the build), Magisk's installer stub in `META-INF/`. `module.prop`'s
    `$(FLUTTER_BUILD_NAME)` and `$(FLUTTER_BUILD_NUMBER)` come from the pubspec
    version or `--build-name` / `--build-number`, as on iOS.
@@ -120,12 +142,15 @@ SDK that can compile Android executables directly.
 
 1. flutter_tools' `web-server` device on a free loopback port, built like
    `build webui` (patched web SDK, the flutter_webui plugin, no CDN).
-2. A dev proxy on `--dev-port` (8800) in front of it: CORS for the manager's
-   origin, flutter-webui's `flutter_webui.js`/`.css` and its
-   `flutter_bootstrap.js` with the loader based at the dev server
-   (`entrypointBaseUrl`, `assetBase`, `canvasKitBaseUrl`), `fonts/` from
-   Google Fonts through the host (Roboto from the engine when offline),
-   DWDS's reload paths made absolute, WebSockets passed through.
+2. A dev server on `--dev-port` (8800) in front of it, per flutter-webui's
+   `docs/dev.md`: CORS for the manager's origin (no credentials, `no-store`),
+   flutter-webui's `flutter_webui.js`/`.css` and its `flutter_bootstrap.js`
+   filled with the build config (the bootstrap itself bases the loader at the
+   dev server), web_ui's fallback fonts at `fonts/`, Roboto added to
+   `FontManifest.json` as `build web` bundles it, `reloaded_sources.json`
+   made absolute, the `Host` header and WebSockets passed through. Checked in
+   headless Chromium with the page on `https://mui.kernelsu.org/`: first
+   frame, text, hot reload keeping state.
 3. With a device on adb (`--serial`): `adb reverse tcp:8800`, and the
    installed module's `index.html` becomes flutter-webui's `dev.html` pointed
    at the proxy (the release page kept as `index.release.html`, put back on

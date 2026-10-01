@@ -15,6 +15,7 @@ import '../webui/dev_proxy.dart';
 import '../squadron.dart';
 import '../webui/flutter_webui.dart';
 import '../webui/plugin.dart';
+import '../webui/webui_packages.dart';
 import 'install.dart' show shellQuote;
 
 /// `flutter run` for WebUI: flutter_tools' `web-server` device (DDC, hot
@@ -87,6 +88,7 @@ class RunCommand extends fl.RunCommand {
   @override
   Future<FlutterCommandResult> runCommand() async {
     await precacheFlutterWebui();
+    await precacheWebuiPackages();
     await ensurePatchedSquadron(project.directory);
     _upstreamPort ??= await _freePort();
     final proxy = await WebUiDevProxy.start(
@@ -94,6 +96,7 @@ class RunCommand extends fl.RunCommand {
       upstream: Uri.parse('http://127.0.0.1:$_upstreamPort/'),
       bootstrap: bootstrapDir(),
       flutterJs: flutterJsFile(),
+      fonts: fallbackFontsDir(),
     );
     final page = _DevPage(project.directory, proxy.url);
     globals.printStatus('WebUI dev server: ${proxy.url} (open dev.html?dev=${proxy.url})');
@@ -106,8 +109,8 @@ class RunCommand extends fl.RunCommand {
     });
 
     try {
-      return await withWebuiPlugin(project.directory, super.targetFile, (entrypoint) async {
-        _entrypoint = entrypoint;
+      return await withWebuiPlugin(project.directory, super.targetFile, (overlay) async {
+        _entrypoint = overlay.entrypoint;
         try {
           return await super.runCommand();
         } finally {

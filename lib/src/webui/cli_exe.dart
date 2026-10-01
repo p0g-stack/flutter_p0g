@@ -109,3 +109,16 @@ Future<Map<String, List<File>>> buildRustForCli(
           : <File>[],
   };
 }
+
+/// rust/ built elsewhere (CI with the NDK): `<dir>/<abi>/*.so`, as
+/// `cargo ndk -o <dir>` lays it out. Every ABI the root process ships for
+/// needs its libraries.
+Map<String, List<File>> prebuiltRustLibs(Directory dir, List<String> abis) => {
+  for (final abi in abis)
+    abi: switch (dir.childDirectory(abi)) {
+      final d when d.existsSync() =>
+        d.listSync().whereType<File>().where((f) => f.path.endsWith('.so')).toList()
+          ..sort((a, b) => a.path.compareTo(b.path)),
+      _ => throwToolExit('--device-rust-libs: no ${dir.childDirectory(abi).path}'),
+    },
+};

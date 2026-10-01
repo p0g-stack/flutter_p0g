@@ -11,9 +11,11 @@ import 'package:flutter_tools/src/hook_runner.dart';
 import 'package:flutter_tools/src/isolated/build_targets.dart';
 import 'package:flutter_tools/src/isolated/mustache_template.dart';
 import 'package:flutter_tools/src/isolated/resident_web_runner.dart';
+import 'package:flutter_tools/src/project.dart';
 import 'package:flutter_tools/src/web/web_runner.dart';
 import 'package:unified_analytics/unified_analytics.dart';
 
+import 'project_factory.dart';
 import 'webui/flutter_webui.dart';
 
 /// flutter_tools' own context, with the overrides its executable.dart makes
@@ -39,6 +41,8 @@ Future<V> runInP0gContext<V>(FutureOr<V> Function() fn, {bool verbose = false}) 
       ),
       FlutterHookRunner: () => FlutterHookRunnerNative(),
       WebRunnerFactory: () => DwdsWebRunnerFactory(),
+      FlutterProjectFactory: () =>
+          P0gProjectFactory(logger: globals.logger, fileSystem: globals.fs),
       Logger: () {
         final Logger base = StdoutLogger(
           terminal: globals.terminal,

@@ -16,16 +16,6 @@ void main() {
     expect(out, contains('<meta name="webui-dev-server" content="http://127.0.0.1:8800/">'));
   });
 
-  test("DWDS's reloaded sources path points at the dev server", () {
-    const js = 'window.\$reloadedSourcesPath = "reloaded_sources.json";\nx = 1;';
-    expect(
-      absolutizeReloadedSources(js, dev),
-      'window.\$reloadedSourcesPath = "http://127.0.0.1:8800/reloaded_sources.json";\nx = 1;',
-    );
-    const already = 'window.\$reloadedSourcesPath = "http://a/b.json";';
-    expect(absolutizeReloadedSources(already, dev), already);
-  });
-
   test('reloaded sources resolve against the dev server', () {
     final out = jsonDecode(
       absolutizeSources(
@@ -39,10 +29,33 @@ void main() {
     expect((out.single as Map)['module'], 'm');
   });
 
-  test('loader config only applies under dev.html', () {
-    expect(kDevLoaderConfig, contains('window.flutterWebUiDevServer'));
-    expect(kDevLoaderConfig, contains('entrypointBaseUrl'));
-    expect(kDevLoaderConfig, contains("canvasKitBaseUrl: dev + 'canvaskit/'"));
+  test('the font manifest gets Roboto once', () {
+    final out = jsonDecode(
+      withRoboto(
+        jsonEncode([
+          {
+            'family': 'MaterialIcons',
+            'fonts': [
+              {'asset': 'fonts/MaterialIcons-Regular.otf'},
+            ],
+          },
+        ]),
+      ),
+    ) as List;
+    expect(out.last, {
+      'family': 'Roboto',
+      'fonts': [
+        {'asset': 'fonts/fallback/Roboto-Regular.ttf'},
+      ],
+    });
+    final again = withRoboto(jsonEncode(out));
+    expect((jsonDecode(again) as List), hasLength(2));
+  });
+
+  test('content types the page needs', () {
+    expect(contentTypeFor('canvaskit.wasm').mimeType, 'application/wasm');
+    expect(contentTypeFor('main.dart.mjs').mimeType, 'text/javascript');
+    expect(contentTypeFor('Roboto.ttf').mimeType, 'font/ttf');
   });
 
   test('CORS echoes the origin', () async {
@@ -57,6 +70,8 @@ void main() {
     final res = await req.close();
     expect(res.headers.value('access-control-allow-origin'), 'https://mui.kernelsu.org');
     expect(res.headers.value('access-control-allow-private-network'), 'true');
+    expect(res.headers.value('access-control-allow-credentials'), isNull);
+    expect(res.headers.value('cache-control'), 'no-store');
     client.close();
     await server.close();
   });

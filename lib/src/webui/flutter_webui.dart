@@ -8,17 +8,26 @@ import 'package:flutter_tools/src/web_template.dart';
 import 'package:meta/meta.dart';
 
 import '../p0g_cache.dart';
+import 'dart_android.dart';
 
 /// flutter-webui, pinned: its bootstrap (`bootstrap/`) replaces the app's
 /// `web/index.html` and `flutter_bootstrap.js` in WebUI builds, and its
 /// `web_ui/` patch series builds the patched web SDK the build compiles
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
-const kFlutterWebuiCommit = '3049dc94adb1df919ccdab1ab305759601a772c3';
+const kFlutterWebuiCommit = '058a33e691b156befe9f7249e56cf5306db77bba';
 
 Directory flutterWebuiDir() => p0gCacheDir().childDirectory('flutter-webui');
 Directory flutterWebuiSource() => flutterWebuiDir().childDirectory('src');
 Directory bootstrapDir() => flutterWebuiSource().childDirectory('bootstrap');
+
+/// web_ui's fallback fonts (`web_ui/tool/fallback_fonts.dart`, default set):
+/// the module's `webroot/fonts/` and the dev server's `fonts/`.
+Directory fallbackFontsDir() => flutterWebuiDir().childDirectory('fonts');
+
+/// The root channel's package (`packages/flutter_webui_root`).
+Directory rootChannelPackage() =>
+    flutterWebuiSource().childDirectory('packages').childDirectory('flutter_webui_root');
 
 /// Root of the patched SDK (`flutter_web_sdk/` inside), mirroring bin/cache.
 Directory patchedWebSdkRoot() => flutterWebuiDir().childDirectory('sdk');
@@ -39,7 +48,8 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
   if (!force &&
       stamp.existsSync() &&
       stamp.readAsStringSync() == kFlutterWebuiCommit &&
-      patchedWebSdk().childDirectory('kernel').existsSync()) {
+      patchedWebSdk().childDirectory('kernel').existsSync() &&
+      fallbackFontsDir().existsSync()) {
     return;
   }
   final src = flutterWebuiSource();
@@ -63,7 +73,44 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
     dartBinary(), 'run', 'tool/build_web_sdk.dart', //
     '--flutter', Cache.flutterRoot!, '--out', patchedWebSdkRoot().path,
   ], webUi);
+  // The root channel and the plugin resolve against the source's workspace.
+  await run([dartBinary(), 'pub', 'get'], src.path);
+
+  globals.printStatus("Fetching web_ui's fallback fonts...");
+  final fonts = fallbackFontsDir();
+  if (fonts.existsSync()) fonts.deleteSync(recursive: true);
+  await run([
+    dartBinary(), 'run', 'tool/fallback_fonts.dart', //
+    '--flutter', Cache.flutterRoot!, '--out', fonts.path,
+    '--cache', flutterWebuiDir().childDirectory('fonts-cache').path,
+  ], webUi);
   stamp.writeAsStringSync(kFlutterWebuiCommit);
+}
+
+/// flutter-webui's root channel for the module (`docs/root-channel.md`):
+/// `flutter_webui/root` and, per kit, `flutter_webui/<abi>/` with the
+/// channel's snapshot and the runtime.
+Future<Map<String, List<int>>> rootChannelFiles(
+  Map<String, DartAndroidKit> kits,
+  Directory work,
+) async {
+  final pkg = rootChannelPackage();
+  final aots = await compileAndroidAot(
+    entrypoint: pkg.childDirectory('bin').childFile('flutter_webui_root.dart'),
+    packageConfig: flutterWebuiSource()
+        .childDirectory('.dart_tool')
+        .childFile('package_config.json'),
+    name: 'flutter_webui_root',
+    kits: kits,
+    work: work,
+  );
+  return {
+    'flutter_webui/root': pkg.childDirectory('module').childFile('root').readAsBytesSync(),
+    for (final MapEntry(key: abi, value: aot) in aots.entries) ...{
+      'flutter_webui/$abi/flutter_webui_root.aot': aot.readAsBytesSync(),
+      'flutter_webui/$abi/dartaotruntime': kits[abi]!.runtime.readAsBytesSync(),
+    },
+  };
 }
 
 /// Pulls the `_flutter.buildConfig = {...};` block flutter_tools wrote into

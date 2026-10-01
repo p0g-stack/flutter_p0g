@@ -5,7 +5,9 @@ import '../aera/kit.dart';
 import '../frb/frb.dart';
 import '../squadron.dart';
 import '../webui/dart_android.dart';
+import '../webui/app_plane.dart';
 import '../webui/flutter_webui.dart';
+import '../webui/webui_packages.dart';
 
 /// Fetches or builds what the p0g targets need beyond stock Flutter.
 class PrecacheCommand extends FlutterCommand {
@@ -50,7 +52,8 @@ class PrecacheCommand extends FlutterCommand {
         help: 'Install a flutter-aera runtime kit (.tar.xz or .tar.gz, path or https URL).',
       )
       ..addOption('aera-kit-sha256', help: 'Expected sha256 of the AERA kit archive.')
-      ..addFlag('app-plane', help: 'The webui-termux-api APK (not released yet).');
+      ..addFlag('webui-packages', help: 'webui-packages (the *_webui plugins and the app plane).')
+      ..addFlag('app-plane', help: 'The webui-termux-api APK the app plane ships (pinned).');
   }
 
   @override
@@ -85,7 +88,8 @@ class PrecacheCommand extends FlutterCommand {
         aeraKitUrl(globals.flutterVersion.frameworkVersion, stringArg('aera-mode')!),
       );
     }
-    if (boolArg('app-plane')) globals.printWarning('webui-termux-api: no release yet.');
+    if (boolArg('webui-packages')) await precacheWebuiPackages(force: true);
+    if (boolArg('app-plane')) await precacheAppPlane(force: true);
     return FlutterCommandResult.success();
   }
 }

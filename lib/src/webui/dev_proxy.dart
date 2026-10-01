@@ -20,16 +20,14 @@ import 'flutter_webui.dart';
 /// - everything else, WebSockets included, passed through to the device, so
 ///   hot restart and the debug service work unchanged.
 class WebUiDevProxy {
-  WebUiDevProxy._(this._server, this.upstream, this._bootstrap, this._flutterJs);
+  WebUiDevProxy._(this._server, this.upstream, this._bootstrap, this._flutterJs, this._fonts);
 
   final io.HttpServer _server;
   final Uri upstream;
   final Directory _bootstrap;
   final File _flutterJs;
+  final Directory _fonts;
   final _client = io.HttpClient()..autoUncompress = false;
-  final _fonts = io.HttpClient()
-    ..connectionTimeout = const Duration(seconds: 3)
-    ..findProxy = io.HttpClient.findProxyFromEnvironment;
 
   /// The URL the page's `?dev=` takes.
   Uri get url => Uri.parse('http://127.0.0.1:${_server.port}/');
@@ -40,16 +38,16 @@ class WebUiDevProxy {
     required Uri upstream,
     required Directory bootstrap,
     required File flutterJs,
+    required Directory fonts,
   }) async {
     final server = await io.HttpServer.bind(io.InternetAddress.loopbackIPv4, port);
-    final proxy = WebUiDevProxy._(server, upstream, bootstrap, flutterJs);
+    final proxy = WebUiDevProxy._(server, upstream, bootstrap, flutterJs, fonts);
     server.listen((r) => unawaited(proxy._handle(r)));
     return proxy;
   }
 
   Future<void> close() async {
     _client.close(force: true);
-    _fonts.close(force: true);
     await _server.close(force: true);
   }
 
@@ -69,6 +67,10 @@ class WebUiDevProxy {
           return await _serveBootstrap(request);
         case '/reloaded_sources.json':
           return await _serveReloadedSources(request);
+        case '/assets/FontManifest.json':
+          return await _serveFontManifest(request);
+        case '/assets/$kRobotoAsset':
+          return await _serveFile(request, bundledRoboto());
       }
       if (request.uri.path.startsWith('/fonts/')) return await _serveFont(request);
       await _proxy(request);
@@ -85,11 +87,12 @@ class WebUiDevProxy {
   }
 
   Future<void> _serveFile(io.HttpRequest request, File file) async {
-    final response = request.response
-      ..headers.contentType = file.basename.endsWith('.css')
-          ? io.ContentType('text', 'css', charset: 'utf-8')
-          : io.ContentType('text', 'javascript', charset: 'utf-8')
-      ..headers.set(io.HttpHeaders.cacheControlHeader, 'no-cache');
+    final response = request.response;
+    if (!file.existsSync()) {
+      response.statusCode = io.HttpStatus.notFound;
+      return await response.close();
+    }
+    response.headers.contentType = contentTypeFor(file.basename);
     await response.addStream(file.openRead());
     await response.close();
   }
@@ -104,42 +107,37 @@ class WebUiDevProxy {
         : fillBootstrap(
             _bootstrap.childFile('flutter_bootstrap.js').readAsStringSync(),
             flutterJs: _flutterJs,
-            buildConfig: config + kDevLoaderConfig,
+            buildConfig: config,
           );
     request.response
       ..headers.contentType = io.ContentType('text', 'javascript', charset: 'utf-8')
-      ..headers.set(io.HttpHeaders.cacheControlHeader, 'no-cache')
       ..write(body);
     await request.response.close();
   }
 
-  /// The bootstrap's `fontFallbackBaseUrl` is `fonts/` (release builds
-  /// bundle Roboto). In dev the page reaches only this server, so fonts come
-  /// from Google Fonts through the host, or Roboto from the engine's copy
-  /// when the host is offline; anything else is a 404 the engine skips.
+  /// The bootstrap's `fontFallbackBaseUrl` is `<dev server>/fonts/`: web_ui's
+  /// fallback fonts, as the release module bundles them.
   Future<void> _serveFont(io.HttpRequest request) async {
-    final rest = request.uri.path.substring('/fonts/'.length);
-    final response = request.response;
-    try {
-      final up = await _fonts.getUrl(Uri.parse('https://fonts.gstatic.com/s/$rest'));
-      final back = await up.close().timeout(const Duration(seconds: 5));
-      if (back.statusCode == io.HttpStatus.ok) {
-        response.headers.contentType = io.ContentType('font', 'woff2');
-        await response.addStream(back);
-        return await response.close();
-      }
-      await back.drain<void>();
-    } on Object {
-      // Offline host.
+    final rest = request.uri.pathSegments.skip(1).toList();
+    if (rest.isEmpty || rest.any((s) => s == '..' || s.isEmpty)) {
+      request.response.statusCode = io.HttpStatus.notFound;
+      return await request.response.close();
     }
-    final roboto = bundledRoboto();
-    if (rest.startsWith('roboto/') && roboto.existsSync()) {
-      response.headers.contentType = io.ContentType('font', 'ttf');
-      await response.addStream(roboto.openRead());
-    } else {
-      response.statusCode = io.HttpStatus.notFound;
-    }
-    await response.close();
+    await _serveFile(request, _fonts.childFile(globals.fs.path.joinAll(rest)));
+  }
+
+  /// `flutter run` doesn't bundle Roboto as `build web --no-web-resources-cdn`
+  /// does; without it no text renders.
+  Future<void> _serveFontManifest(io.HttpRequest request) async {
+    final up = await _client.getUrl(upstream.resolve('assets/FontManifest.json'));
+    up.headers.removeAll(io.HttpHeaders.acceptEncodingHeader);
+    final back = await up.close();
+    final body = await utf8.decodeStream(back);
+    request.response
+      ..statusCode = back.statusCode
+      ..headers.contentType = io.ContentType.json
+      ..write(back.statusCode == io.HttpStatus.ok ? withRoboto(body) : body);
+    await request.response.close();
   }
 
   /// Hot reload's module list: its `src` paths are origin-relative, and the
@@ -152,7 +150,6 @@ class WebUiDevProxy {
     request.response
       ..statusCode = back.statusCode
       ..headers.contentType = io.ContentType.json
-      ..headers.set(io.HttpHeaders.cacheControlHeader, 'no-cache')
       ..write(back.statusCode == io.HttpStatus.ok ? absolutizeSources(body, url) : body);
     await request.response.close();
   }
@@ -161,33 +158,27 @@ class WebUiDevProxy {
     final target = upstream.replace(path: request.uri.path, query: request.uri.query);
     final out = await _client.openUrl(request.method, target);
     out.followRedirects = false;
-    final rewrite = _isEntryScript(request.uri.path);
+    // The Host header goes through unchanged: the debug client dials
+    // ws://<Host>/, which must be this server (flutter-webui docs/dev.md).
     request.headers.forEach((name, values) {
-      if (_hopByHop.contains(name) || (rewrite && name == 'accept-encoding')) return;
+      if (_hopByHop.contains(name)) return;
       for (final v in values) {
-        out.headers.add(name, name == 'host' ? '${upstream.host}:${upstream.port}' : v);
+        out.headers.add(name, v);
       }
     });
     await out.addStream(request);
     final back = await out.close();
     final response = request.response..statusCode = back.statusCode;
     back.headers.forEach((name, values) {
-      if (_hopByHop.contains(name) || name.startsWith('access-control-')) return;
+      if (_hopByHop.contains(name) ||
+          name.startsWith('access-control-') ||
+          name == io.HttpHeaders.cacheControlHeader) {
+        return;
+      }
       for (final v in values) {
         response.headers.add(name, v);
       }
     });
-    if (rewrite && back.statusCode == io.HttpStatus.ok) {
-      // The debug service's client (injected into the entry's bootstrap
-      // script) resolves this against the page, the manager's origin here.
-      final js = absolutizeReloadedSources(await utf8.decodeStream(back), url);
-      response.headers
-        ..removeAll(io.HttpHeaders.contentLengthHeader)
-        ..removeAll(io.HttpHeaders.contentEncodingHeader)
-        ..chunkedTransferEncoding = true;
-      response.write(js);
-      return await response.close();
-    }
     await response.addStream(back);
     await response.close();
   }
@@ -199,11 +190,6 @@ class WebUiDevProxy {
     up.listen(down.add, onDone: () => down.close(), onError: (_) => down.close());
     down.listen(up.add, onDone: () => up.close(), onError: (_) => up.close());
   }
-
-  /// Top-level scripts: `main.dart.js` and the `*.bootstrap.js` the debug
-  /// service injects its client into.
-  static bool _isEntryScript(String path) =>
-      RegExp(r'^/(main\.dart|[^/]+\.bootstrap)\.js$').hasMatch(path);
 
   static const _hopByHop = {
     'connection',
@@ -230,33 +216,37 @@ File bundledRoboto() => globals.fs.file(
   ),
 );
 
-/// Points DWDS's `\$reloadedSourcesPath` (relative, so resolved against the
-/// page) at the dev server.
-String absolutizeReloadedSources(String js, Uri devServer) => js.replaceAllMapped(
-  RegExp(r'(\$reloadedSourcesPath\s*=\s*")([^":]+)(")'),
-  (m) => '${m[1]}${devServer.resolve(m[2]!)}${m[3]}',
-);
+/// Where `build web --no-web-resources-cdn` puts Roboto, under `assets/`.
+const kRobotoAsset = 'fonts/fallback/Roboto-Regular.ttf';
 
-/// Runs after flutter.js and the build config, before the bootstrap's
-/// `load()`: the page stays on the manager's origin and the app comes from
-/// the dev server (`window.flutterWebUiDevServer`, set by `dev.html`), so the
-/// loader's relative URLs are based there.
-const kDevLoaderConfig = r'''
-(function () {
-  var dev = window.flutterWebUiDevServer;
-  if (!dev) return;
-  var loader = _flutter.loader;
-  var load = loader.load.bind(loader);
-  loader.load = function (options) {
-    options = options || {};
-    options.config = Object.assign(
-      {entrypointBaseUrl: dev, assetBase: dev, canvasKitBaseUrl: dev + 'canvaskit/'},
-      options.config || {},
-      {fontFallbackBaseUrl: dev + 'fonts/'});
-    return load(options);
-  };
-})();
-''';
+/// `FontManifest.json` with Roboto at [kRobotoAsset] if it lacks a Roboto.
+String withRoboto(String json) {
+  final manifest = jsonDecode(json) as List<Object?>;
+  if (manifest.any((e) => e is Map && e['family'] == 'Roboto')) return json;
+  return jsonEncode([
+    ...manifest,
+    {
+      'family': 'Roboto',
+      'fonts': [
+        {'asset': kRobotoAsset},
+      ],
+    },
+  ]);
+}
+
+/// Content types the page's loads need (`.wasm` for streaming compile, a JS
+/// type for module scripts).
+io.ContentType contentTypeFor(String name) => switch (name.split('.').last) {
+  'js' || 'mjs' => io.ContentType('text', 'javascript', charset: 'utf-8'),
+  'css' => io.ContentType('text', 'css', charset: 'utf-8'),
+  'json' => io.ContentType.json,
+  'wasm' => io.ContentType('application', 'wasm'),
+  'ttf' => io.ContentType('font', 'ttf'),
+  'otf' => io.ContentType('font', 'otf'),
+  'woff2' => io.ContentType('font', 'woff2'),
+  'woff' => io.ContentType('font', 'woff'),
+  _ => io.ContentType.binary,
+};
 
 /// `reloaded_sources.json` with each `src` resolved against [devServer].
 String absolutizeSources(String json, Uri devServer) {
@@ -271,18 +261,17 @@ String absolutizeSources(String json, Uri devServer) {
 }
 
 /// The manager's page runs on its own origin; the dev server must let it in.
+/// Every request is anonymous, so no credentials; nothing may be cached
+/// across a restart (flutter-webui `docs/dev.md`).
 @visibleForTesting
 void addCorsHeaders(io.HttpHeaders headers, String? origin) {
   headers
     ..set('access-control-allow-origin', origin ?? '*')
-    ..set('access-control-allow-methods', 'GET, POST, PUT, OPTIONS')
+    ..set('access-control-allow-methods', 'GET, OPTIONS')
     ..set('access-control-allow-headers', '*')
-    ..set('access-control-allow-private-network', 'true');
-  if (origin != null) {
-    headers
-      ..set('access-control-allow-credentials', 'true')
-      ..add('vary', 'origin');
-  }
+    ..set('access-control-allow-private-network', 'true')
+    ..set(io.HttpHeaders.cacheControlHeader, 'no-store')
+    ..add('vary', 'origin');
 }
 
 /// flutter-webui's `dev.html` with the module id and dev server filled in:

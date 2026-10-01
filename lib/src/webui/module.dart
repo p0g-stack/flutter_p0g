@@ -29,9 +29,15 @@ bool isPrunedWebFile(String relPath, {bool wasm = false}) {
       p.posix.basename(path).startsWith('wimp.');
 }
 
-/// Files run as programs: scripts at the module root and anything in bin/.
+/// Module directories flutter_p0g fills with programs of its own: the root
+/// channel (flutter-webui) and the app plane (webui-packages).
+const kToolProgramDirs = ['flutter_webui', 'webui_app_plane'];
+
+/// Files run as programs: scripts at the module root and anything in bin/
+/// or the tool's program directories.
 bool isExecutableModulePath(String path) =>
     path.startsWith('bin/') ||
+    kToolProgramDirs.any((d) => path.startsWith('$d/')) ||
     (!path.contains('/') && path.endsWith('.sh')) ||
     path == 'META-INF/com/google/android/update-binary';
 
@@ -58,6 +64,14 @@ List<ModuleFile> assembleModule({
     files[path] = bytes;
   });
   files.addAll(extra);
+  final permDirs = [
+    for (final d in kToolProgramDirs)
+      if (files.keys.any((f) => f.startsWith('$d/'))) d,
+  ];
+  if (permDirs.isNotEmpty) {
+    final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
+    files['customize.sh'] = utf8.encode(withToolPerms(own, permDirs));
+  }
   files['META-INF/com/google/android/update-binary'] = utf8.encode(kUpdateBinary);
   files['META-INF/com/google/android/updater-script'] = utf8.encode(kUpdaterScript);
   if (!files.containsKey('module.prop')) {
@@ -68,6 +82,19 @@ List<ModuleFile> assembleModule({
     for (final path in paths)
       ModuleFile(path, files[path]!, executable: isExecutableModulePath(path)),
   ];
+}
+
+/// [customizeSh] with a block that makes the tool's program directories
+/// executable: managers install with 0644 files and leave the rest to
+/// `customize.sh`.
+String withToolPerms(String customizeSh, List<String> dirs) {
+  final b = StringBuffer(customizeSh);
+  if (customizeSh.isNotEmpty && !customizeSh.endsWith('\n')) b.writeln();
+  b.writeln('# flutter_p0g: the programs it ships (generated at build).');
+  for (final d in dirs) {
+    b.writeln('set_perm_recursive "\$MODPATH/$d" 0 0 0755 0755');
+  }
+  return b.toString();
 }
 
 bool _expandsVars(String path) => path == 'module.prop' || path == 'webroot/config.json';

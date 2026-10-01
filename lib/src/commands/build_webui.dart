@@ -13,7 +13,9 @@ import '../webui/cli_exe.dart';
 import '../webui/dart_android.dart';
 import '../webui/flutter_webui.dart';
 import '../webui/module.dart';
+import '../webui/app_plane.dart';
 import '../webui/plugin.dart';
+import '../webui/webui_packages.dart';
 import '../webui/workers.dart';
 
 /// `flutter build web` with WebUI defaults, then the module zip.
@@ -39,6 +41,13 @@ class BuildWebUiCommand extends BuildWebCommand {
       help:
           "Build rust/ for the device beside cli/ (cargo-ndk and the Android NDK). "
           'Without it the root process runs without the crate.',
+    );
+    argParser.addOption(
+      'device-rust-libs',
+      valueHelp: 'dir',
+      help:
+          'rust/ already built for the device: <dir>/<abi>/*.so (cargo-ndk -o layout), '
+          'used in place of building it here.',
     );
   }
 
@@ -88,11 +97,14 @@ class BuildWebUiCommand extends BuildWebCommand {
     // flutter-webui's bootstrap and patched web SDK (fetched and built on
     // first use, like flutter's own artifacts).
     await precacheFlutterWebui();
+    await precacheWebuiPackages();
 
     // The flutter_webui web plugin (engine handlers), added for this build
     // only: apps depend on flutter_webui_client alone.
-    final result = await withWebuiPlugin(app, super.targetFile, (entrypoint) async {
-      _webuiEntrypoint = entrypoint;
+    var packages = <String>{};
+    final result = await withWebuiPlugin(app, super.targetFile, (overlay) async {
+      _webuiEntrypoint = overlay.entrypoint;
+      packages = overlay.packages;
       try {
         return await super.runCommand();
       } finally {
@@ -119,6 +131,28 @@ class BuildWebUiCommand extends BuildWebCommand {
     out.createSync(recursive: true);
 
     final extra = <String, List<int>>{};
+    // web_ui's fallback fonts: the bootstrap points the engine at `fonts/`,
+    // and a manager WebView has no system fonts.
+    final fonts = fallbackFontsDir();
+    for (final f in fonts.listSync(recursive: true).whereType<File>()) {
+      extra['webroot/fonts/${fs.path.relative(f.path, from: fonts.path).replaceAll(r'\', '/')}'] = f
+          .readAsBytesSync();
+    }
+    // flutter-webui's root channel, which the page starts through the
+    // manager's bridge and which starts the app's root process.
+    final kits = DartAndroidKit.installed(sdkDartVersion());
+    if (kits.isEmpty) {
+      throwToolExit(
+        "The root channel needs the Dart Android kit. Run `flutter_p0g precache --dart-android`.",
+      );
+    }
+    globals.printStatus('Compiling the root channel for ${kits.keys.join(', ')}...');
+    extra.addAll(await rootChannelFiles(kits, out.childDirectory('flutter_webui')));
+    if (packages.contains(kAppPlanePackage)) {
+      globals.printStatus('Adding the app plane (webui-termux-api $kAppPlaneTag)...');
+      extra.addAll(await appPlaneFiles(kits, out.childDirectory('webui_app_plane')));
+    }
+
     final cli = CliPackage.find(app);
     var abis = <String, DartAndroidKit>{};
     if (cli != null) {
@@ -128,20 +162,20 @@ class BuildWebUiCommand extends BuildWebCommand {
         await compileCli(cli, exe);
         extra['bin/${cli.name}'] = exe.readAsBytesSync();
       } else {
-        abis = DartAndroidKit.installed(sdkDartVersion());
+        abis = kits;
         extra.addAll(await compileCliAot(cli, abis, out.childDirectory('cli')));
       }
       // cli/ and rust/ are one unit per ABI: the frb library sits beside
       // that ABI's snapshot and runtime. Rust never ships as its own binary.
       final rust = cli.dir.parent.childDirectory('rust');
+      final prebuilt = stringArg('device-rust-libs');
+      final targetAbis = abis.isEmpty ? const [kDefaultAbi] : abis.keys.toList();
       if (rust.childFile('Cargo.toml').existsSync() && !boolArg('device-rust')) {
         globals.printWarning('--no-device-rust: the root process ships without rust/.');
-      } else if (rust.childFile('Cargo.toml').existsSync()) {
-        final libs = await buildRustForCli(
-          rust,
-          out.childDirectory('jniLibs'),
-          abis.isEmpty ? const [kDefaultAbi] : abis.keys.toList(),
-        );
+      } else if (rust.childFile('Cargo.toml').existsSync() || prebuilt != null) {
+        final libs = prebuilt != null
+            ? prebuiltRustLibs(fs.directory(prebuilt), targetAbis)
+            : await buildRustForCli(rust, out.childDirectory('jniLibs'), targetAbis);
         libs.forEach((abi, files) {
           for (final so in files) {
             extra['bin/$abi/${so.basename}'] = so.readAsBytesSync();

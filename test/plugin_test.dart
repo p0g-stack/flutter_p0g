@@ -45,7 +45,11 @@ void main() {
         {'name': 'counter', 'rootUri': '../', 'packageUri': 'lib/'},
       ],
     };
-    final r = overlayPackageConfig(app, src, graph, srcConfigDir: srcDir);
+    final r = overlayPackageConfig(
+      app,
+      [(config: src, graph: graph, dir: srcDir)],
+      ['flutter_webui'],
+    );
     expect(r.added, ['args', 'flutter_webui', 'flutter_webui_client', 'flutter_webui_root', 'web']);
     final pkgs = {for (final p in r.config['packages']! as List) (p as Map)['name']: p};
     expect(
@@ -67,12 +71,115 @@ void main() {
         {'name': 'web', 'rootUri': 'file:///pub/web'},
       ],
     };
-    final r = overlayPackageConfig(app, src, graph, srcConfigDir: srcDir);
+    final r = overlayPackageConfig(
+      app,
+      [(config: src, graph: graph, dir: srcDir)],
+      ['flutter_webui'],
+    );
     expect(r.added, ['flutter_webui']);
     final client = (r.config['packages']! as List).cast<Map>().firstWhere(
       (p) => p['name'] == 'flutter_webui_client',
     );
     expect(client['rootUri'], 'file:///git/client');
+  });
+
+  test('a second source fills what the first lacks; the first wins', () {
+    final pkgs = {
+      'configVersion': 2,
+      'packages': [
+        {'name': 'url_launcher_webui', 'rootUri': '../packages/url_launcher_webui'},
+        {'name': 'webui_app_plane', 'rootUri': '../packages/webui_app_plane'},
+        {'name': 'flutter_webui_client', 'rootUri': 'file:///other/client'},
+      ],
+    };
+    final pkgsGraph = {
+      'packages': [
+        {
+          'name': 'url_launcher_webui',
+          'dependencies': ['webui_app_plane', 'flutter_webui_client'],
+        },
+        {
+          'name': 'webui_app_plane',
+          'dependencies': ['flutter_webui_client'],
+        },
+      ],
+    };
+    final app = {
+      'packages': [
+        {'name': 'flutter', 'rootUri': 'file:///sdk/packages/flutter'},
+      ],
+    };
+    final r = overlayPackageConfig(
+      app,
+      [
+        (config: src, graph: graph, dir: srcDir),
+        (
+          config: pkgs,
+          graph: pkgsGraph,
+          dir: Uri.parse('file:///cache/webui-packages/src/.dart_tool/'),
+        ),
+      ],
+      ['flutter_webui', 'url_launcher_webui'],
+    );
+    expect(r.added, containsAll(['url_launcher_webui', 'webui_app_plane', 'flutter_webui']));
+    final byName = {for (final p in r.config['packages']! as List) (p as Map)['name']: p};
+    expect(
+      byName['flutter_webui_client']!['rootUri'],
+      'file:///cache/flutter-webui/src/packages/flutter_webui_client',
+    );
+    expect(
+      byName['url_launcher_webui']!['rootUri'],
+      'file:///cache/webui-packages/src/packages/url_launcher_webui',
+    );
+  });
+
+  test('the graph makes the *_webui packages direct dependencies of the app', () {
+    final appGraph = {
+      'roots': ['counter'],
+      'packages': [
+        {
+          'name': 'counter',
+          'dependencies': ['url_launcher'],
+          'devDependencies': <String>[],
+        },
+        {
+          'name': 'url_launcher',
+          'dependencies': ['url_launcher_web'],
+        },
+        {'name': 'url_launcher_web', 'dependencies': <String>[]},
+      ],
+    };
+    expect(closureOf(appGraph, 'counter'), {'url_launcher', 'url_launcher_web'});
+    final direct = webuiPackagesFor(
+      closureOf(appGraph, 'counter'),
+      {'url_launcher'},
+      {'url_launcher': 'url_launcher_webui', 'share_plus': 'share_plus_webui'},
+    );
+    expect(direct, ['url_launcher_webui']);
+    final g = overlayPackageGraph(
+      appGraph,
+      root: 'counter',
+      added: ['url_launcher_webui', 'webui_app_plane'],
+      direct: direct,
+      dependencies: {
+        'url_launcher_webui': ['webui_app_plane'],
+      },
+    );
+    final byName = {for (final p in g['packages']! as List) (p as Map)['name']: p};
+    expect(byName['counter']!['dependencies'], ['url_launcher', 'url_launcher_webui']);
+    expect(byName['counter']!['devDependencies'], isEmpty);
+    expect(byName['url_launcher_webui']!['dependencies'], ['webui_app_plane']);
+    expect(byName['webui_app_plane']!['dependencies'], isEmpty);
+    expect(g['roots'], ['counter']);
+  });
+
+  test('an app that already names a *_webui package keeps it', () {
+    expect(
+      webuiPackagesFor({'url_launcher'}, {'url_launcher_webui'}, {
+        'url_launcher': 'url_launcher_webui',
+      }),
+      isEmpty,
+    );
   });
 
   test('entrypoint registers the plugin then runs the app', () {

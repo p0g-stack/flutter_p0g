@@ -145,22 +145,46 @@ Future<Map<String, List<int>>> compileCliAot(
   Map<String, DartAndroidKit> kits,
   Directory work,
 ) async {
-  if (kits.isEmpty) {
-    throwToolExit('cli/ needs the Dart Android kit. Run `flutter_p0g precache --dart-android`.');
-  }
-  final fs = globals.fs;
-  final sdk = fs.path.join(Cache.flutterRoot!, 'bin', 'cache', 'dart-sdk');
-  work.createSync(recursive: true);
-  final dill = work.childFile('${cli.name}.dill');
   final packages = cli.dir.childDirectory('.dart_tool').childFile('package_config.json');
   final workspacePackages = cli.dir.parent
       .childDirectory('.dart_tool')
       .childFile('package_config.json');
   final config = packages.existsSync() ? packages : workspacePackages;
   if (!config.existsSync()) throwToolExit('Run `dart pub get` in ${cli.dir.path} first.');
+  final aots = await compileAndroidAot(
+    entrypoint: cli.entrypoint,
+    packageConfig: config,
+    name: cli.name,
+    kits: kits,
+    work: work,
+  );
+  final files = <String, List<int>>{'bin/${cli.name}': launcherScript(cli.name).codeUnits};
+  for (final MapEntry(key: abi, value: aot) in aots.entries) {
+    files['bin/$abi/${cli.name}.aot'] = aot.readAsBytesSync();
+    files['bin/$abi/dartaotruntime'] = kits[abi]!.runtime.readAsBytesSync();
+  }
+  return files;
+}
+
+/// Compiles [entrypoint] (resolved with [packageConfig]) to an Android AOT
+/// snapshot per kit: `<work>/<abi>/<name>.aot`.
+Future<Map<String, File>> compileAndroidAot({
+  required File entrypoint,
+  required File packageConfig,
+  required String name,
+  required Map<String, DartAndroidKit> kits,
+  required Directory work,
+}) async {
+  if (kits.isEmpty) {
+    throwToolExit('$name needs the Dart Android kit. Run `flutter_p0g precache --dart-android`.');
+  }
+  final fs = globals.fs;
+  final sdk = fs.path.join(Cache.flutterRoot!, 'bin', 'cache', 'dart-sdk');
+  work.createSync(recursive: true);
+  final dill = work.childFile('$name.dill');
 
   Future<void> run(List<String> cmd) async {
-    final r = await globals.processUtils.run(cmd, workingDirectory: cli.dir.path);
+    final r = await globals.processUtils.run(cmd, workingDirectory: entrypoint.parent.path);
     if (r.exitCode != 0) throwToolExit('${fs.path.basename(cmd.first)} failed:\n$r');
   }
 
@@ -174,23 +198,22 @@ Future<Map<String, List<int>>> compileCliAot(
     'android',
     '-Ddart.vm.product=true',
     '--packages',
-    config.path,
+    packageConfig.path,
     '-o',
     dill.path,
-    cli.entrypoint.path,
+    entrypoint.path,
   ]);
   // The kernel is the same for every ABI; only gen_snapshot differs.
-  final files = <String, List<int>>{'bin/${cli.name}': launcherScript(cli.name).codeUnits};
+  final out = <String, File>{};
   for (final MapEntry(key: abi, value: kit) in kits.entries) {
-    final aot = work.childDirectory(abi).childFile('${cli.name}.aot')..parent.createSync();
+    final aot = work.childDirectory(abi).childFile('$name.aot')..parent.createSync();
     await run([
       kit.genSnapshot.path,
       '--snapshot_kind=app-aot-elf',
       '--elf=${aot.path}',
       dill.path,
     ]);
-    files['bin/$abi/${cli.name}.aot'] = aot.readAsBytesSync();
-    files['bin/$abi/dartaotruntime'] = kit.runtime.readAsBytesSync();
+    out[abi] = aot;
   }
-  return files;
+  return out;
 }
