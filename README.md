@@ -21,6 +21,25 @@ flutter_p0g build webui       # build/webui/<id>-v<version>.zip
 flutter_p0g install --reboot  # adb + the device's ksud / apd / magisk
 ```
 
+## Parity
+
+The bar: on WebUI and AERA, the same experience the stock `flutter` tool
+gives on an official platform, with the same flags meaning the same things.
+Measured against `flutter run` on desktop and against flutterpi_tool.
+Gaps are listed here, not hidden.
+
+| Stock `flutter` | WebUI | AERA |
+|---|---|---|
+| `create --platforms` | `create` adds `webui/` | `create` adds `aera/` |
+| `build <target>` (all flags) | `build webui`: every `build web` flag | `build aera`: every `build bundle` flag; debug, profile, release |
+| `run` + hot reload / restart | gap: needs flutter-webui's dev loader (plan: web dev server over adb reverse, a dev module pointing at it) | gap: needs flutter-aera's debug engine with the VM service URL in its log |
+| `attach` | gap | gap (follows the debug engine) |
+| `install` | `install`: adb + ksud / apd / magisk; activates on reboot | gap: no `.aerap` install path yet |
+| `devices` | gap (adb devices with a root manager probe) | gap |
+| `logs` | gap | gap |
+| `precache` | web SDK; Android Dart kit; frb | AERA runtime kit |
+| `clean`, `doctor`, `test` | gap (stock `flutter test` works; no target tests) | gap |
+
 ## Commands
 
 | Command | What it does | State |

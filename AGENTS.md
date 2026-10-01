@@ -2,6 +2,14 @@
 
 Self-contained; no external base file.
 
+- Parity is the bar. On each p0g target the tool gives the experience the
+  stock `flutter` tool gives on an official platform: `create`, `build`,
+  `run` with hot reload and hot restart, `attach`, `install`, `devices`,
+  `logs`, with the same flags meaning the same things. Measure against
+  `flutter run` on desktop and against flutterpi_tool as the community
+  precedent. A gap goes in the README's parity table; never paper over one
+  with a workaround that looks like the real thing.
+
 - Pattern first. Before designing a feature, check how `flutter_tools`,
   `flutterpi_tool`, flutter-elinux or flutter-tizen do it, and do it their
   way. A new command is a `FlutterCommand`; a new target's build reuses the
