@@ -4,6 +4,14 @@
   `packages/p0g_lints`, pinned by commit): `core_imports_flutter` and
   `strategy_reads_platform` are warnings. `app/analysis_options.yaml`
   includes the root file so they apply in the app too.
+- squadron_process d6c561b: reconnect after a dropped link, concurrent
+  clients, malformed-handshake hardening.
+- `rust` follows flutter_p0g's frb (the demo's four fixes): frb_dart by git at
+  848e438, `auto_upgrade_dependency: false`, frb without thread-pool for the
+  single-threaded wasm, `mod frb_generated;` after lib.rs's docs. New
+  `tool/rust.sh` (run by bootstrap) uses flutter_p0g's patched frb when
+  built (native and wasm), else frb at 848e438 (native only), linked through
+  gitignored `rust/.cargo/config.toml` and `pubspec_overrides.yaml`.
 
 # 0.5.0
 

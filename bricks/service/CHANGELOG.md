@@ -1,3 +1,9 @@
+# 0.3.0
+
+- README "Shaping the methods" and the service's doc comment: process-place
+  call cost and link throughput from squadron_process's benchmark; batch, or
+  stream, rather than chatty calls.
+
 # 0.2.0
 
 - For `p0g_app` 0.3.0: the `serve` entry is a worker instance, and the panel

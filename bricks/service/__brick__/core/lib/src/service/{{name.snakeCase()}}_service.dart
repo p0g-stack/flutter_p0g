@@ -8,8 +8,11 @@ import '{{name.snakeCase()}}_service.activator.g.dart';
 part '{{name.snakeCase()}}_service.worker.g.dart';
 
 /// The {{name.snakeCase()}} service. The same class runs in every place: an
-/// isolate, a Web Worker, or the CLI's `serve {{name.snakeCase()}}` in
-/// another process.
+/// isolate, a Web Worker, or the CLI's `serve` in another process.
+///
+/// A call to the process place costs a few hundred microseconds and its link
+/// moves about 110 MiB/s: give each method a whole job, and return progress
+/// or bulk data as a `Stream` instead of making many small calls.
 @SquadronService(
   baseUrl: '~/workers',
   targetPlatform: TargetPlatform.vm | TargetPlatform.web,

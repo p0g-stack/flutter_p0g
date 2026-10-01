@@ -1,7 +1,10 @@
-# flutter_rust_bridge codegen: `flutter_rust_bridge_codegen generate`
-# (flutter_p0g runs it and the web build with its frb patches applied).
+# flutter_rust_bridge codegen, run by tool/rust.sh (and by flutter_p0g's
+# build, with its frb patches applied).
 rust_input: crate::api
 rust_root: rust/
 dart_output: core/lib/src/rust
 # Squadron owns threading; bindings are sync and run inside the calling worker.
 default_dart_async: false
+# Keep codegen from rewriting core/pubspec.yaml; tool/rust.sh points pub at
+# the patched frb through pubspec_overrides.yaml instead.
+auto_upgrade_dependency: false

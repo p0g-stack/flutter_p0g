@@ -21,7 +21,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-expand,flutter_rust_bridge_codegen@2.14.0-beta.2
+          tool: cargo-expand
+      # frb codegen at flutter_p0g's base commit, which the rust variant pins.
+      - uses: actions/cache@v4
+        id: frb
+        with:
+          path: ~/.frb-codegen
+          key: frb-codegen-848e438c561491adcc16cbf8b33bb61e541bd475
+      - name: frb codegen
+        if: steps.frb.outputs.cache-hit != 'true'
+        run: >
+          cargo install --locked --root ~/.frb-codegen
+          --git https://github.com/fzyzcjy/flutter_rust_bridge
+          --rev 848e438c561491adcc16cbf8b33bb61e541bd475
+          flutter_rust_bridge_codegen
+      - run: echo "$HOME/.frb-codegen/bin" >> "$GITHUB_PATH"
       - name: Install mason
         run: |
           dart pub global activate mason_cli 0.1.4

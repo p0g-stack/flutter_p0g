@@ -64,8 +64,10 @@ binary), then a Linux bundle's `lib/`, then `rust/target/` in the workspace.
 On the web it is frb's wasm under `pkg/`, which `flutter_p0g build webui`
 builds; a plain `flutter build web` has none, and the Dart strategy runs.
 The hello service's `sha256`, the CLI's `digest` command and the app's
-SHA-256 button go through it. Bootstrap needs `flutter_rust_bridge_codegen`
-2.14.0-beta.2 (`cargo install`) and cargo-expand.
+SHA-256 button go through it. `tool/rust.sh` (run by bootstrap) uses
+flutter_p0g's patched frb when `flutter_p0g precache --frb` has built it,
+native and wasm; otherwise `flutter_rust_bridge_codegen` built from frb
+848e438 (the commit both sides pin), native only. It also needs cargo-expand.
 
 Generated code (`*.g.dart`, compiled workers) is not committed; bootstrap
 regenerates it.

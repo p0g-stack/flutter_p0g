@@ -8,6 +8,7 @@ pubspec_overrides.yaml
 app/web/workers/
 {{#rust}}# flutter_rust_bridge codegen (tool/bootstrap.sh).
 core/lib/src/rust/
+app/web/pkg/
 rust/src/frb_generated.rs
 rust/target/
 {{/rust}}

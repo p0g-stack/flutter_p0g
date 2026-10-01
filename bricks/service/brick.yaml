@@ -1,6 +1,6 @@
 name: service
 description: Adds a Squadron service to a p0g_app workspace, exposed in the GUI (a panel) and the CLI (a command and serve).
-version: 0.2.0
+version: 0.3.0
 repository: https://github.com/p0g-stack/bricks/tree/main/bricks/service
 
 environment:

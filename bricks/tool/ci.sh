@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Generate each brick into a scratch folder and build and test what it made.
 # Usage: tool/ci.sh [out-dir]. Needs flutter (3.47.5) and mason on PATH;
-# the rust variant also needs cargo, cargo-expand and
-# flutter_rust_bridge_codegen 2.14.0-beta.2.
+# the rust variant also needs cargo, cargo-expand and flutter_rust_bridge_codegen
+# built from frb 848e438 (see the generated tool/rust.sh).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$(mktemp -d)}"
