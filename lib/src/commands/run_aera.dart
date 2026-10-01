@@ -32,6 +32,7 @@ String aeraDebugSetupScript(String dataDir, int port) {
 /// flutter-aera's `docs/debugging.md` describes.
 Future<int> runAera({
   required Directory app,
+  String target = 'lib/main.dart',
   required Adb adb,
   required int vmPort,
   required bool ram,
@@ -51,7 +52,7 @@ Future<int> runAera({
     globals.printStatus('${package.id}: VM service at $url. Attaching...');
     final attach = await io.Process.start(
       globals.fs.path.join(Cache.flutterRoot!, 'bin', 'flutter'),
-      ['attach', '--debug-url', url, '-d', 'flutter-tester'],
+      ['attach', '--debug-url', url, '-d', 'flutter-tester', '--target', target],
       workingDirectory: app.path,
       mode: io.ProcessStartMode.inheritStdio,
     );

@@ -83,8 +83,19 @@ class RunCommand extends fl.RunCommand {
   @override
   Future<FlutterCommandResult> verifyThenRunCommand(String? commandPath) async {
     if (boolArg('aera')) {
+      // run's own validation (devices, web) is skipped here, so check the
+      // app before anything is installed: attach needs its sources.
+      final app = project.directory;
+      if (!app.childFile('pubspec.yaml').existsSync()) {
+        throwToolExit('No pubspec.yaml in ${app.path}: run --aera from the app directory.');
+      }
+      final target = stringArg('target') ?? 'lib/main.dart';
+      if (!globals.fs.isFileSync(globals.fs.path.join(app.path, target))) {
+        throwToolExit('Target file "$target" not found in ${app.path}.');
+      }
       final code = await runAera(
-        app: project.directory,
+        app: app,
+        target: target,
         adb: Adb.find(stringArg('serial')),
         vmPort:
             // The stock option; AERA's engine needs a fixed port to forward.
