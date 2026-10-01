@@ -107,9 +107,13 @@ same call runs `dd` on the device. On a desktop with fastboot it runs
 `core/test/fetch_partition_test.dart` checks the choice with fabricated
 facts (device, host, both, browser tab), and runs the `dd` strategy against
 a plain file standing in for `/dev/block/by-name/boot_a`. Every run is
-logged on `objective.fetch_partition`, for example:
+logged on `objective.fetch_partition`. `--how` prints the choice for the
+place it runs in, for example as root on a device, then as a user on a
+computer without fastboot:
 
 ```
 $ cbm partitions --how
-nothing fits: dd skipped (missing block_devices); fastboot_fetch skipped (missing tool.fastboot, usb.native)
+dd chosen
+$ cbm partitions --how
+nothing fits: dd skipped (missing root, block_devices); fastboot_fetch skipped (missing tool.fastboot, usb.native)
 ```

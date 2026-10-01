@@ -2,6 +2,7 @@ import 'dart:io';
 
 {{#rust}}import '../native/native.dart';
 {{/rust}}import 'facts.dart';
+import 'posix_open.dart';
 
 /// Checks the facts of the current Dart VM process.
 ///
@@ -38,24 +39,17 @@ Future<bool> _isRoot() async {
 }
 
 Future<bool> _canReadBlockDevice() async {
-  // A block device listed by the kernel that this process can open for
-  // reading.
+  // Any block device listed by the kernel that this process can open for
+  // reading: `/dev/block/<name>` on Android, `/dev/<name>` elsewhere. The
+  // open goes through libc; dart:io's File.open refuses block devices.
   try {
     final names = await Directory('/sys/class/block')
-        .list()
+        .list(followLinks: false)
         .map((e) => e.uri.pathSegments.lastWhere((s) => s.isNotEmpty))
         .toList();
     for (final name in names) {
       for (final node in ['/dev/block/$name', '/dev/$name']) {
-        RandomAccessFile? f;
-        try {
-          f = await File(node).open();
-          return true;
-        } catch (_) {
-          // not present or not readable
-        } finally {
-          await f?.close();
-        }
+        if (canOpenForReading(node)) return true;
       }
     }
   } catch (_) {}

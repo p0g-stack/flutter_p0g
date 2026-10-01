@@ -1,3 +1,11 @@
+# 0.6.4
+
+- `block_devices` was false everywhere, root included: dart:io's `File.open`
+  accepts only regular files, character devices and pipes, and reports a
+  block device as not found. The check now opens through libc
+  (`core/lib/src/facts/posix_open.dart`, `package:ffi`), any device that
+  opens counts.
+
 # 0.6.3
 
 - flutter-webui 020ab92: Back at the root route works in WebUI X. The fix is
