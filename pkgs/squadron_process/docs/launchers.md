@@ -15,6 +15,13 @@ implementation of the same interface.
 | `WindowsRunAsLauncher` | PowerShell `Start-Process -Verb RunAs` (UAC) | no |
 | your own | whatever the embedding has | either |
 
+The interface has no authorization step. Rights that are already granted
+are the normal case: a launcher for an environment that already runs with
+them (a process started by a root-run module, a privileged helper the app
+already owns) just starts the host, like `IoProcessLauncher`. Only the
+`ElevatedLauncher` front-ends add a step, the OS prompt, inside their own
+`launch`.
+
 `ElevatedLauncher.forHost()` picks the front-end for the OS it runs on.
 Choosing a launcher by OS is fine; deciding what a place can *do* by OS is
 not, that is what facts are for.
