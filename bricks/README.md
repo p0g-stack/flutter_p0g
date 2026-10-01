@@ -1,9 +1,9 @@
 # bricks
 
-> This repo was `template-app`; it is being renamed to `bricks`.
+> Formerly `template-app`.
 
 [Mason](https://pub.dev/packages/mason) bricks for p0g-stack apps. Platform
-folders are not here: `flutterp0g_tool create .` adds `webui/` and `aera/` to
+folders are not here: `flutter_p0g create .` adds `webui/` and `aera/` to
 any Flutter app, the way `flutter create --platforms` does.
 
 ## Bricks
@@ -14,8 +14,8 @@ any Flutter app, the way `flutter create --platforms` does.
 | `service` | a Squadron service exposed to both the GUI and the CLI |
 | `strategy` | a strategy with `available(facts)` (e.g. on-device `dd` vs host `fastboot fetch`) |
 
-A new app: `mason make p0g_app`, then `flutterp0g_tool create .`, write the
-core, then `flutterp0g_tool build webui` / `aera`.
+A new app: `mason make p0g_app`, then `flutter_p0g create .`, write the
+core, then `flutter_p0g build webui` / `aera`.
 
 ## License
 
