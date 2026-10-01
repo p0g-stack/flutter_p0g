@@ -1,0 +1,24 @@
+name: strategy
+description: Adds an objective and its strategies to a p0g_app workspace, chosen by available(facts), with plan, confirm and receipt for device writes.
+version: 0.1.0
+repository: https://github.com/p0g-stack/bricks/tree/main/bricks/strategy
+
+environment:
+  mason: ^0.1.1
+
+vars:
+  name:
+    type: string
+    description: The objective (snake_case), e.g. fetch_partition.
+    default: example
+    prompt: What is the objective called?
+  strategies:
+    type: list
+    description: Strategy names in preference order, e.g. on_device, from_host.
+    default: [on_device, from_host]
+    prompt: Which strategies, in preference order?
+  write:
+    type: boolean
+    description: Whether the objective writes to a device (plan, confirm, receipt).
+    default: false
+    prompt: Does it write to a device?

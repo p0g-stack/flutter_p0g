@@ -15,9 +15,13 @@ make_app() { # name rust
   mason make p0g_app -c "$out/$1.json" -o "$out" --on-conflict overwrite
 }
 
-echo "::group::p0g_app (defaults)"
+echo "::group::p0g_app (defaults) + service + strategy"
 make_app ci_app false
 app="$out/ci_app"
+# Feature bricks run in the workspace root (their hooks find core/pubspec.yaml).
+mason make service -o "$app" --name partitions
+mason make strategy -o "$app" --name fetch_partition --strategies '["dd", "fastboot fetch"]' --write false
+mason make strategy -o "$app" --name flash --strategies '["dd"]' --write true
 (
   cd "$app"
   bash tool/bootstrap.sh
@@ -29,6 +33,7 @@ app="$out/ci_app"
   mkdir -p build
   dart compile exe cli/bin/ci_app.dart -o build/ci_app
   ./build/ci_app hello ci
+  ./build/ci_app partitions ci
   ./build/ci_app facts
   (cd app && flutter build web)
   if [ "${SKIP_LINUX:-}" != 1 ]; then (cd app && flutter build linux); fi

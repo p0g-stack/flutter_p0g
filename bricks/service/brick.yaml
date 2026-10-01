@@ -1,0 +1,14 @@
+name: service
+description: Adds a Squadron service to a p0g_app workspace, exposed in the GUI (a panel) and the CLI (a command and serve).
+version: 0.1.0
+repository: https://github.com/p0g-stack/bricks/tree/main/bricks/service
+
+environment:
+  mason: ^0.1.1
+
+vars:
+  name:
+    type: string
+    description: The service name (snake_case), e.g. partitions.
+    default: example
+    prompt: What is the service called?

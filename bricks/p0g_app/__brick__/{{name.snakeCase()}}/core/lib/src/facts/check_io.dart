@@ -98,4 +98,3 @@ Future<bool> _hasNetwork() async {
     return false;
   }
 }
-

@@ -60,9 +60,7 @@ class _HelloPanelState extends State<HelloPanel> {
   void _countToFive() {
     _count?.cancel();
     setState(_counted.clear);
-    _count = _service
-        .count(5)
-        .listen((i) => setState(() => _counted.add(i)));
+    _count = _service.count(5).listen((i) => setState(() => _counted.add(i)));
   }
 
   @override

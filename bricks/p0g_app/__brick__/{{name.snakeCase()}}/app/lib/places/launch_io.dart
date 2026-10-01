@@ -10,8 +10,7 @@ ProcessPlace? processPlaceFor(String service) {
   const defined = String.fromEnvironment('P0G_CLI');
   final cli = defined.isNotEmpty ? defined : Platform.environment['P0G_CLI'];
   if (cli == null || cli.isEmpty) return null;
-  final session =
-      '${Directory.systemTemp.path}/{{name.snakeCase()}}.$service.place.json';
+  final session = '${Directory.systemTemp.path}/{{name.snakeCase()}}.$service.place.json';
   return ProcessPlace(
     launcher: const IoProcessLauncher(),
     store: FileEndpointStore(session),

@@ -1,3 +1,7 @@
 bricks:
   p0g_app:
     path: bricks/p0g_app
+  service:
+    path: bricks/service
+  strategy:
+    path: bricks/strategy
