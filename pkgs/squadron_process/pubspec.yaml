@@ -1,0 +1,26 @@
+name: squadron_process
+description: >-
+  Unofficial Squadron extension: run a Squadron service in another,
+  optionally elevated, process over a loopback socket, and report what each
+  place can do.
+version: 0.1.0
+publish_to: none
+repository: https://github.com/p0g-stack/squadron_process
+
+environment:
+  # Dart that ships with the pinned Flutter 3.47.5.
+  sdk: ^3.13.4
+
+dependencies:
+  # Exact pin: the channel-factory patch in third_party/squadron/patches is
+  # written against this release. tool/squadron.sh materializes the patched
+  # tree and points pub at it through pubspec_overrides.yaml.
+  squadron: 7.4.4
+  cancelation_token: ^1.1.0
+  logger: ^2.1.0
+  meta: ^1.11.0
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.30.0

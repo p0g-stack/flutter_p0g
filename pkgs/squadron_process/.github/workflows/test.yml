@@ -1,0 +1,30 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.4
+      - name: Patched Squadron
+        run: tool/squadron.sh
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart analyze --fatal-infos
+      - name: VM
+        run: dart test -p vm
+      - name: Browser (dart2js, dart2wasm)
+        run: |
+          dart test -p chrome test/codec_test.dart test/facts_test.dart
+          dart test -p chrome -c dart2wasm test/codec_test.dart test/facts_test.dart
+      - name: Squadron suite with the patch
+        working-directory: third_party/squadron/src
+        run: |
+          dart pub get
+          dart test -p vm test/squadron_vm_test.dart test/channel_factory_test.dart

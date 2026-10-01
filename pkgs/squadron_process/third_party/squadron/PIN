@@ -1,0 +1,4 @@
+# Squadron release the patch series applies to.
+repo=https://github.com/d-markey/squadron
+tag=v7.4.4
+commit=4ab7f15a5d6d395dbbb928542196f58949a5ba0b

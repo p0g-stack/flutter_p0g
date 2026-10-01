@@ -1,0 +1,218 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: squadron_process <noreply@p0g-stack>
+Date: Thu, 1 Oct 2026 05:15:45 +0000
+Subject: [PATCH] Worker: pluggable channel factory
+
+Worker.start() opens Channel.open() unless Worker.channelFactory is set, so
+a worker can run somewhere other than an isolate or a Web Worker. Exports
+SquadronCancelationToken and StreamId, which Channel implementers need.
+---
+ lib/squadron.dart              |   3 +
+ lib/src/channel.dart           |  13 ++++
+ lib/src/worker/worker.dart     |  23 ++++---
+ test/channel_factory_test.dart | 106 +++++++++++++++++++++++++++++++++
+ 4 files changed, 137 insertions(+), 8 deletions(-)
+ create mode 100644 test/channel_factory_test.dart
+
+diff --git a/lib/squadron.dart b/lib/squadron.dart
+index 10fa9210..f82f9b9a 100644
+--- a/lib/squadron.dart
++++ b/lib/squadron.dart
+@@ -41,10 +41,13 @@ export 'src/squadron_singleton.dart';
+ export 'src/stats/perf_counter.dart' hide PerfCounterImpl;
+ export 'src/stats/perf_counter_snapshot.dart';
+ export 'src/stats/worker_stat.dart' hide WorkerStatImpl;
++export 'src/tokens/_squadron_cancelation_token.dart'
++    hide SquadronCancelationTokenExt;
+ export 'src/typedefs.dart';
+ export 'src/utils.dart';
+ export 'src/worker/worker.dart';
+ export 'src/worker/worker_channel.dart';
++export 'src/worker/worker_message.dart' show StreamId;
+ export 'src/worker/worker_request.dart' hide CancelationTokenExt;
+ export 'src/worker/worker_response.dart';
+ export 'src/worker_client.dart';
+diff --git a/lib/src/channel.dart b/lib/src/channel.dart
+index 577b4bd2..8cfc1ef3 100644
+--- a/lib/src/channel.dart
++++ b/lib/src/channel.dart
+@@ -16,6 +16,19 @@ import 'worker/worker_message.dart';
+ import 'worker/worker_request.dart';
+ import 'worker/worker_response.dart';
+ 
++/// Opens a [Channel] to a platform worker. [Worker.start] calls it instead of
++/// [Channel.open] when a [Worker.channelFactory] is set, so a worker can run
++/// somewhere other than an isolate or a Web Worker (for instance, another
++/// process). [entryPoint] is the worker's own entry point; factories that do
++/// not spawn a thread may ignore it. As with [Channel.open], the future must
++/// not complete before the worker is ready to serve requests.
++typedef ChannelFactory = Future<Channel> Function(
++  ExceptionManager exceptionManager,
++  Logger? logger,
++  EntryPoint entryPoint,
++  List startArguments,
++);
++
+ /// A [Channel] supports communication from a client to a platform worker. It
+ /// is used to send a [WorkerRequest] to a platform worker.
+ abstract interface class Channel {
+diff --git a/lib/src/worker/worker.dart b/lib/src/worker/worker.dart
+index 9ceae5ce..2783309c 100644
+--- a/lib/src/worker/worker.dart
++++ b/lib/src/worker/worker.dart
+@@ -31,7 +31,9 @@ abstract class Worker
+     implements WorkerService, IWorker, Invoker {
+   /// Creates a [Worker] with the specified entrypoint.
+   Worker(this._entryPoint,
+-      {PlatformThreadHook? threadHook, ExceptionManager? exceptionManager})
++      {PlatformThreadHook? threadHook,
++      ExceptionManager? exceptionManager,
++      this.channelFactory})
+       : _threadHook = threadHook,
+         exceptionManager = exceptionManager ?? ExceptionManager() {
+     _stats = _Stats(this);
+@@ -55,6 +57,11 @@ abstract class Worker
+ 
+   final PlatformThreadHook? _threadHook;
+ 
++  /// Opens the [Channel] instead of [Channel.open] when set. It must be set
++  /// before the worker starts; changing it later has no effect on a running
++  /// worker. The thread hook is not called for channels opened this way.
++  ChannelFactory? channelFactory;
++
+   /// The [Worker]'s start arguments.
+   List? getStartArgs();
+ 
+@@ -239,13 +246,13 @@ abstract class Worker
+       return Future.value(_channel!);
+     }
+ 
+-    return _openChannel ??= Channel.open(
+-      exceptionManager,
+-      channelLogger,
+-      _entryPoint,
+-      getStartArgs() ?? const [],
+-      _threadHook,
+-    ).then((channel) {
++    final factory = channelFactory;
++    final startArgs = getStartArgs() ?? const [];
++    return _openChannel ??= (factory != null
++            ? factory(exceptionManager, channelLogger, _entryPoint, startArgs)
++            : Channel.open(exceptionManager, channelLogger, _entryPoint,
++                startArgs, _threadHook))
++        .then((channel) {
+       _channel = channel;
+       _stats.start();
+       return channel;
+diff --git a/test/channel_factory_test.dart b/test/channel_factory_test.dart
+new file mode 100644
+index 00000000..2f543fc5
+--- /dev/null
++++ b/test/channel_factory_test.dart
+@@ -0,0 +1,106 @@
++@TestOn('vm')
++library;
++
++import 'dart:async';
++
++import 'package:logger/web.dart';
++import 'package:squadron/squadron.dart';
++import 'package:test/test.dart';
++
++/// A channel that answers every request with its command id, without any
++/// platform thread behind it.
++class _EchoChannel implements Channel {
++  _EchoChannel(this.exceptionManager, this.logger);
++
++  @override
++  final ExceptionManager exceptionManager;
++
++  @override
++  final Logger? logger;
++
++  final _closed = Completer<void>();
++  int requests = 0;
++
++  @override
++  Future<void> get closed => _closed.future;
++
++  @override
++  Future<void> close() {
++    if (!_closed.isCompleted) _closed.complete();
++    return _closed.future;
++  }
++
++  @override
++  PlatformChannel serialize() => throw UnsupportedError('not serializable');
++
++  @override
++  Channel share() => this;
++
++  @override
++  void cancelStream(StreamId streamId) {}
++
++  @override
++  void cancelToken(SquadronCancelationToken? token) {}
++
++  @override
++  Future<dynamic> sendRequest(int command, List args,
++      {SquadronCancelationToken? token,
++      bool inspectRequest = false,
++      bool inspectResponse = false}) async {
++    requests++;
++    return command;
++  }
++
++  @override
++  Stream<dynamic> sendStreamingRequest(int command, List args,
++          {SquadronCancelationToken? token,
++          bool inspectRequest = false,
++          bool inspectResponse = false}) =>
++      Stream.fromIterable(args);
++}
++
++class _TestWorker extends Worker {
++  _TestWorker({super.channelFactory}) : super(_noEntryPoint);
++
++  @override
++  List? getStartArgs() => const ['start'];
++}
++
++void _noEntryPoint(WorkerRequest _) =>
++    throw StateError('the platform channel must not be opened');
++
++void main() {
++  test('Worker.start uses the channel factory instead of Channel.open',
++      () async {
++    List? seenStartArgs;
++    _EchoChannel? opened;
++    final worker = _TestWorker(
++      channelFactory: (exceptionManager, logger, entryPoint, startArgs) async {
++        seenStartArgs = startArgs;
++        return opened = _EchoChannel(exceptionManager, logger);
++      },
++    );
++
++    expect(await worker.send(7), 7);
++    expect(await worker.stream(1, args: [1, 2, 3]).toList(), [1, 2, 3]);
++    expect(seenStartArgs, ['start']);
++    expect(opened!.requests, 1);
++    expect(worker.isConnected, isTrue);
++
++    worker.stop();
++    await opened!.closed;
++  });
++
++  test('channelFactory can be set on an existing worker before it starts',
++      () async {
++    final worker = _TestWorker();
++    var calls = 0;
++    worker.channelFactory = (em, logger, entryPoint, startArgs) async {
++      calls++;
++      return _EchoChannel(em, logger);
++    };
++    await Future.wait([worker.send(1), worker.send(2)]);
++    expect(calls, 1);
++    worker.stop();
++  });
++}
