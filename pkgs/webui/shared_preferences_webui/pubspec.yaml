@@ -1,0 +1,31 @@
+name: shared_preferences_webui
+description: WebUI implementation of shared_preferences. A module's preferences as one JSON value in KernelSU's module config (persist.config), kept until the module is uninstalled.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    implements: shared_preferences
+    platforms:
+      web:
+        pluginClass: SharedPreferencesWebUi
+        fileName: shared_preferences_webui.dart
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.1
+  shared_preferences_web: ^2.4.3
+  webui_app_plane:
+    path: ../webui_app_plane
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

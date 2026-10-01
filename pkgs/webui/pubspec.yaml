@@ -11,6 +11,7 @@ workspace:
   - packages/url_launcher_webui
   - packages/share_plus_webui
   - packages/dynamic_color_webui
+  - packages/shared_preferences_webui
 
 dev_dependencies:
   lints: ^6.0.0

@@ -60,29 +60,36 @@ registers the `Link` platform view).
   (webui-termux-api `util/ResultReturner.java`). The same library
   (`package:webui_app_plane/termux_api.dart`) can run inside an app's own
   root process.
-- `writeAppFile`: methods that read a `file` extra open it as the app's uid,
-  so files go to `/data/data/com.webui.termux.api/files/<moduleId>/`, chowned
-  to the app and `chcon`ed to the app data dir's full context (earlier files
-  there are removed first). `restorecon` is not enough: it leaves `s0`
-  without the app's MLS categories (devicelab, Android 15 AVD).
+- `handoff()`: methods that read or write a `file` extra open it as the
+  app's uid, so each call gets its own folder
+  `/data/data/<package>/cache/handoff/<call id>/`; `AppHandoff.write` puts a
+  file there chowned to the app and `chcon`ed to the app data dir's full
+  context (`restorecon` leaves `s0` without the app's MLS categories,
+  devicelab, Android 15 AVD), and `delete` removes the folder after the call.
+  Separate folders mean no stale picks and no two calls wiping each other.
+  The first hand-off of a page removes what earlier pages left; Android may
+  also reclaim the cache dir.
 - `scanMedia(paths)`: after the app writes a file to shared storage
   (`Download`, `Documents`, a path from the save picker), asks the media
   provider to index it so it shows in Files and Gallery: a root
   `MEDIA_SCANNER_SCAN_FILE` broadcast per file (devicelab, Android 15: indexed;
   files written as root are not indexed on their own). The app's
   `MediaScanner` method is gone since webui.3. No `*_webui` package writes
-  to shared storage itself (`share_plus_webui` writes only into the app's
-  private directory), so the app, or bricks' save flow, calls it after its
+  to shared storage itself (`share_plus_webui` writes only into a hand-off
+  folder), so the app, or bricks' save flow, calls it after its
   write.
 - `testing.dart`: `FakeRootChannel` speaks the real v1 protocol to the real
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
 
-App: release `webui-v0.53.0-webui.2` of p0g-stack/webui-termux-api,
-`webui-termux-api_v0.53.0-webui.2.apk`, sha256
-`b6925a96aa7e8fdd919c22aa10a177bd72acac9524bfcc80e2708fc705b084e2`, test key
-(see its `WEBUI.md`; webui.2 drops the SMS, contacts, call log and telephony
-methods and their permissions).
+App: release `webui-v0.53.0-webui.3` of p0g-stack/webui-termux-api
+(7c75e03, versionCode 1005), `webui-termux-api_v0.53.0-webui.3.apk`, sha256
+`442d227d839e936b9c635b48991c5bf393870d382d689971eba4fdfe88bebeb1`, package
+`com.webui.termux.api`, test key. flutter_p0g renames it per module to
+`com.webui.api.<seg>` and signs it with the developer's key; the app takes
+its socket, share authority and intents from `getPackageName()` (see its
+`WEBUI.md`: webui.3 drops `JobScheduler`, webui.2 dropped SMS, contacts, call
+log and telephony).
 
 ### What flutter_p0g ships for the app plane
 
@@ -132,35 +139,36 @@ No stock web implementation, so this registers even when transitive.
 
 | Method | WebUI host | Browser tab |
 |---|---|---|
-| temporary | `/data/local/tmp` | stock (`MissingPluginException`) |
+| temporary | `/data/adb/<id>/tmp` (created) | stock (`MissingPluginException`) |
 | application support | `/data/adb/<id>` (created, 700) | stock |
 | application cache | `/data/adb/<id>/cache` (created) | stock |
-| documents | `/storage/emulated/0/Documents` | stock |
+| documents | `/data/adb/<id>/documents` (created; private, as on Android) | stock |
 | downloads | `/storage/emulated/0/Download` | stock |
 | library, external storage | unimplemented, as `path_provider_linux` | unimplemented |
 
-Shaped like `path_provider_linux`. State is outside `/data/adb/modules/<id>`
-because a module update replaces that directory; flutter_p0g's module
-template `uninstall.sh` should remove `/data/adb/<id>`. The paths are for the
-app's root process; the page cannot open them.
+State is outside `/data/adb/modules/<id>` because a module update replaces
+that directory. Lifetimes follow KernelSU's module lifecycle (kept by
+flutter_p0g's customize.sh and flutter-webui's root launcher): a fresh
+install starts with an empty `/data/adb/<id>` (install marker
+`webui.installed` in module config), temp is cleared on the first start of
+each boot, uninstall.sh removes the folder. The paths are for the app's root
+process; the page cannot open them.
 
-### url_launcher_webui
+### shared_preferences_webui
 
-| Method | WebUI host | Browser tab |
-|---|---|---|
-| `launchUrl` | `am start --user current -a android.intent.action.VIEW -d <url>` as root; `false` when `am` reports `Error:` | stock (`window.open`) |
-| `canLaunch` | `cmd package query-activities --brief -a VIEW -d <url>` finds an activity | stock |
-| `supportsMode` | `platformDefault`, `externalApplication` | stock |
-| `Link` widget | stock | stock |
-
-Why not stock on a host: the managers do not support multiple windows, so
-`window.open` loads the URL in the module's WebView. KernelSU and Next then
-navigate the page away; WebUI X opens non-module URLs externally
-(`WXClient.shouldOverrideUrlLoading`), so it would work there alone. Why not
-an app-plane method (the README's first proposal): root may start activities
-(uid 0 is exempt from background activity start limits in AOSP
-`BackgroundActivityStartController`, inferred), so the fork needs no new
-method. `javascript:` is refused as in stock.
+`SharedPreferences`, `SharedPreferencesAsync` and `SharedPreferencesWithCache`
+keep a module's preferences as one JSON object in KernelSU's module config:
+`KSU_MODULE=<id> /data/adb/ksu/bin/ksud module config set
+webui.shared_preferences --stdin` (persist.config, KernelSU and KernelSU Next
+since v3.0.0). ksud keeps it across updates and while the module is
+disabled, and clears it on uninstall. Every operation reads it fresh; a
+change writes it whole, one at a time per page. Values are the stock web
+types (bool, int, double, String, `List<String>`); the whole object may be
+at most 1 MB (ksud's limit per value), else
+`PlatformException(webui-prefs-too-large)`. Why not localStorage: every
+module page shares one origin, so `flutter.` keys of different modules clash
+and `clear()` would wipe them all. A browser tab keeps the stock
+localStorage store.
 
 Gaps: a `Link` widget on KSU/Next still navigates the WebView (stock link
 delegate). Open device checks: `am start` and `cmd package query-activities
@@ -171,7 +179,7 @@ delegate). Open device checks: `am start` and `cmd package query-activities
 | Case | WebUI host with the app | No app / browser tab |
 |---|---|---|
 | text or `uri` | `Share`, text on stdin, `--es action send`, `--es title <subject>` | stock: no `navigator.share` in WebViews, so `mailto:` through url_launcher_webui |
-| one file | copied by `writeAppFile`, `Share --es file <path> --es action send [--es content-type]` | stock download (does nothing in a manager) |
+| one file | copied into a hand-off folder (kept: the target reads it after Share returns), `Share --es file <path> --es action send [--es content-type]` | stock download (does nothing in a manager) |
 | more than one file | `PlatformException(webui-share-multiple-files)` | stock |
 
 Result is `ShareResult.unavailable` (ShareAPI reports no outcome; as Linux).

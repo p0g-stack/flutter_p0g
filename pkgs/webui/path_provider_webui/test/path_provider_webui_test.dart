@@ -21,18 +21,17 @@ void main() {
   test('module paths, state outside the module dir, created once', () async {
     final fake = FakeRootChannel();
     final p = PathProviderWebUiImpl(stock: Stock(), root: fake.root());
-    expect(await p.getTemporaryPath(), '/data/local/tmp');
+    expect(await p.getTemporaryPath(), '/data/adb/demo/tmp');
     expect(await p.getApplicationSupportPath(), '/data/adb/demo');
     expect(await p.getApplicationCachePath(), '/data/adb/demo/cache');
     expect(await p.getApplicationSupportPath(), '/data/adb/demo');
-    expect(
-      await p.getApplicationDocumentsPath(),
-      '/storage/emulated/0/Documents',
-    );
+    expect(await p.getApplicationDocumentsPath(), '/data/adb/demo/documents');
     expect(await p.getDownloadsPath(), '/storage/emulated/0/Download');
     expect(fake.runs.map((r) => r.argv.last), [
       '/data/adb/demo',
+      '/data/adb/demo/tmp',
       '/data/adb/demo/cache',
+      '/data/adb/demo/documents',
     ]);
     expect(fake.runs.first.argv, [
       '/system/bin/mkdir',

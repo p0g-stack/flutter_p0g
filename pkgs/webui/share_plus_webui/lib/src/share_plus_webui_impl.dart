@@ -64,7 +64,10 @@ final class SharePlusWebUiImpl extends SharePlatform {
         final name = names != null && names.isNotEmpty
             ? names.first
             : file.name;
-        final path = await plane.writeAppFile(
+        // The target app reads the file after Share returns, so the
+        // hand-off stays until the next page's first hand-off sweeps it.
+        final handoff = await plane.handoff();
+        final path = await handoff.write(
           name.isEmpty ? 'shared' : name,
           await file.readAsBytes(),
         );

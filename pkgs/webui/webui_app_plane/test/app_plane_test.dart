@@ -146,27 +146,46 @@ void main() {
       );
     });
 
-    test('writeAppFile writes into the app dir for the module', () async {
+    test('each hand-off gets its own folder in the app cache', () async {
       final fake = FakeRootChannel();
-      final path = await AppPlane(fake.root()).writeAppFile('a/b.png', [1, 2]);
-      expect(path, '/data/data/com.webui.api.demo/files/demo/a_b.png');
-      final run = fake.runs.single;
-      expect(run.shArgs, ['/data/data/com.webui.api.demo/files/demo', path]);
-      expect(run.stdin, [1, 2]);
+      final plane = AppPlane(fake.root());
+      final a = await plane.handoff();
+      final b = await plane.handoff();
+      expect(a.dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+      expect(a.dir, isNot(b.dir));
+      // The first hand-off sweeps what earlier pages left, once.
+      expect(fake.runs.map((r) => r.argv).toList(), [
+        [
+          '/system/bin/rm',
+          '-rf',
+          '/data/data/com.webui.api.demo/cache/handoff',
+        ],
+      ]);
+      final path = await a.write('a/b.png', [1, 2]);
+      expect(path, '${a.dir}/a_b.png');
+      expect(fake.runs.last.shArgs, [a.dir, path]);
+      expect(fake.runs.last.stdin, [1, 2]);
+      expect(a.path('.x'), '${a.dir}/file.x');
+      await a.delete();
+      expect(fake.runs.last.argv, ['/system/bin/rm', '-rf', a.dir]);
     });
 
-    test('the writeAppFile script works in a real sh', () async {
+    test('the hand-off write script works in a real sh', () async {
       final fake = FakeRootChannel();
-      await AppPlane(fake.root()).writeAppFile('x.txt', [1]);
-      final script = fake.runs.single.argv[2];
-      final tmp = await Directory.systemTemp.createTemp('appfile');
+      final plane = AppPlane(fake.root());
+      final h = await plane.handoff();
+      await h.write('x.txt', [1]);
+      final script = fake.runs.last.argv[2];
+      final tmp = await Directory.systemTemp.createTemp('handoff');
       addTearDown(() => tmp.delete(recursive: true));
       final app = Directory('${tmp.path}/data/data/pkg')
         ..createSync(recursive: true);
-      final dir = '${app.path}/files/demo';
-      File('$dir/old')
+      Directory('${app.path}/cache').createSync();
+      final other = '${app.path}/cache/handoff/other';
+      File('$other/keep')
         ..createSync(recursive: true)
-        ..writeAsStringSync('stale');
+        ..writeAsStringSync('another call');
+      final dir = '${app.path}/cache/handoff/call1';
       final p = await Process.start('sh', [
         '-c',
         script,
@@ -177,7 +196,7 @@ void main() {
       p.stdin.add('fresh'.codeUnits);
       await p.stdin.close();
       expect(await p.exitCode, 0);
-      expect(File('$dir/old').existsSync(), isFalse);
+      expect(File('$other/keep').readAsStringSync(), 'another call');
       expect(File('$dir/new.txt').readAsStringSync(), 'fresh');
     }, testOn: 'linux');
   });

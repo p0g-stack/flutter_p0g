@@ -69,39 +69,41 @@ void main() {
     expect(fake.runs.last.stdinText, 'https://x.org/a');
   });
 
-  test('one file is copied into the app dir and shared by path', () async {
-    final fake = withApp();
-    await sharer(fake).share(
-      ShareParams(
-        files: [
-          XFile.fromData(
-            Uint8List.fromList([1, 2, 3]),
-            mimeType: 'image/png',
-            path: 'pic.png',
-          ),
-        ],
-      ),
-    );
-    final write = fake.runs.firstWhere((r) => r.argv[1] == '-c');
-    expect(write.argv.take(2), ['/system/bin/sh', '-c']);
-    expect(write.shArgs, [
-      '/data/data/com.webui.api.demo/files/demo',
-      '/data/data/com.webui.api.demo/files/demo/pic.png',
-    ]);
-    expect(write.stdin, [1, 2, 3]);
-    expect(fake.runs.last.argv.sublist(4), [
-      'Share',
-      '--es',
-      'action',
-      'send',
-      '--es',
-      'file',
-      '/data/data/com.webui.api.demo/files/demo/pic.png',
-      '--es',
-      'content-type',
-      'image/png',
-    ]);
-  });
+  test(
+    'one file is copied into a hand-off folder and shared by path',
+    () async {
+      final fake = withApp();
+      await sharer(fake).share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              Uint8List.fromList([1, 2, 3]),
+              mimeType: 'image/png',
+              path: 'pic.png',
+            ),
+          ],
+        ),
+      );
+      final write = fake.runs.firstWhere((r) => r.argv[1] == '-c');
+      expect(write.argv.take(2), ['/system/bin/sh', '-c']);
+      final dir = write.shArgs.first;
+      expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+      expect(write.shArgs, [dir, '$dir/pic.png']);
+      expect(write.stdin, [1, 2, 3]);
+      expect(fake.runs.last.argv.sublist(4), [
+        'Share',
+        '--es',
+        'action',
+        'send',
+        '--es',
+        'file',
+        '$dir/pic.png',
+        '--es',
+        'content-type',
+        'image/png',
+      ]);
+    },
+  );
 
   test('fileNameOverrides names the copy', () async {
     final fake = withApp();

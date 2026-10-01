@@ -65,39 +65,27 @@ final class AppPlane {
     }();
   }
 
-  /// The app's private directory for this module's files
-  /// (`/data/data/<package>/files/<moduleId>`). Methods that read a `file`
-  /// extra run as the app's uid, so files they read go here (written by
-  /// [writeAppFile]), never in the module directory.
-  String appFileDir() =>
-      '/data/data/$package/files/${root.moduleId ?? 'webui'}';
+  /// Where hand-off folders live: the app's cache dir, which Android may
+  /// also reclaim.
+  String get handoffRoot => '/data/data/$package/cache/handoff';
 
-  /// Writes [bytes] to [name] in [appFileDir], owned by the app and labelled
-  /// with its data dir's SELinux context (categories included), after removing what earlier calls left there. Returns the path.
-  Future<String> writeAppFile(String name, List<int> bytes) async {
-    final safe = name.replaceAll(RegExp(r'[/\x00]'), '_');
-    final dir = appFileDir();
-    final path =
-        '$dir/${safe.isEmpty || safe.startsWith('.') ? 'file$safe' : safe}';
-    final r = await root.sh(
-      r'set -e; d=$1; f=$2; a=${d%/files/*}; '
-      r'rm -rf "$d"; mkdir -p "$d"; cat > "$f"; '
-      r'o=$(stat -c %u:%g "$a"); chown "$o" "$a/files"; chown -R "$o" "$d"; '
-      r'chmod 700 "$d"; chmod 600 "$f"; '
-      // restorecon drops the app's MLS categories (devicelab, Android 15):
-      // copy the data dir's full context instead.
-      r'c=$(stat -c %C "$a" 2>/dev/null || ls -dZ "$a" | cut -d" " -f1); '
-      r'case "$c" in *:*) chcon "$c" "$a/files"; chcon -R "$c" "$d" ;; esac',
-      args: [dir, path],
-      stdin: bytes,
-    );
-    if (!r.ok) {
-      throw AppPlaneException(
-        'failed',
-        'could not write $path: ${r.errorText.trim()}',
-      );
-    }
-    return path;
+  Future<void>? _swept;
+  int _handoffs = 0;
+
+  /// A fresh hand-off folder for one call (`<handoffRoot>/<call id>`).
+  /// Methods that read or write a `file` extra run as the app's uid, so their
+  /// files go here, never in module storage. Every call gets its own folder,
+  /// so a call never sees another call's file and two calls never wipe each
+  /// other. The first hand-off of an [AppPlane] removes what earlier pages
+  /// left behind.
+  Future<AppHandoff> handoff() async {
+    await (_swept ??= root
+        .run(['/system/bin/rm', '-rf', handoffRoot])
+        .then((_) {}, onError: (Object _) {}));
+    final id =
+        '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+        '-${(_handoffs++).toRadixString(36)}';
+    return AppHandoff._(this, '$handoffRoot/$id');
   }
 
   /// Calls [method] with am-style [extras] (`--es name value`, `--ez name
@@ -169,5 +157,53 @@ final class AppPlane {
         );
       }
     }
+  }
+}
+
+/// One call's hand-off folder in the app's cache dir (from
+/// [AppPlane.handoff]). Root writes files there for the app, or collects
+/// what the app wrote, then [delete]s it.
+final class AppHandoff {
+  AppHandoff._(this._plane, this.dir);
+
+  final AppPlane _plane;
+
+  /// The folder: `/data/data/<package>/cache/handoff/<call id>`.
+  final String dir;
+
+  /// The path of [name] in [dir], made safe (no `/`, no leading `.`).
+  String path(String name) {
+    final safe = name.replaceAll(RegExp(r'[/\x00]'), '_');
+    return '$dir/${safe.isEmpty || safe.startsWith('.') ? 'file$safe' : safe}';
+  }
+
+  /// Writes [bytes] to [name] in [dir], owned by the app and labelled with
+  /// its data dir's SELinux context (categories included). Returns the path.
+  Future<String> write(String name, List<int> bytes) async {
+    final file = path(name);
+    final r = await _plane.root.sh(
+      r'set -e; d=$1; f=$2; a=${d%/cache/handoff/*}; h=$a/cache/handoff; '
+      r'mkdir -p "$d"; cat > "$f"; '
+      r'o=$(stat -c %u:%g "$a"); chown "$o" "$a/cache"; chown -R "$o" "$h"; '
+      r'chmod 700 "$h" "$d"; chmod 600 "$f"; '
+      // restorecon drops the app's MLS categories (devicelab, Android 15):
+      // copy the data dir's full context instead.
+      r'c=$(stat -c %C "$a" 2>/dev/null || ls -dZ "$a" | cut -d" " -f1); '
+      r'case "$c" in *:*) chcon "$c" "$a/cache"; chcon -R "$c" "$h" ;; esac',
+      args: [dir, file],
+      stdin: bytes,
+    );
+    if (!r.ok) {
+      throw AppPlaneException(
+        'failed',
+        'could not write $file: ${r.errorText.trim()}',
+      );
+    }
+    return file;
+  }
+
+  /// Removes [dir] and everything in it.
+  Future<void> delete() async {
+    await _plane.root.run(['/system/bin/rm', '-rf', dir]);
   }
 }
