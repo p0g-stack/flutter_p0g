@@ -130,4 +130,47 @@ void main() {
     }
     expect(made, 3);
   });
+
+  group('self-update', () {
+    test('githubReleaseBase takes GitHub repository URLs only', () {
+      expect(
+        githubReleaseBase('https://github.com/p0g-stack/demo'),
+        'https://github.com/p0g-stack/demo/releases/latest/download/',
+      );
+      expect(
+        githubReleaseBase('https://github.com/a/b.git/'),
+        'https://github.com/a/b/releases/latest/download/',
+      );
+      expect(githubReleaseBase('https://gitlab.com/a/b'), isNull);
+      expect(githubReleaseBase(null), isNull);
+    });
+
+    test('withUpdateJson sets the key once', () {
+      const prop = 'id=demo\nupdateJson=https://old/update.json\nversion=v1\n\n';
+      final out = withUpdateJson(prop, 'https://new/update.json');
+      expect(out, 'id=demo\nversion=v1\nupdateJson=https://new/update.json\n');
+      expect(readProp(out, 'updateJson'), 'https://new/update.json');
+    });
+
+    test('updateJsonFor writes the managers\' format', () {
+      final json = jsonDecode(
+        updateJsonFor(
+          base: 'https://x/dl/',
+          version: 'v0.1.0',
+          versionCode: '3',
+          zipName: 'demo-v0.1.0.zip',
+        ),
+      );
+      expect(json, {
+        'version': 'v0.1.0',
+        'versionCode': 3,
+        'zipUrl': 'https://x/dl/demo-v0.1.0.zip',
+        'changelog': 'https://x/dl/changelog.md',
+      });
+      expect(
+        () => updateJsonFor(base: 'b/', version: 'v', versionCode: 'x', zipName: 'z'),
+        throwsFormatException,
+      );
+    });
+  });
 }

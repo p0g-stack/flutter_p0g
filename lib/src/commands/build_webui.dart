@@ -49,6 +49,21 @@ class BuildWebUiCommand extends BuildWebCommand {
           'rust/ already built for the device: <dir>/<abi>/*.so (cargo-ndk -o layout), '
           'used in place of building it here.',
     );
+    argParser.addFlag(
+      'update-json',
+      defaultsTo: true,
+      help:
+          "Set module.prop's updateJson and write update.json and changelog.md beside "
+          "the zip, for the manager's update button. Publish all three with each release.",
+    );
+    argParser.addOption(
+      'update-url',
+      valueHelp: 'url',
+      help:
+          'Where releases publish the zip, update.json and changelog.md (a directory '
+          "URL). Default: the updateJson already in webui/module.prop, else the latest "
+          "release of the pubspec's GitHub repository.",
+    );
   }
 
   @override
@@ -194,12 +209,74 @@ class BuildWebUiCommand extends BuildWebCommand {
       buildNumber: buildNumber,
       wasm: boolArg(FlutterOptions.kWebWasmFlag),
     );
-    final prop = utf8.decode(files.firstWhere((f) => f.path == 'module.prop').bytes);
+    final propIndex = files.indexWhere((f) => f.path == 'module.prop');
+    var prop = utf8.decode(files[propIndex].bytes);
     final id = readProp(prop, 'id') ?? project.manifest.appName;
-    final File zip = out.childFile('$id-v$buildName.zip')..writeAsBytesSync(zipModule(files));
+    final zipName = '$id-v$buildName.zip';
+    final base = boolArg('update-json') ? _updateBase(prop) : null;
+    if (base != null) {
+      prop = withUpdateJson(prop, '$base$kUpdateJsonName');
+      files[propIndex] = ModuleFile('module.prop', utf8.encode(prop));
+    }
+    final File zip = out.childFile(zipName)..writeAsBytesSync(zipModule(files));
     final size = (zip.lengthSync() / (1024 * 1024)).toStringAsFixed(1);
     globals.printStatus('Built ${fs.path.relative(zip.path)} ($size MB, ${files.length} files).');
+    if (base != null) {
+      out
+          .childFile(kUpdateJsonName)
+          .writeAsStringSync(
+            updateJsonFor(
+              base: base,
+              version: readProp(prop, 'version') ?? 'v$buildName',
+              versionCode: readProp(prop, 'versionCode') ?? buildNumber,
+              zipName: zipName,
+            ),
+          );
+      final changelog = [
+        app.childFile('CHANGELOG.md'),
+        app.parent.childFile('CHANGELOG.md'),
+      ].where((f) => f.existsSync()).firstOrNull;
+      out
+          .childFile(kChangelogName)
+          .writeAsStringSync(changelog?.readAsStringSync() ?? '# v$buildName\n');
+      globals.printStatus(
+        'Wrote $kUpdateJsonName and $kChangelogName beside it; publish them with the zip '
+        'at $base.',
+      );
+    }
     return result;
+  }
+
+  /// The directory URL releases publish to, ending in `/`; null (with a
+  /// note) when there is none.
+  String? _updateBase(String moduleProp) {
+    String dir(String url) => url.endsWith('/') ? url : '$url/';
+    final given = stringArg('update-url');
+    if (given != null) return dir(given);
+    final existing = readProp(moduleProp, 'updateJson');
+    if (existing != null && existing.isNotEmpty) {
+      return existing.substring(0, existing.lastIndexOf('/') + 1);
+    }
+    final fromRepo = githubReleaseBase(_repository());
+    if (fromRepo == null) {
+      globals.printStatus(
+        'No updateJson: pass --update-url, or set `repository:` (GitHub) in pubspec.yaml.',
+      );
+    }
+    return fromRepo;
+  }
+
+  String? _repository() {
+    for (final dir in [project.directory, project.directory.parent]) {
+      final pubspec = dir.childFile('pubspec.yaml');
+      if (!pubspec.existsSync()) continue;
+      final m = RegExp(
+        r'^repository:\s*(\S+)\s*$',
+        multiLine: true,
+      ).firstMatch(pubspec.readAsStringSync());
+      if (m != null) return m[1]!.replaceAll(RegExp('''^['"]|['"]\$'''), '');
+    }
+    return null;
   }
 
   Map<String, List<int>> _readTree(Directory root) {

@@ -111,6 +111,14 @@ Gaps are listed here, not hidden.
    the build), Magisk's installer stub in `META-INF/`. `module.prop`'s
    `$(FLUTTER_BUILD_NAME)` and `$(FLUTTER_BUILD_NUMBER)` come from the pubspec
    version or `--build-name` / `--build-number`, as on iOS.
+11. Self-update: sets `updateJson` in `module.prop` and writes `update.json`
+   (`version`, `versionCode`, `zipUrl`, `changelog`: the format KernelSU,
+   APatch and Magisk poll) and `changelog.md` (the app's `CHANGELOG.md`, or a
+   version line) beside the zip, so the manager's update button works once a
+   release publishes all three. They live under `--update-url`, else the
+   directory of an `updateJson` already in `webui/module.prop`, else
+   `releases/latest/download/` of the pubspec's GitHub `repository:`. With
+   none of those, or `--no-update-json`, the module has no `updateJson`.
 
 A stock counter app gives a 6.3 MB zip (29 files) that loads with no console
 errors and no requests outside the module, served at `/` with no COOP/COEP.

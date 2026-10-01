@@ -108,6 +108,44 @@ String? readProp(String moduleProp, String key) {
   return null;
 }
 
+/// The update file managers poll: `updateJson` in module.prop names it
+/// (KernelSU, APatch and Magisk share the format).
+const kUpdateJsonName = 'update.json';
+const kChangelogName = 'changelog.md';
+
+/// Where a GitHub-hosted app's latest release serves its assets, from the
+/// pubspec's `repository:` (null for anything else).
+String? githubReleaseBase(String? repository) {
+  final m = RegExp(r'^https://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$')
+      .firstMatch(repository?.trim() ?? '');
+  return m == null ? null : 'https://github.com/${m[1]}/${m[2]}/releases/latest/download/';
+}
+
+/// [moduleProp] with `updateJson=[url]`, replacing one already there.
+String withUpdateJson(String moduleProp, String url) {
+  final lines = [
+    for (final line in moduleProp.split('\n'))
+      if (!RegExp(r'^\s*updateJson\s*=').hasMatch(line)) line,
+  ];
+  while (lines.isNotEmpty && lines.last.trim().isEmpty) {
+    lines.removeLast();
+  }
+  return '${[...lines, 'updateJson=$url'].join('\n')}\n';
+}
+
+/// The update file for a release whose assets sit under [base] (the
+/// directory of `updateJson`, ending in `/`).
+String updateJsonFor({
+  required String base,
+  required String version,
+  required String versionCode,
+  required String zipName,
+}) {
+  final code = int.tryParse(versionCode);
+  if (code == null) throw FormatException('versionCode "$versionCode" is not a number');
+  return '${const JsonEncoder.withIndent('  ').convert({'version': version, 'versionCode': code, 'zipUrl': '$base$zipName', 'changelog': '$base$kChangelogName'})}\n';
+}
+
 /// Zips the module with unix modes, module.prop first like the stock ones.
 Uint8List zipModule(List<ModuleFile> files) {
   final archive = Archive();
