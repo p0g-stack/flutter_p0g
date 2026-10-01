@@ -26,6 +26,7 @@ A worked objective, CBM's partition fetch (`dd` on the device against
 Apps that talk to a phone over a cable: [docs/patterns/devices.md](docs/patterns/devices.md).
 Which place runs what, and how logs come back: [docs/patterns/places.md](docs/patterns/places.md).
 Saving a file on every target: [docs/patterns/files.md](docs/patterns/files.md).
+Apps in a browser tab (long jobs, files to workers, wasm, writes): [docs/patterns/web.md](docs/patterns/web.md).
 
 In short:
 
