@@ -45,9 +45,12 @@ Nothing else: no job store, no restart policy, no knowledge of Squadron.
 
 ## What the host (the app's CLI) does
 
-`bin/<app>` is a launcher flutter_p0g ships: it runs the CLI's AOT snapshot
-with `<abi>/dartaotruntime` and `exec`s, so the root channel's detached wrapper
-sees the host's own exit code. One host serves all of the app's services;
+`bin/<app>` is a launcher `flutter_p0g build webui` writes: a `/system/bin/sh`
+script that `exec`s `<module>/bin/<abi>/dartaotruntime <app>.aot "$@"` (abi from
+`getprop ro.product.cpu.abi`), so the root channel's detached wrapper sees the
+host's own exit code. flutter_p0g names it after the first `executables:` key
+of `cli/pubspec.yaml`; the brick declares `<app>: <app>` there, so both sides
+read the same name. One host serves all of the app's services;
 a client names the service when it binds a worker.
 
 ```
