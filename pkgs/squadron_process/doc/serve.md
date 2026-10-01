@@ -69,7 +69,7 @@ serve mode on stderr, or at least after the ready line.
 
 ```dart
 final place = ProcessPlace(
-  launcher: launcher,                       // see docs/launchers.md
+  launcher: launcher,                       // see doc/launchers.md
   store: store,                             // reads the session file
   command: ProcessCommand(cliPath, arguments: ['serve', '--session-file', sessionPath]),
 );

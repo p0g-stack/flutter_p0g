@@ -106,7 +106,7 @@ abstract interface class LaunchedProcess {
 /// (`IoProcessLauncher`) and one per OS elevation front-end
 /// (`ElevatedLauncher`). An embedding with its own way of starting processes
 /// (a privileged helper, a remote shell, a sandbox broker) implements this
-/// interface; docs/launchers.md says what it must do.
+/// interface; doc/launchers.md says what it must do.
 ///
 /// The process must be started detached: it has to outlive the client's link
 /// (a client restart, the launcher's own shell going away) and stop only by

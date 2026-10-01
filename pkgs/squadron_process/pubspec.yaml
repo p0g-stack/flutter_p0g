@@ -12,10 +12,10 @@ environment:
   sdk: ^3.13.4
 
 dependencies:
-  # Exact pin: the channel-factory patch in third_party/squadron/patches is
+  # The channel-factory patch in third_party/squadron/patches is
   # written against this release. tool/squadron.sh materializes the patched
   # tree and points pub at it through pubspec_overrides.yaml.
-  squadron: 7.4.4
+  squadron: ">=7.4.4 <7.5.0"
   cancelation_token: ^1.1.0
   logger: ^2.1.0
   meta: ^1.11.0

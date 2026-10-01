@@ -1,5 +1,10 @@
 # squadron_process
 
+> **Unofficial.** This package is not part of Squadron and is not affiliated
+> with or endorsed by Squadron's author. It needs a small patch to Squadron
+> (see [Squadron patch](#squadron-patch)) until an equivalent hook exists
+> upstream.
+
 An unofficial extension for [Squadron](https://pub.dev/packages/squadron) that
 adds a third place to run a worker. Squadron runs a service in an **isolate**
 (native) or a **Web Worker** (web). This package adds **another process**,
@@ -11,14 +16,46 @@ optionally elevated, reached over a loopback WebSocket:
 | web worker | Web Worker (Squadron) | most work on the web |
 | process | the app's own Dart CLI in serve mode, hosting the same Squadron service | work that needs other rights than the UI has: an elevated helper for a disk writer or installer (the balenaEtcher pattern), a root helper behind a web UI on a rooted phone |
 
-The same service class runs in all three; only the channel differs. Not
-affiliated with or endorsed by Squadron's author.
+The same service class runs in all three; only the channel differs.
+
+Features:
+
+- Bind any generated Squadron worker to a place; requests, streams,
+  cancellation and Squadron exceptions work unchanged.
+- One CLI process serves several named services.
+- Launchers: plain, and per-OS elevation (`pkexec`, `su`, the macOS admin
+  prompt, UAC), or your own.
+- A token handshake that also carries the facts the host checked.
+- Lifetime: the host lingers for a grace window after its last client and
+  then cancels its work and exits.
+- Client library runs on the Dart VM, dart2js and dart2wasm; the host needs
+  `dart:io`.
 
 Status: 0.1.0, unpublished. A service runs in a separate CLI process end to
 end, including through stand-in `su` / `pkexec` / `osascript` front-ends (VM
 tests). The client library compiles for dart2js and dart2wasm; its codec and
 facts tests pass in Chromium. The real elevation prompts have not been run
 here.
+
+## Install
+
+```yaml
+dependencies:
+  squadron_process:
+    git:
+      url: https://github.com/p0g-stack/squadron_process
+      ref: <commit sha>
+```
+
+Then, from the package or pub workspace root:
+
+```sh
+dart pub get
+dart run squadron_process:squadron_patch   # patched Squadron + dependency_overrides
+dart pub get
+```
+
+A runnable example is in [example/](example/squadron_process_example.dart).
 
 ## Use
 
@@ -93,7 +130,7 @@ caller's rights) and one per OS elevation front-end, `PkexecLauncher`,
 (`ElevatedLauncher.forHost()` picks one). An embedding with its own way of
 starting processes implements the same interface. Requirements, discovery
 through `--launch-id` and the session file, and security notes:
-[docs/launchers.md](docs/launchers.md).
+[doc/launchers.md](doc/launchers.md).
 
 ## Squadron patch
 
@@ -114,7 +151,17 @@ Until the patch is upstream, an app depending on squadron_process needs the
 same patched Squadron: `dart run squadron_process:squadron_patch` from its
 package or workspace root fetches it into `.dart_tool` and adds the
 `dependency_overrides` entry. How a CLI wires `serve`, its options and its
-output: [docs/serve.md](docs/serve.md).
+output: [doc/serve.md](doc/serve.md).
+
+## Limitations
+
+- Needs the Squadron patch until upstream has a channel hook.
+- Values crossing the link are limited to the codec's types (those of Flutter's
+  `StandardMessageCodec`); custom types need Squadron marshalers.
+- The host trusts any local client that presents the token; there is no peer
+  credential check.
+- A worker whose link drops fails its pending calls and must be recreated; the
+  host keeps the work running for the grace window.
 
 ## Scope
 
