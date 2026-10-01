@@ -1,3 +1,8 @@
+# 0.6.6
+
+- flutter-webui 9ee7918: on KernelSU Next, Back at the root route unwinds
+  history and the next Back closes the WebUI, as in a browser tab.
+
 # 0.6.5
 
 - flutter-webui 8deba51: Back from a pushed route no longer closes the whole
