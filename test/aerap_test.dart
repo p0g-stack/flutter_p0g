@@ -84,6 +84,8 @@ void main() {
       expect(m['type'], 'ui-runtime');
       expect(m['executable'], 'usr/bin/aera-plugin');
       expect(m['min_host_api'], 3);
+      expect(m['protocol_version'], 3);
+      expect(m['permissions'], containsAll(['display', 'touch-input', 'pixel-surface']));
       expect(m['payload_size'], 2);
       expect(m['payload_sha256'], sha256.convert(xz).toString());
       expect(m['expanded_size'], 4);
