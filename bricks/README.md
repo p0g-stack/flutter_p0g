@@ -23,6 +23,8 @@ A worked objective, CBM's partition fetch (`dd` on the device against
 `fastboot fetch` from a computer):
 [docs/samples/partition-fetch.md](docs/samples/partition-fetch.md).
 
+Apps that talk to a phone over a cable: [docs/patterns/devices.md](docs/patterns/devices.md).
+
 In short:
 
 ```sh

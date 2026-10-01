@@ -1,3 +1,12 @@
+# 0.7.0
+
+- `Availability.waiting`: a strategy that would run once the user acts
+  (connect a phone) says so. It isn't chosen; `Selection.waiting` lists it
+  for the UI and `Selection.why` logs "x waits: ...". Missing facts win.
+- `WriteStrategy`'s doc comment: a write to a device outside this place
+  names the device in its input and refuses if another is connected.
+- docs/patterns/devices.md in bricks: the device-app patterns.
+
 # 0.6.6
 
 - flutter-webui 9ee7918: on KernelSU Next, Back at the root route unwinds

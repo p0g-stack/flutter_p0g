@@ -1,6 +1,6 @@
 name: strategy
 description: Adds an objective and its strategies to a p0g_app workspace, chosen by available(facts), with plan, confirm and receipt for device writes.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/p0g-stack/bricks/tree/main/bricks/strategy
 
 environment:

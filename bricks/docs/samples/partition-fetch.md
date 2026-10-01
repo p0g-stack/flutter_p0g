@@ -82,6 +82,12 @@ bodies are a `Process.run` and a check of the exit code. A fetch changes
 nothing on the device, so these are `ReadStrategy`s. Flashing the image back
 would be a `WriteStrategy` (`--write true`): plan, confirm, receipt.
 
+A strategy that would run once the user acts (say, `fastboot fetch` with no
+phone connected yet) can return `Availability(name, note: ..., waiting: true)`
+instead, so the UI offers it rather than hiding it. A write to a phone over
+a cable names that phone in its input. Both are in
+[../patterns/devices.md](../patterns/devices.md).
+
 ## 4. Expose it
 
 `PartitionsService` gets two methods. Each runs in whatever place the

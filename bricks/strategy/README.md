@@ -1,6 +1,6 @@
 # strategy
 
-Adds an objective and its strategies to a `p0g_app` workspace (0.2.0 or
+Adds an objective and its strategies to a `p0g_app` workspace (0.7.0 or
 later). Run it in the workspace root:
 
 ```sh
@@ -24,6 +24,12 @@ Conventions it stamps:
   nothing; the UI or CLI shows them and makes a `Confirmation`;
   `Objective.apply` checks it is for this plan, writes, and returns a
   `Receipt`.
+- **Waiting for the user.** A strategy that would run once the user acts
+  (connect a phone) returns `Availability(name, note: ..., waiting: true)`
+  from `available`. It isn't chosen, `Selection.waiting` offers it, and
+  `Selection.why` logs it. A write to a device outside this place names
+  that device in its input and refuses if another is connected. See
+  [docs/patterns/devices.md](../../docs/patterns/devices.md).
 - **Accounting.** Every run logs a `StrategyRun` on `objective.<name>`: which
   strategy, in which place, with which facts, what was skipped and why.
 

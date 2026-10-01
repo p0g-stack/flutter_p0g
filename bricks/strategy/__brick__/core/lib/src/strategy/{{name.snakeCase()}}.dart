@@ -26,6 +26,9 @@ final class {{type}}
     '{{name.snakeCase()}} $input via {{id}} in $place',
   ];
 
+  /// Writing to a device outside this place (a phone on a cable)? Name it
+  /// in the input and refuse here if another one is connected now; see
+  /// `WriteStrategy` and docs/patterns/devices.md in bricks.
   @override
   Future<String> write(String input, PlaceInfo place) =>
       throw UnimplementedError('{{name.snakeCase()}} via {{id}}');

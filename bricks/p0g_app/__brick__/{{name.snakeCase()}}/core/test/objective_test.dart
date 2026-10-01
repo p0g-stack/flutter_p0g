@@ -21,6 +21,25 @@ final class FromHost extends ReadStrategy<String, String> {
   Future<String> run(String input, PlaceInfo place) async => 'host:$input';
 }
 
+/// A host-side strategy whose phone may not be plugged in yet.
+final class OverUsb extends ReadStrategy<String, String> {
+  OverUsb({this.plugged = false});
+  final bool plugged;
+  @override
+  String get name => 'over_usb';
+  @override
+  Set<String> get requires => const {Fact.usbNative};
+  @override
+  Availability available(Facts facts) {
+    final base = super.available(facts);
+    if (!base.ok || plugged) return base;
+    return Availability(name, note: 'connect a phone', waiting: true);
+  }
+
+  @override
+  Future<String> run(String input, PlaceInfo place) async => 'usb:$input';
+}
+
 final class Flash extends WriteStrategy<String, int> {
   final written = <String>[];
   @override
@@ -84,6 +103,30 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('waiting for the user', () {
+    test('a waiting strategy is offered, not chosen', () {
+      final fetch = Objective<String, String>('fetch', [
+        OverUsb(),
+        const FromHost(),
+      ]);
+      final s = fetch.selectRead(host);
+      expect(s.chosen, isA<FromHost>());
+      expect(s.waiting.single.$1, isA<OverUsb>());
+      expect(s.why, 'over_usb waits: connect a phone; from_host chosen');
+    });
+
+    test('missing facts win over waiting', () {
+      final s = Objective<String, String>('fetch', [OverUsb()]).selectRead(page);
+      expect(s.waiting, isEmpty);
+      expect(s.why, 'nothing fits: over_usb skipped (missing usb.native)');
+    });
+
+    test('once the phone is plugged in, it runs', () async {
+      final fetch = Objective<String, String>('fetch', [OverUsb(plugged: true)]);
+      expect(await fetch.run('boot', host), 'usb:boot');
     });
   });
 
