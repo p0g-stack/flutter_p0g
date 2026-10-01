@@ -55,7 +55,9 @@ registers the `Link` platform view).
   root process.
 - `writeAppFile`: methods that read a `file` extra open it as the app's uid,
   so files go to `/data/data/com.webui.termux.api/files/<moduleId>/`, chowned
-  to the app and `restorecon`ed (earlier files there are removed first).
+  to the app and `chcon`ed to the app data dir's full context (earlier files
+  there are removed first). `restorecon` is not enough: it leaves `s0`
+  without the app's MLS categories (devicelab, Android 15 AVD).
 - `testing.dart`: `FakeRootChannel` speaks the real v1 protocol to the real
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
@@ -160,8 +162,17 @@ ShareAPI prints its errors to stdout; those become
 is not supported by ShareAPI. Fork gaps: `ACTION_SEND_MULTIPLE`, text with a
 file.
 
-Open device checks (devicelab, first): the app as a system app answering a
-root `am broadcast`; SELinux letting the app (a non-privileged preinstalled app, so
-`untrusted_app`) `connectto` a socket bound by the root channel's domain
-(KernelSU `su`, Magisk `magisk`); `restorecon` labelling files in the app's
-data dir with the app's categories.
+Devicelab (Android 15 x86_64 AVD, SELinux enforcing, KernelSU 3.3.0
+jailbreak mode; devicelab `lab-results`
+`runs/20261001T092147Z-avd-ksu-kernelsu-36841013518/app-plane.jsonl`):
+- a root `am broadcast -n com.webui.termux.api/com.termux.api.TermuxApiReceiver`
+  with the termux-api extras starts the app (`untrusted_app_27`) and
+  `BatteryStatus` answers;
+- the app connects to abstract sockets bound by a `u:r:su:s0` root process
+  with no AVC denials (the root channel's own `u:r:ksu:s0` domain not yet
+  tried);
+- placing the APK as a system app on KernelSU needs the module to mount
+  `/product/app` itself (Magisk-style rbind of a tmpfs) or a metamodule;
+  that is flutter_p0g's module template.
+
+Open: `Share` end to end; reading a `chcon`ed file from the app.

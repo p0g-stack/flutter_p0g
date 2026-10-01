@@ -52,7 +52,7 @@ final class AppPlane {
       '/data/data/$package/files/${root.moduleId ?? 'webui'}';
 
   /// Writes [bytes] to [name] in [appFileDir], owned by the app and labelled
-  /// for it, after removing what earlier calls left there. Returns the path.
+  /// with its data dir's SELinux context (categories included), after removing what earlier calls left there. Returns the path.
   Future<String> writeAppFile(String name, List<int> bytes) async {
     final safe = name.replaceAll(RegExp(r'[/\x00]'), '_');
     final dir = appFileDir();
@@ -63,7 +63,10 @@ final class AppPlane {
       r'rm -rf "$d"; mkdir -p "$d"; cat > "$f"; '
       r'o=$(stat -c %u:%g "$a"); chown "$o" "$a/files"; chown -R "$o" "$d"; '
       r'chmod 700 "$d"; chmod 600 "$f"; '
-      r'restorecon "$a/files" "$d" "$f" 2>/dev/null || true',
+      // restorecon drops the app's MLS categories (devicelab, Android 15):
+      // copy the data dir's full context instead.
+      r'c=$(stat -c %C "$a" 2>/dev/null || ls -dZ "$a" | cut -d" " -f1); '
+      r'case "$c" in *:*) chcon "$c" "$a/files"; chcon -R "$c" "$d" ;; esac',
       args: [dir, path],
       stdin: bytes,
     );
