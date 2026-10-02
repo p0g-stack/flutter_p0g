@@ -1,3 +1,10 @@
+# 0.8.7
+
+- flutter-webui 74d0575 (root channel 0.2.2): the channel holds the module
+  app's `<pkg>/hold` socket while it runs, so the app's foreground service
+  stops itself when the channel dies. The client is unchanged, so nothing
+  changes for the app.
+
 # 0.8.6
 
 - flutter-webui 95be767 (root channel 0.2.1): when the module's app is
