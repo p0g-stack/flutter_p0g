@@ -195,9 +195,9 @@ const kAppPlaneInstallScript = 'webui_app_plane/app-install.sh';
 /// Skips when [app] at its version is already there; `--if-missing`
 /// installs only when the app is gone. Prints what it did; exits 1 on
 /// failure. After the install, `after_install` applies the two device
-/// settings the app's own screen asks for (draw over other apps, no battery
-/// optimization), both best effort; the `before_install` / `after_install`
-/// lines stay the marked seam.
+/// settings Termux:API's own main screen asks for (draw over other apps,
+/// battery optimization off), both best effort; the `before_install` /
+/// `after_install` lines stay the marked seam.
 String appPlaneInstallScript(AppPlaneApp app) {
   if (!RegExp(r'^[A-Za-z][A-Za-z0-9_.]*$').hasMatch(app.package)) {
     throw StateError('"${app.package}" is not a package name');
@@ -221,13 +221,13 @@ esac
 # ---- GAP: install-time device settings, filled by the maintainer ----
 before_install() { :; }
 after_install() {
-  # The two settings the app's own screen asks for (Termux:API's
-  # TermuxAPIMainActivity): draw over other apps, so an activity started from
-  # a broadcast (Share's chooser, dialogs) is not blocked as a background
-  # activity start; no battery optimization, so a call can wake the app and
-  # it may start its foreground helper service. Both best effort.
-  /system/bin/appops set "\$PKG" SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
-  /system/bin/dumpsys deviceidle whitelist +"\$PKG" >/dev/null 2>&1
+  # The two settings Termux:API's own main screen (TermuxAPIMainActivity)
+  # asks the user for, best effort: draw over other apps, so an activity
+  # started from a broadcast (Share's chooser, dialogs) is not blocked as a
+  # background activity start (devicelab, Android 15); battery optimization
+  # off, "so that termux-api script can start it from the background".
+  appops set "\$PKG" SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
+  dumpsys deviceidle whitelist +"\$PKG" >/dev/null 2>&1
 }
 # ---- end of GAP ----
 

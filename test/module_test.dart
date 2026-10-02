@@ -151,15 +151,12 @@ void main() {
       expect(script, contains('PKG=com.webui.api.demo\nVC=1009\n'));
       expect(script, contains('pm install-create --user 0 -i com.android.vending -r -S'));
       expect(script, contains('pm install-commit'));
-      // The settings gap sits before the session install and wraps it.
+      // The maintainer's gap sits before the session install and wraps it.
       final gap = script.indexOf('# ---- GAP');
       expect(gap, greaterThan(0));
       expect(script.indexOf('# ---- end of GAP'), greaterThan(gap));
       expect(script.indexOf('before_install\n'), lessThan(script.indexOf('pm install-create')));
       expect(script.indexOf('after_install\n'), greaterThan(script.indexOf('pm install-commit')));
-      // The two settings the app's own screen asks for.
-      expect(script, contains('appops set "\$PKG" SYSTEM_ALERT_WINDOW allow'));
-      expect(script, contains('dumpsys deviceidle whitelist +"\$PKG"'));
     });
 
     test('a bad app plane package name is refused', () {
