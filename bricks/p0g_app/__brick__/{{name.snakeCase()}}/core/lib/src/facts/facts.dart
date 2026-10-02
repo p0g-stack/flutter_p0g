@@ -25,7 +25,11 @@ abstract final class Fact {
   /// The place can start other processes.
   static const processSpawn = 'process.spawn';
 
-  /// Files the place writes survive a restart.
+  /// Files the place writes survive a restart. Natively: its working folder
+  /// is writable (the WebUI process place works in `/data/adb/<id>`). In a
+  /// page or Web Worker: the browser granted persistent storage
+  /// (`navigator.storage.persisted()`), which manager WebViews never do, so
+  /// on WebUI persistent files belong to the process place.
   static const fsPersistent = 'fs.persistent';
 
   /// The place has a network interface other than loopback that is up.

@@ -8,10 +8,16 @@ import 'package:squadron_process/squadron_process.dart';
 ///
 /// [connect] opens the root channel; on a WebUI page that is
 /// `WebUi.connectRootChannel`. It is called again when the channel closed.
+///
+/// The host works in [dataDir], the module's data folder
+/// (`/data/adb/<id>`, kept across reboots and updates), so relative paths
+/// and the `fs.persistent` fact refer to it rather than to whatever folder
+/// the manager's shell was in.
 ProcessPlace webUiProcessPlace(
   Future<RootChannel> Function() connect, {
   required String moduleDir,
   required String app,
+  String? dataDir,
 }) {
   final root = RootChannelConnection(connect);
   // Outside webroot/, which the manager serves: the file holds the token.
@@ -24,6 +30,7 @@ ProcessPlace webUiProcessPlace(
     command: ProcessCommand(
       '$moduleDir/bin/$app',
       arguments: ['serve', '--session-file', session],
+      workingDirectory: dataDir ?? '/data/adb/${moduleDir.split('/').last}',
     ),
   );
 }

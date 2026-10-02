@@ -1,3 +1,12 @@
+# 0.8.5
+
+- WebUI: the process place's host starts in the module's data folder
+  (`/data/adb/<id>`, or `dataDir:`). It used to start wherever the manager's
+  shell was, usually the read-only `/`, so `fs.persistent` read false there.
+  The page and its Web Workers still report false, because manager WebViews
+  never grant persistent browser storage. The fact's doc comment explains
+  this.
+
 # 0.8.4
 
 - `rust`: when wasm-opt is missing or older than binaryen 117, `tool/rust.sh`
