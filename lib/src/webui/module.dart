@@ -196,8 +196,7 @@ const kAppPlaneInstallScript = 'webui_app_plane/app-install.sh';
 /// installs only when the app is gone. Prints what it did; exits 1 on
 /// failure. After the install, `after_install` applies the two device
 /// settings Termux:API's own main screen asks for (draw over other apps,
-/// battery optimization off), both best effort; the `before_install` /
-/// `after_install` lines stay the marked seam.
+/// battery optimization off), both best effort.
 String appPlaneInstallScript(AppPlaneApp app) {
   if (!RegExp(r'^[A-Za-z][A-Za-z0-9_.]*$').hasMatch(app.package)) {
     throw StateError('"${app.package}" is not a package name');
@@ -218,8 +217,6 @@ case "\$(pm path \$PKG 2>/dev/null </dev/null)" in
     if [ "\$v" = "\$VC" ]; then echo "\$PKG \$VC is installed"; exit 0; fi ;;
 esac
 
-# ---- GAP: install-time device settings, filled by the maintainer ----
-before_install() { :; }
 after_install() {
   # The two settings Termux:API's own main screen (TermuxAPIMainActivity)
   # asks the user for, best effort: draw over other apps, so an activity
@@ -229,12 +226,10 @@ after_install() {
   appops set "\$PKG" SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
   dumpsys deviceidle whitelist +"\$PKG" >/dev/null 2>&1
 }
-# ---- end of GAP ----
 
 T=/data/local/tmp/webui-app-plane-\$PKG.apk
 cp -f "\$APK" "\$T" && chmod 644 "\$T" && chown 1000:1000 "\$T"
 chcon u:object_r:apk_data_file:s0 "\$T" 2>/dev/null
-before_install
 SZ=\$(stat -c %s "\$T")
 O=\$(pm install-create --user 0 -i com.android.vending -r -S "\$SZ" 2>&1 </dev/null)
 case "\$O" in
