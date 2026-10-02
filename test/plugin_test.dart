@@ -182,6 +182,21 @@ void main() {
     );
   });
 
+  test('an app on flutter_local_notifications gets its *_webui as a direct dependency', () {
+    // The stock web class registers first, the direct *_webui one second and wins.
+    expect(
+      webuiPackagesFor(
+        {'flutter_local_notifications', 'flutter_local_notifications_web', 'timezone'},
+        {'flutter_local_notifications'},
+        {
+          'flutter_local_notifications': 'flutter_local_notifications_webui',
+          'permission_handler': 'permission_handler_webui',
+        },
+      ),
+      ['flutter_local_notifications_webui'],
+    );
+  });
+
   test('a plugin only an added package brings in gets its *_webui too', () {
     expect(
       webuiPackagesFor(
