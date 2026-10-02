@@ -157,9 +157,10 @@ root-process place reports itself unavailable. The same holds under
    user's step is flashing the root module. No metamodule is needed for the
    app plane; the `customize.sh` metamodule warning (KernelSU 3.x without
    `/data/adb/metamodule`) appears only when the app ships its own `system/`
-   files. The install script has one marked gap (`before_install` and
-   `after_install`, empty by default) for install-time device settings; see
-   the flutter_p0g issue "App plane: install method".
+   files. After installing, the script also sets the two device settings the
+   app's own screen asks for: draw over other apps (its activities start
+   from a broadcast) and no battery optimization (so a call can wake it and
+   it can start its helper service), both best effort.
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
    - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
