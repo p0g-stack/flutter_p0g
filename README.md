@@ -157,9 +157,13 @@ root-process place reports itself unavailable. The same holds under
    user's step is flashing the root module. No metamodule is needed for the
    app plane; the `customize.sh` metamodule warning (KernelSU 3.x without
    `/data/adb/metamodule`) appears only when the app ships its own `system/`
-   files. The install script has one marked gap (`before_install` and
-   `after_install`, empty by default) for install-time device settings; see
-   the flutter_p0g issue "App plane: install method".
+   files. After installing, the script also sets the two device settings
+   Termux:API's own main screen asks for, both best effort: draw over other
+   apps (its activities start from a broadcast: Share's chooser, dialogs)
+   and battery optimization off (upstream's reason: so its caller can start
+   it from the background). It sets them only when it runs an install
+   (fresh, after removal, new versionCode), so a module update that keeps
+   the app's version leaves them as the user left them.
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
    - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
