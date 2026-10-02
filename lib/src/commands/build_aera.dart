@@ -10,6 +10,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../aera/aerap.dart';
 import '../aera/kit.dart';
+import '../aera/rust.dart';
 import '../templates.dart';
 
 /// `flutter build bundle` for linux-arm64, plus AOT `libapp.so` for profile
@@ -23,6 +24,21 @@ class BuildAeraCommand extends BuildBundleCommand {
       'payload-url',
       defaultsTo: 'https://localhost/runtime.xz',
       help: 'Where runtime.xz will be published (any https URL for local installs).',
+    );
+    argParser.addFlag(
+      'device-rust',
+      defaultsTo: true,
+      help:
+          'Cross-build rust/ for the device (cargo, the Rust target and its '
+          'cross linker) and pack its libraries into usr/lib/. Without it the '
+          'app runs without the crate.',
+    );
+    argParser.addOption(
+      'device-rust-libs',
+      valueHelp: 'dir',
+      help:
+          'rust/ already built for the device: <dir>/<rust target>/*.so or <dir>/*.so, '
+          'used in place of building it here.',
     );
   }
 
@@ -82,6 +98,9 @@ class BuildAeraCommand extends BuildBundleCommand {
         RuntimeMember('usr/share/flutter/flutter_assets/${_rel(f, assets)}', f.readAsBytesSync()),
       );
     }
+    for (final so in await _rustLibs(app, target)) {
+      members.add(RuntimeMember('usr/lib/${so.basename}', so.readAsBytesSync()));
+    }
     if (!buildInfo.isDebug) {
       final libapp = await _compileAot(kit, buildInfo, out.childDirectory('aot'), target);
       members.add(RuntimeMember('usr/lib/libapp.so', libapp.readAsBytesSync()));
@@ -134,6 +153,26 @@ class BuildAeraCommand extends BuildBundleCommand {
       'Built ${fs.path.relative(aerap.path)} ($size MB, ${members.length} members).',
     );
     return result;
+  }
+
+  /// The app's rust/ crate (in the app, or the workspace root beside it)
+  /// as libraries for usr/lib/, where the kit's loader path finds them by
+  /// bare name, as `build webui` ships it beside the root process.
+  Future<List<File>> _rustLibs(Directory app, String target) async {
+    final prebuilt = stringArg('device-rust-libs');
+    final triple = aeraRustTriple(target);
+    if (prebuilt != null) return prebuiltAeraRustLibs(globals.fs.directory(prebuilt), triple);
+    final rust = [app, app.parent]
+        .map((d) => d.childDirectory('rust'))
+        .where((d) => d.childFile('Cargo.toml').existsSync())
+        .firstOrNull;
+    if (rust == null) return const [];
+    if (!boolArg('device-rust')) {
+      globals.printWarning('--no-device-rust: the plugin ships without rust/.');
+      return const [];
+    }
+    globals.printStatus('Building rust/ for $triple...');
+    return buildRustForAera(rust, triple);
   }
 
   /// Kernel with the SDK's frontend server (flutter target, AOT), then the
