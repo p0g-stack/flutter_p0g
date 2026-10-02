@@ -80,6 +80,30 @@ void main() {
     ]);
   });
 
+  test('notifications are requested on their own call', () async {
+    final fake = app((run) {
+      final names = run.argv[run.argv.indexOf('permissions') + 1];
+      return names == 'android.permission.POST_NOTIFICATIONS'
+          ? '{"android.permission.POST_NOTIFICATIONS":"permanentlyDenied"}'
+          : '{"android.permission.CAMERA":"granted"}';
+    });
+    final result = await handler(fake)
+        .requestPermissions([Permission.camera, Permission.notification]);
+    expect(result, {
+      Permission.camera: PermissionStatus.granted,
+      Permission.notification: PermissionStatus.permanentlyDenied,
+    });
+    final asked = [
+      for (final r in fake.runs)
+        if (r.argv.contains('Permission'))
+          r.argv[r.argv.indexOf('permissions') + 1],
+    ];
+    expect(asked, [
+      'android.permission.CAMERA',
+      'android.permission.POST_NOTIFICATIONS',
+    ]);
+  });
+
   test('coarse location is enough for location', () async {
     final fake = app(
       (_) =>

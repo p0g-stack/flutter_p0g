@@ -1,0 +1,33 @@
+name: flutter_local_notifications_webui
+description: WebUI implementation of flutter_local_notifications. Posts through the module's own app (webui-termux-api's Notification method) after Android's own notification prompt, as a site posts after the browser's "allow notifications".
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.5"
+
+flutter:
+  plugin:
+    implements: flutter_local_notifications
+    platforms:
+      web:
+        pluginClass: FlutterLocalNotificationsWebUi
+        fileName: flutter_local_notifications_webui.dart
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^22.3.1
+  flutter_local_notifications_platform_interface: ^12.2.0
+  flutter_local_notifications_web: ^1.0.0
+  flutter_web_plugins:
+    sdk: flutter
+  timezone: ^0.11.0
+  webui_app_plane:
+    path: ../webui_app_plane
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

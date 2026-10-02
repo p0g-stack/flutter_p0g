@@ -92,14 +92,14 @@ registers the `Link` platform view).
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
 
-App: release `webui-v0.53.0-webui.8` of p0g-stack/webui-termux-api
-(c8c11f8, versionCode 1010), `webui-termux-api_v0.53.0-webui.8.apk`, package
+App: release `webui-v0.53.0-webui.9` of p0g-stack/webui-termux-api
+(f46ffdf, versionCode 1011), `webui-termux-api_v0.53.0-webui.9.apk`, package
 `com.webui.termux.api`, test key. flutter_p0g renames it per module to
 `com.webui.api.<seg>` and signs it with the developer's key; the app takes
 its socket, share authority and intents from `getPackageName()`. Methods
 this repo needs beyond upstream: `Permission` (webui.4), `DocumentOpen`
 (webui.5), `Clipboard` reads on Android 10+ (webui.6), and the
-`RootHelperService` foreground service (webui.7, held by socket since webui.8). See its `WEBUI.md` for
+`RootHelperService` foreground service (webui.7, held by socket since webui.8), and Android's notification prompt through `Permission` (webui.9). See its `WEBUI.md` for
 every change (webui.3 drops `JobScheduler`, webui.2 dropped SMS, contacts,
 call log and telephony).
 
@@ -216,6 +216,35 @@ pastes). Needs webui-termux-api webui.6 and the `WebUiClipboard` seam in
 flutter-webui. Open device checks: the read's activity on KernelSU, Next
 and WebUI X (focus, lifecycle blip on WX's `WX_ON_PAUSE`).
 
+### flutter_local_notifications_webui
+
+`flutter_local_notifications` is the notifications plugin with an endorsed
+web implementation (`flutter_local_notifications_web`, the browser's
+Notification API: "allow notifications", then post), and Linux and Windows
+ones, so its web surface is the parity bar. This package implements that web
+platform; it extends `WebFlutterLocalNotificationsPlugin` because the
+app-facing plugin looks that class up on web. It needs to be a direct
+dependency. `flutter_local_notifications` also depends on
+`flutter_local_notifications_web` itself, so Flutter 3.47.5's registrant
+registers both, the stock one first and this one after it (checked with
+`flutter build web`), and the last registration wins.
+
+| Call | WebUI host with the app | No app / browser tab |
+|---|---|---|
+| `initialize` | reads the permission state | stock (service worker) |
+| `requestNotificationsPermission` | `Permission` for `POST_NOTIFICATIONS`: Android's own prompt, shown once (webui.9) | stock browser prompt |
+| `permissionStatus` | last answer: granted, `defaultPermissions` (not asked), denied (Android will not ask again) | stock |
+| `show` | `Notification --es id <id> --es title <title>`, body on stdin, `isSilent` = low priority; throws as web does when not allowed | stock |
+| `cancel`, `cancelAll` | `NotificationRemove --es id <id>` (cancelAll: ids this page posted) | stock |
+| `getActiveNotifications` | empty (reading the shade needs listener access) | stock |
+| scheduling | unsupported, as on web | stock |
+
+Not carried over: taps do not reach `onDidReceiveNotificationResponse` (the
+fork's tap actions run Termux commands), nor actions, icons or images. The
+notification shows under the module's app (its name), channel
+"Notifications". Open device checks: the prompt appears from the
+background call on Android 13+, and posting works while the page is shown.
+
 ### permission_handler_webui
 
 Runtime permissions belong to the module's own app (`com.webui.api.<seg>`,
@@ -235,8 +264,18 @@ dialog of ours exists.
 Mapped: camera (`CAMERA`), microphone and speech (`RECORD_AUDIO`),
 location and locationWhenInUse (fine or coarse), locationAlways
 (`ACCESS_BACKGROUND_LOCATION`), sensors (`BODY_SENSORS`), storage (read and
-write external storage). Everything else is not declared by the app and is
-`denied`. Retry and "don't ask again" are Android's; what to show after
+write external storage), notification (`POST_NOTIFICATIONS`, requested on
+its own call). Everything else is not declared by the app and is
+`denied`.
+
+Notifications: the app targets an SDK before Android 13, where Android does
+not let it request `POST_NOTIFICATIONS`; Android shows its own prompt once,
+when such an app starts an activity from a launcher intent after creating a
+notification channel (AOSP `PermissionPolicyService`
+`shouldForceShowNotificationPermissionRequest`). webui.9's `Permission`
+does exactly that, so a request shows Android's prompt and a denial is
+`permanentlyDenied` (Android will not ask again; Settings will). Nothing
+grants it at install, and no appop is written for it. Retry and "don't ask again" are Android's; what to show after
 `permanentlyDenied` (usually "allow it in Settings" plus `openAppSettings()`)
 is the app's, as on Flutter Android. Needs webui-termux-api webui.4 (the
 `Permission` method).

@@ -22,6 +22,11 @@ import 'package:webui_app_plane/webui_app_plane.dart';
 /// | locationAlways | `ACCESS_BACKGROUND_LOCATION` |
 /// | sensors | `BODY_SENSORS` |
 /// | storage | `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` |
+/// | notification | `POST_NOTIFICATIONS` (Android 13+; before, whether notifications are on) |
+///
+/// Notifications ask through Android's own prompt for apps built before
+/// Android 13, which Android shows once: a denial is `permanentlyDenied`
+/// (webui-termux-api webui.9). It is requested on its own call.
 ///
 /// Other permissions are not declared by the app: they report and request
 /// as `denied`. `permanentlyDenied` comes only from a request (Android does
@@ -38,6 +43,9 @@ final class PermissionHandlerWebUiImpl extends PermissionHandlerPlatform {
   /// How long a request may wait on the user at Android's dialog.
   static const Duration requestWait = Duration(minutes: 5);
 
+  /// Android's notification permission; the app asks for it on its own.
+  static const String notifications = 'android.permission.POST_NOTIFICATIONS';
+
   static final Map<Permission, List<String>> androidPermissions = {
     Permission.camera: ['android.permission.CAMERA'],
     Permission.microphone: ['android.permission.RECORD_AUDIO'],
@@ -53,6 +61,7 @@ final class PermissionHandlerWebUiImpl extends PermissionHandlerPlatform {
     Permission.locationAlways: [
       'android.permission.ACCESS_BACKGROUND_LOCATION',
     ],
+    Permission.notification: [notifications],
     Permission.sensors: ['android.permission.BODY_SENSORS'],
     Permission.storage: [
       'android.permission.READ_EXTERNAL_STORAGE',
@@ -135,9 +144,16 @@ final class PermissionHandlerWebUiImpl extends PermissionHandlerPlatform {
     if (!await _useApp()) return stock.requestPermissions(permissions);
     final names = {for (final p in permissions) ...?androidPermissions[p]}
         .toList();
-    final answers = names.isEmpty
-        ? const <String, String>{}
-        : await _call(names, request: true);
+    // The fork asks for notifications through a prompt of its own.
+    final others = [
+      for (final n in names)
+        if (n != notifications) n,
+    ];
+    final answers = <String, String>{
+      if (others.isNotEmpty) ...await _call(others, request: true),
+      if (names.contains(notifications))
+        ...await _call([notifications], request: true),
+    };
     return {
       for (final p in permissions)
         p: androidPermissions.containsKey(p)

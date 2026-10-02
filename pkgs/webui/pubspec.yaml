@@ -14,6 +14,7 @@ workspace:
   - packages/shared_preferences_webui
   - packages/permission_handler_webui
   - packages/clipboard_webui
+  - packages/flutter_local_notifications_webui
 
 dev_dependencies:
   lints: ^6.0.0

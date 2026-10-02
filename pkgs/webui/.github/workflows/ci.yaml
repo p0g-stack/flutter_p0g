@@ -27,6 +27,6 @@ jobs:
         working-directory: packages/webui_app_plane
       - name: plugins
         run: |
-          for p in file_selector path_provider url_launcher share_plus dynamic_color shared_preferences permission_handler clipboard; do
+          for p in file_selector path_provider url_launcher share_plus dynamic_color shared_preferences permission_handler clipboard flutter_local_notifications; do
             (cd packages/${p}_webui && flutter test) || exit 1
           done
