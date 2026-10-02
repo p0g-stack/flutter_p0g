@@ -92,14 +92,14 @@ registers the `Link` platform view).
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
 
-App: release `webui-v0.53.0-webui.7` of p0g-stack/webui-termux-api
-(4512fec, versionCode 1009), `webui-termux-api_v0.53.0-webui.7.apk`, package
+App: release `webui-v0.53.0-webui.8` of p0g-stack/webui-termux-api
+(c8c11f8, versionCode 1010), `webui-termux-api_v0.53.0-webui.8.apk`, package
 `com.webui.termux.api`, test key. flutter_p0g renames it per module to
 `com.webui.api.<seg>` and signs it with the developer's key; the app takes
 its socket, share authority and intents from `getPackageName()`. Methods
 this repo needs beyond upstream: `Permission` (webui.4), `DocumentOpen`
 (webui.5), `Clipboard` reads on Android 10+ (webui.6), and the
-`RootHelperService` foreground service (webui.7). See its `WEBUI.md` for
+`RootHelperService` foreground service (webui.7, held by socket since webui.8). See its `WEBUI.md` for
 every change (webui.3 drops `JobScheduler`, webui.2 dropped SMS, contacts,
 call log and telephony).
 
@@ -134,6 +134,11 @@ app from being frozen (Android 14+) with the app's foreground service:
 on wind-up (`--ez wakelock true` for a partial wake lock) and
 `am stopservice --user 0 -n <package>/com.termux.api.RootHelperService` at
 idle shutdown. Its notification is a silent "<module name> is running".
+Since webui.8 the service also never outlives the root helper: the helper
+connects to the abstract socket `<package>/hold` right after starting it and
+keeps that connection for its life, and the service stops when the last
+holder's connection ends (a killed helper's fds close too) or when none
+connects within 10 s of a start.
 
 ## Per plugin
 
