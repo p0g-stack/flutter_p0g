@@ -242,3 +242,29 @@ String? manifestApplicationLabel(Uint8List manifest) {
   }
   return null;
 }
+
+/// `<manifest android:versionCode>`, or null when it is missing.
+int? manifestVersionCode(Uint8List manifest) {
+  final d = ByteData.sublistView(manifest);
+  final poolStart = d.getUint16(2, Endian.little);
+  final strings = _StringPool.read(d, poolStart).strings;
+  var p = poolStart + d.getUint32(poolStart + 4, Endian.little);
+  while (p + 8 <= manifest.length) {
+    final size = d.getUint32(p + 4, Endian.little);
+    if (d.getUint16(p, Endian.little) == _startElementType) {
+      final ext = p + d.getUint16(p + 2, Endian.little);
+      if (strings[d.getUint32(ext + 4, Endian.little)] != 'manifest') return null;
+      final attrStart = d.getUint16(ext + 8, Endian.little);
+      final attrSize = d.getUint16(ext + 10, Endian.little);
+      for (var i = 0; i < d.getUint16(ext + 12, Endian.little); i++) {
+        final a = ext + attrStart + i * attrSize;
+        if (strings[d.getUint32(a + 4, Endian.little)] == 'versionCode') {
+          return d.getUint32(a + 16, Endian.little);
+        }
+      }
+      return null;
+    }
+    p += size;
+  }
+  return null;
+}

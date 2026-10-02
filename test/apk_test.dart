@@ -14,7 +14,16 @@ import 'package:test/test.dart';
 // A minimal compiled manifest: `<manifest package=...><application
 // android:label=@0x7f010000><receiver android:name=.../></application></manifest>`.
 Uint8List manifestXml(List<String> extra) {
-  final strings = ['package', 'label', 'name', 'manifest', 'application', 'receiver', ...extra];
+  final strings = [
+    'package',
+    'label',
+    'name',
+    'versionCode',
+    'manifest',
+    'application',
+    'receiver',
+    ...extra,
+  ];
   int s(String v) => strings.indexOf(v);
   final pool = BytesBuilder();
   final offsets = <int>[];
@@ -67,7 +76,12 @@ Uint8List manifestXml(List<String> extra) {
 
   final body = BytesBuilder()
     ..add(poolBytes)
-    ..add(start('manifest', [('package', s(extra[0]), 3, s(extra[0]))]))
+    ..add(
+      start('manifest', [
+        ('package', s(extra[0]), 3, s(extra[0])),
+        ('versionCode', 0xffffffff, 0x10, 1008),
+      ]),
+    )
     ..add(start('application', [('label', 0xffffffff, 1, 0x7f010000)]))
     ..add(start('receiver', [('name', s(extra[1]), 3, s(extra[1]))]));
   final bytes = body.takeBytes();
@@ -112,6 +126,7 @@ void main() {
       );
       expect(manifestStrings(out), isNot(contains('com.webui.termux.api')));
       expect(manifestApplicationLabel(out), 'Démo');
+      expect(manifestVersionCode(out), 1008);
       expect(ByteData.sublistView(out).getUint32(4, Endian.little), out.length);
     });
 
