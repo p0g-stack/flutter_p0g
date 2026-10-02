@@ -21,7 +21,7 @@ dependencies:
     git:
       url: https://github.com/p0g-stack/flutter-webui
       path: packages/flutter_webui_client
-      ref: 798548958306fb5baedf5c06a2f520c85448dba6
+      ref: 95be76718faf7bc9272567a05899a176afe41be9
   {{name.snakeCase()}}_core: any
 
 dev_dependencies:

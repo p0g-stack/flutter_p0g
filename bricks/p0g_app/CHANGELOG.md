@@ -1,3 +1,10 @@
+# 0.8.6
+
+- flutter-webui 95be767 (root channel 0.2.1): when the module's app is
+  installed, the channel starts its foreground service as it winds up and
+  stops it on idle exit. The client is unchanged, so nothing changes for
+  the app.
+
 # 0.8.5
 
 - WebUI: the process place's host starts in the module's data folder
