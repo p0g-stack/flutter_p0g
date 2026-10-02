@@ -15,7 +15,7 @@ manager name.
 |---|---|
 | web | the stock web implementation already works in the WebView; no package needed |
 | root channel | `flutter_webui`'s root channel: shell commands and files as root |
-| app plane | `webui-termux-api` (repackaged Termux:API placed by the module), driven over the root channel |
+| app plane | `webui-termux-api` (repackaged Termux:API installed by the module), driven over the root channel |
 | WebUI X | WebUI X bridge additions, as an improvement only |
 
 Which route each plugin uses, per host, lives in `docs/plugins.md`. A plugin

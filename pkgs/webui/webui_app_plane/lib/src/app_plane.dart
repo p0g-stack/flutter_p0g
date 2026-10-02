@@ -18,7 +18,7 @@ final class AppPlaneException implements Exception {
 }
 
 /// The app plane from the page: the module's own copy of webui-termux-api
-/// (Termux:API repackaged, renamed per module to [appPlanePackage] and placed
+/// (Termux:API repackaged, renamed per module to [appPlanePackage] and installed
 /// by the module) called as root through the root channel.
 ///
 /// A call runs `<moddir>/webui_app_plane/termux-api [--wait s] <Method> [extras]`, the
@@ -121,7 +121,7 @@ final class AppPlane {
     if (!await isAvailable()) {
       throw AppPlaneException(
         'not-installed',
-        '$package is not installed or is disabled; the module places it',
+        '$package is not installed or is disabled; the module installs it',
       );
     }
     final r = await root.run([

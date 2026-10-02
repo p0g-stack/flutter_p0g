@@ -92,14 +92,16 @@ registers the `Link` platform view).
   `RootChannel` client; plugin tests script its processes. The Termux:API
   client is tested against a fake app on real abstract sockets.
 
-App: release `webui-v0.53.0-webui.3` of p0g-stack/webui-termux-api
-(7c75e03, versionCode 1005), `webui-termux-api_v0.53.0-webui.3.apk`, sha256
-`442d227d839e936b9c635b48991c5bf393870d382d689971eba4fdfe88bebeb1`, package
+App: release `webui-v0.53.0-webui.7` of p0g-stack/webui-termux-api
+(4512fec, versionCode 1009), `webui-termux-api_v0.53.0-webui.7.apk`, package
 `com.webui.termux.api`, test key. flutter_p0g renames it per module to
 `com.webui.api.<seg>` and signs it with the developer's key; the app takes
-its socket, share authority and intents from `getPackageName()` (see its
-`WEBUI.md`: webui.3 drops `JobScheduler`, webui.2 dropped SMS, contacts, call
-log and telephony).
+its socket, share authority and intents from `getPackageName()`. Methods
+this repo needs beyond upstream: `Permission` (webui.4), `DocumentOpen`
+(webui.5), `Clipboard` reads on Android 10+ (webui.6), and the
+`RootHelperService` foreground service (webui.7). See its `WEBUI.md` for
+every change (webui.3 drops `JobScheduler`, webui.2 dropped SMS, contacts,
+call log and telephony).
 
 ### What flutter_p0g ships for the app plane
 
@@ -108,11 +110,30 @@ When an app depends on `webui_app_plane` (directly or through a plugin):
 ```
 <moddir>/webui_app_plane/termux-api                     packages/webui_app_plane/module/termux-api
 <moddir>/webui_app_plane/<abi>/webui_termux_api.aot     AOT snapshot of bin/webui_termux_api.dart
-system/product/app/WebuiApi_<seg>/WebuiApi_<seg>.apk   the release APK above, renamed to the module's package and re-signed
+<moddir>/webui_app_plane/app.apk                        the release APK above, renamed to the module's package and re-signed
 ```
 
 The launcher reuses flutter-webui's runtime in `<moddir>/flutter_webui/<abi>/`
 (and its glibc loader when present), exactly as `flutter_webui/root` does.
+
+The app is a normal installed app, not a mounted system app (decided
+2026-10-02): KernelSU's "Umount modules" detaches module mounts in apps
+without root, so a mounted APK vanishes from its own app. flutter_p0g's
+module installs `app.apk` with a package-installer session as the Play Store
+(`pm install-create --user 0 -i com.android.vending`, verifiers paused) from
+`customize.sh` when the package is missing or its versionCode differs,
+reinstalls it at boot (`service.sh`) only when missing, and removes it with
+`pm uninstall` in `uninstall.sh`. No metamodule is needed for the app plane.
+`AppPlane.isAvailable` needs no change: `pm path <package>` prints
+`package:/data/app/.../base.apk` for an installed app exactly as it printed
+the `/product/app` path.
+
+While the module's root helper runs, flutter-webui's root channel keeps the
+app from being frozen (Android 14+) with the app's foreground service:
+`am start-foreground-service --user 0 -n <package>/com.termux.api.RootHelperService`
+on wind-up (`--ez wakelock true` for a partial wake lock) and
+`am stopservice --user 0 -n <package>/com.termux.api.RootHelperService` at
+idle shutdown. Its notification is a silent "<module name> is running".
 
 ## Per plugin
 
@@ -258,9 +279,8 @@ jailbreak mode; devicelab `lab-results`
 - the app connects to abstract sockets bound by a `u:r:su:s0` root process
   with no AVC denials (the root channel's own `u:r:ksu:s0` domain not yet
   tried);
-- placing the APK as a system app on KernelSU needs the module to mount
-  `/product/app` itself (Magisk-style rbind of a tmpfs) or a metamodule;
-  that is flutter_p0g's module template.
+- placing the APK as a system app on KernelSU needed the module to mount
+  `/product/app` (since replaced by the session install above, 2026-10-02).
 
 - `Share` works end to end (text, and one `chcon`ed file with targets
   listed) once the appop is granted; the file passed ShareAPI's own

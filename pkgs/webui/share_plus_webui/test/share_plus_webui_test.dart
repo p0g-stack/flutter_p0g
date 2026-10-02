@@ -24,7 +24,7 @@ FakeRootChannel withApp({String shareOutput = ''}) => FakeRootChannel(
   handler: (run) {
     if (run.argv[0] == '/system/bin/pm') {
       return const FakeProcessResult(
-        stdout: 'package:/system/product/app/WebuiTermuxApi/WebuiTermuxApi.apk',
+        stdout: 'package:/data/app/~~x/com.webui.api.demo-y/base.apk',
       );
     }
     if (run.argv.length > 1 && run.argv[1] == launcher) {

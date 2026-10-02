@@ -92,7 +92,7 @@ void main() {
           handler: (run) => run.argv.contains('path')
               ? const FakeProcessResult(
                   stdout:
-                      'package:/system/product/app/WebuiTermuxApi/base.apk\n',
+                      'package:/data/app/~~x/com.webui.api.demo-y/base.apk\n',
                 )
               : FakeProcessResult(stdout: 'echo:${run.stdinText}'),
         );
