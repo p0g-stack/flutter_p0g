@@ -163,6 +163,7 @@ class BuildWebUiCommand extends BuildWebCommand {
     }
     globals.printStatus('Compiling the root channel for ${kits.keys.join(', ')}...');
     extra.addAll(await rootChannelFiles(kits, out.childDirectory('flutter_webui')));
+    AppPlaneApp? appPlane;
     if (packages.contains(kAppPlanePackage)) {
       globals.printStatus('Adding the app plane (webui-termux-api $kAppPlaneTag)...');
       final moduleId = readProp(moduleProp, 'id') ?? project.manifest.appName;
@@ -175,7 +176,8 @@ class BuildWebUiCommand extends BuildWebCommand {
           key: appPlaneSigningKey(app),
         ),
       );
-      globals.printStatus('App plane APK: ${appPlanePackageName(moduleId)}.');
+      appPlane = (package: appPlanePackageName(moduleId), versionCode: appPlaneVersionCode());
+      globals.printStatus('App plane app: ${appPlane.package} ${appPlane.versionCode}.');
     }
 
     final cli = CliPackage.find(app);
@@ -226,6 +228,7 @@ class BuildWebUiCommand extends BuildWebCommand {
       buildName: buildName,
       buildNumber: buildNumber,
       wasm: boolArg(FlutterOptions.kWebWasmFlag),
+      appPlane: appPlane,
     );
     final propIndex = files.indexWhere((f) => f.path == 'module.prop');
     var prop = utf8.decode(files[propIndex].bytes);

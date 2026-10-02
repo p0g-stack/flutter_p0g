@@ -97,23 +97,73 @@ void main() {
       expect(isSigningSecret('webroot/keyboard.png'), isFalse);
     });
 
-    test('a module with the app plane warns when KernelSU 3.x has no metamodule', () {
-      String customize(Map<String, List<int>> extra) => utf8.decode(
+    test('only system/ files bring the metamodule notice', () {
+      String customize(Map<String, List<int>> extra, {AppPlaneApp? appPlane}) => utf8.decode(
         assembleModule(
           webBuild: const {},
           webuiFolder: webui,
           extra: extra,
           buildName: '1',
           buildNumber: '1',
+          appPlane: appPlane,
         ).firstWhere((f) => f.path == 'customize.sh').bytes,
       );
       expect(
         customize({
-          'system/product/app/WebuiApi_demo/WebuiApi_demo.apk': [1],
+          'system/etc/x.conf': [1],
         }),
         endsWith('$kMetamoduleCheck\n'),
       );
       expect(customize(const {}), isNot(contains('metamodule')));
+      expect(
+        customize(
+          {
+            kAppPlaneApkPath: [1],
+          },
+          appPlane: (package: 'com.webui.api.demo', versionCode: 1009),
+        ),
+        isNot(contains('metamodule')),
+      );
+    });
+
+    test('the app plane app is installed, not mounted', () {
+      final files = assembleModule(
+        webBuild: const {},
+        webuiFolder: webui,
+        extra: {
+          kAppPlaneApkPath: [1],
+        },
+        buildName: '1',
+        buildNumber: '1',
+        appPlane: (package: 'com.webui.api.demo', versionCode: 1009),
+      );
+      final byPath = {for (final f in files) f.path: utf8.decode(f.bytes, allowMalformed: true)};
+      expect(byPath.keys.where((p) => p.startsWith('system/')), isEmpty);
+      expect(byPath['customize.sh'], endsWith('ui_print "  \$l"; done\n'));
+      expect(byPath['customize.sh'], contains('sh "\$MODPATH/$kAppPlaneInstallScript"'));
+      expect(byPath['service.sh'], startsWith('#!/system/bin/sh\n'));
+      expect(byPath['service.sh'], contains('sys.boot_completed'));
+      expect(byPath['service.sh'], contains('$kAppPlaneInstallScript" --if-missing'));
+      expect(byPath['uninstall.sh'], contains('$kUninstallLine\n'));
+      expect(byPath['uninstall.sh'], contains("pm uninstall com.webui.api.demo'"));
+
+      final script = byPath[kAppPlaneInstallScript]!;
+      expect(script, contains('PKG=com.webui.api.demo\nVC=1009\n'));
+      expect(script, contains('pm install-create --user 0 -i com.android.vending -r -S'));
+      expect(script, contains('pm install-commit'));
+      // The maintainer's gap sits before the session install and wraps it.
+      final gap = script.indexOf('# ---- GAP');
+      expect(gap, greaterThan(0));
+      expect(script.indexOf('# ---- end of GAP'), greaterThan(gap));
+      expect(script.indexOf('before_install\n'), lessThan(script.indexOf('pm install-create')));
+      expect(script.indexOf('after_install\n'), greaterThan(script.indexOf('pm install-commit')));
+    });
+
+    test('a bad app plane package name is refused', () {
+      expect(
+        () => appPlaneInstallScript((package: 'a;rm -rf /', versionCode: 1)),
+        throwsStateError,
+      );
     });
 
     test('an invalid module id is refused before it reaches a script', () {

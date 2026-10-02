@@ -141,14 +141,25 @@ root-process place reports itself unavailable. The same holds under
    --app-plane`); the build renames it to `com.webui.api.<seg>` (`<seg>` is the
    module id with characters outside `[A-Za-z0-9_]` turned into `_`, and an `m`
    in front of a leading digit), labels it with module.prop's `name`, and puts
-   it at `system/product/app/WebuiApi_<seg>/WebuiApi_<seg>.apk`. So Android's
-   permission dialog names the module, and grants and data are per module.
-   The app sits in the zip's `system/`, which the manager mounts. On KernelSU
-   3.x and KernelSU Next 3.x (WebUI X installs through their ksud) that is the
-   job of a metamodule, and neither ships one: **install a metamodule first**
-   or the app never appears. Only pre-3.0 managers mounted `system/`
-   themselves. The generated `customize.sh` warns at install when KernelSU
-   3.x has no metamodule (`/data/adb/metamodule` absent).
+   it at `webui_app_plane/app.apk`. So Android's permission dialog names the
+   module, and grants and data are per module.
+   The app is **installed, not mounted**: KernelSU's default per-app "Umount
+   modules" would take a mounted APK away from the app's own process. The
+   build writes `webui_app_plane/app-install.sh` (package and versionCode
+   baked in), which installs the APK with a PackageInstaller session as the
+   Play Store (`pm install-create --user 0 -i com.android.vending -r`, then
+   `install-write` and `install-commit`, the way j-hc/revanced-magisk-module
+   does). `customize.sh` runs it on every module install and update; it skips
+   when the app at that versionCode is already there. `service.sh` runs it
+   with `--if-missing` after `sys.boot_completed`, so a removed app comes
+   back. `uninstall.sh` runs `pm uninstall com.webui.api.<seg>` once the
+   system has booted. The implications match an app in `system/app`: the
+   user's step is flashing the root module. No metamodule is needed for the
+   app plane; the `customize.sh` metamodule warning (KernelSU 3.x without
+   `/data/adb/metamodule`) appears only when the app ships its own `system/`
+   files. The install script has one marked gap (`before_install` and
+   `after_install`, empty by default) for install-time device settings; see
+   the flutter_p0g issue "App plane: install method".
    The APK is re-signed (APK Signature Scheme v2, no JDK needed) the way a
    stock Flutter Android build picks a key:
    - `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,

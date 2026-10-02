@@ -249,6 +249,5 @@ void main() {
     expect(appPlanePackageName('demo'), 'com.webui.api.demo');
     expect(appPlanePackageName('my-mod.x'), 'com.webui.api.my_mod_x');
     expect(appPlanePackageName('2fa'), 'com.webui.api.m2fa');
-    expect(appPlaneApkPath('my-mod'), 'system/product/app/WebuiApi_my_mod/WebuiApi_my_mod.apk');
   });
 }

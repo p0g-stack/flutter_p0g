@@ -8,7 +8,10 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import '../apk/keystore.dart';
 import '../apk/rename_apk.dart';
 import '../apk/sign_v2.dart';
+import '../apk/axml.dart';
+import '../apk/zip_apk.dart';
 import '../p0g_cache.dart';
+import 'module.dart' show kAppPlaneApkPath;
 import 'dart_android.dart';
 import 'webui_packages.dart';
 
@@ -33,10 +36,12 @@ String appPlaneSegment(String moduleId) {
 /// dialog, grants and data belong to that module alone.
 String appPlanePackageName(String moduleId) => 'com.webui.api.${appPlaneSegment(moduleId)}';
 
-/// Where the module carries its APK: a non-privileged product app.
-String appPlaneApkPath(String moduleId) {
-  final dir = 'WebuiApi_${appPlaneSegment(moduleId)}';
-  return 'system/product/app/$dir/$dir.apk';
+/// The base APK's versionCode (the per-module copy keeps it).
+int appPlaneVersionCode() {
+  final manifest = readZipEntries(appPlaneApk().readAsBytesSync())
+      .firstWhere((e) => e.name == 'AndroidManifest.xml');
+  return manifestVersionCode(entryBytes(manifest)) ??
+      throwToolExit('webui-termux-api $kAppPlaneTag has no versionCode.');
 }
 
 /// The package that brings the app plane in.
@@ -66,8 +71,9 @@ Future<void> precacheAppPlane({String? source, bool force = false}) async {
 
 /// The app plane's module files (webui-packages `docs/plugins.md`, "What
 /// flutter_p0g ships"): the `termux-api` launcher, its snapshot per kit (run
-/// by the root channel's runtime) and the module's own APK, renamed for
-/// [moduleId], labelled [title] and signed with [key].
+/// by the root channel's runtime) and the module's own APK at
+/// [kAppPlaneApkPath], renamed for [moduleId], labelled [title] and signed
+/// with [key]. The module installs it as an ordinary app ([AppPlaneApp]).
 Future<Map<String, List<int>>> appPlaneFiles(
   Map<String, DartAndroidKit> kits,
   Directory work, {
@@ -100,7 +106,7 @@ Future<Map<String, List<int>>> appPlaneFiles(
         .readAsBytesSync(),
     for (final MapEntry(key: abi, value: aot) in aots.entries)
       'webui_app_plane/$abi/webui_termux_api.aot': aot.readAsBytesSync(),
-    appPlaneApkPath(moduleId): apk,
+    kAppPlaneApkPath: apk,
   };
 }
 
