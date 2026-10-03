@@ -3,7 +3,7 @@
 Each `*_webui` package takes the first route that works on every manager
 (README, "How a plugin is closed"). Host behaviour comes from
 `WebUiHost.detect` in `flutter_webui_client` (pinned at flutter-webui
-`7985489`), never a manager name. In a browser tab every package hands
+`74d0575`), never a manager name. In a browser tab every package hands
 everything to the stock web implementation, so one web build serves both.
 
 **Nothing below is device-verified.** Routes are chosen from source reads;

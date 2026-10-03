@@ -23,7 +23,7 @@ dependencies:
   flutter_webui:
     git:
       url: https://github.com/p0g-stack/flutter-webui
-      ref: 798548958306fb5baedf5c06a2f520c85448dba6
+      ref: 74d0575a9a5851ddb879f6a16e473e1741bd9a76
       path: packages/flutter_webui
   webui_app_plane:
     path: ../webui_app_plane
