@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -19,16 +20,18 @@ void main() {
         'canvaskit/webparagraph/x.wasm',
         'canvaskit/wimp.wasm',
         'canvaskit/skwasm.wasm',
+        'canvaskit/canvaskit.js',
+        'canvaskit/canvaskit.wasm',
       ]) {
         expect(isPrunedWebFile(path), isTrue, reason: path);
       }
     });
 
-    test('keeps the app and CanvasKit', () {
+    test('keeps the app and the chromium CanvasKit', () {
       for (final path in [
         'index.html',
         'main.dart.js',
-        'canvaskit/canvaskit.wasm',
+        'canvaskit/chromium/canvaskit.js',
         'canvaskit/chromium/canvaskit.wasm',
         'assets/fonts/fallback/Roboto-Regular.ttf',
         'wimp.txt',
@@ -159,6 +162,55 @@ void main() {
         () => appPlaneInstallScript((package: 'a;rm -rf /', versionCode: 1)),
         throwsStateError,
       );
+    });
+
+    test('the app runs the root channel\'s runtime, linked at install', () {
+      final files = assembleModule(
+        webBuild: const {},
+        webuiFolder: webui,
+        extra: {
+          'flutter_webui/arm64-v8a/dartaotruntime': [1, 2, 3],
+          'bin/arm64-v8a/dartaotruntime': [1, 2, 3],
+          'bin/arm64-v8a/demo.aot': [9],
+          // Not the same runtime: both ship.
+          'flutter_webui/x86_64/dartaotruntime': [4],
+          'bin/x86_64/dartaotruntime': [5],
+        },
+        buildName: '1',
+        buildNumber: '1',
+      );
+      final byPath = {for (final f in files) f.path: f.bytes};
+      expect(byPath.containsKey('bin/arm64-v8a/dartaotruntime'), isFalse);
+      expect(byPath['flutter_webui/arm64-v8a/dartaotruntime'], [1, 2, 3]);
+      expect(byPath['bin/x86_64/dartaotruntime'], [5]);
+      final customize = utf8.decode(byPath['customize.sh']!);
+      expect(
+        customize,
+        contains(
+          'ln -f "\$MODPATH/flutter_webui/arm64-v8a/dartaotruntime" '
+          '"\$MODPATH/bin/arm64-v8a/dartaotruntime"',
+        ),
+      );
+      expect(customize, isNot(contains('bin/x86_64/dartaotruntime')));
+      // After the programs are made executable, so a link shares their mode.
+      expect(
+        customize.indexOf('ln -f'),
+        greaterThan(customize.indexOf('set_perm_recursive "\$MODPATH/flutter_webui"')),
+      );
+    });
+
+    test('the runtime link works in a shell', () async {
+      final tmp = Directory.systemTemp.createTempSync('module_links');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      File('${tmp.path}/flutter_webui/arm64-v8a/dartaotruntime')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('rt');
+      final script = withRuntimeLinks('', {
+        'bin/arm64-v8a/dartaotruntime': 'flutter_webui/arm64-v8a/dartaotruntime',
+      });
+      final r = await Process.run('sh', ['-c', 'set_perm() { :; }; MODPATH=${tmp.path}; $script']);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      expect(File('${tmp.path}/bin/arm64-v8a/dartaotruntime').readAsStringSync(), 'rt');
     });
 
     test('an invalid module id is refused before it reaches a script', () {

@@ -35,6 +35,14 @@ class BuildWebUiCommand extends BuildWebCommand {
           'How cli/ ships: an AOT snapshot plus the Android Dart runtime kit, '
           'or a single executable (for a Dart SDK that can target Android).',
     );
+    argParser.addMultiOption(
+      'abi',
+      allowed: kDartArchForAbi.keys,
+      defaultsTo: const [kDefaultAbi],
+      help:
+          'The ABIs whose programs (root channel, app plane, cli/, rust/) the module '
+          'ships. Phones are arm64-v8a; add x86_64 for an x86_64 emulator.',
+    );
     argParser.addFlag(
       'device-rust',
       defaultsTo: true,
@@ -155,12 +163,16 @@ class BuildWebUiCommand extends BuildWebCommand {
     }
     // flutter-webui's root channel, which the page starts through the
     // manager's bridge and which starts the app's root process.
-    final kits = DartAndroidKit.installed(sdkDartVersion());
-    if (kits.isEmpty) {
-      throwToolExit(
-        "The root channel needs the Dart Android kit. Run `flutter_p0g precache --dart-android`.",
-      );
-    }
+    final installed = DartAndroidKit.installed(sdkDartVersion());
+    final kits = {
+      for (final abi in stringsArg('abi'))
+        abi:
+            installed[abi] ??
+            throwToolExit(
+              'The root channel needs the Dart Android kit for $abi. '
+              'Run `flutter_p0g precache --dart-android --dart-android-abi=$abi`.',
+            ),
+    };
     globals.printStatus('Compiling the root channel for ${kits.keys.join(', ')}...');
     extra.addAll(await rootChannelFiles(kits, out.childDirectory('flutter_webui')));
     AppPlaneApp? appPlane;

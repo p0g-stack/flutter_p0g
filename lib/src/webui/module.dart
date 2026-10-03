@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 
 import '../templates.dart';
@@ -18,13 +19,19 @@ class ModuleFile {
 
 /// Parts of `flutter build web` output that never load in a manager's
 /// WebView: debug symbols, the experimental text stacks, the service worker
-/// (no host runs one), the build stamp, and Skwasm unless built `--wasm`.
+/// (no host runs one), the build stamp, Skwasm unless built `--wasm`, and
+/// the full CanvasKit: flutter.js loads `canvaskit/chromium/` wherever the
+/// browser has `Intl.v8BreakIterator` and `ImageDecoder`, which Android
+/// System WebView (Chrome 94+) has. The plain web target keeps the full one
+/// for other browsers.
 bool isPrunedWebFile(String relPath, {bool wasm = false}) {
   final path = p.posix.normalize(relPath.replaceAll(r'\', '/'));
   if (path == 'flutter_service_worker.js' || path == '.last_build_id') return true;
   if (!path.startsWith('canvaskit/')) return false;
   if (!wasm && p.posix.basename(path).startsWith('skwasm')) return true;
   return path.endsWith('.symbols') ||
+      path == 'canvaskit/canvaskit.js' ||
+      path == 'canvaskit/canvaskit.wasm' ||
       path.startsWith('canvaskit/webparagraph/') ||
       p.posix.basename(path).startsWith('wimp.');
 }
@@ -76,6 +83,11 @@ List<ModuleFile> assembleModule({
     final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
     files['customize.sh'] = utf8.encode(withToolPerms(own, permDirs));
   }
+  final links = dedupeRuntimes(files);
+  if (links.isNotEmpty) {
+    final own = files['customize.sh'] == null ? '' : utf8.decode(files['customize.sh']!);
+    files['customize.sh'] = utf8.encode(withRuntimeLinks(own, links));
+  }
   final moduleId = files['module.prop'] == null
       ? null
       : readProp(utf8.decode(files['module.prop']!), 'id');
@@ -107,6 +119,56 @@ List<ModuleFile> assembleModule({
     for (final path in paths)
       ModuleFile(path, files[path]!, executable: isExecutableModulePath(path)),
   ];
+}
+
+/// The Dart runtime the root channel ships, `flutter_webui/<abi>/dartaotruntime`.
+String rootChannelRuntime(String abi) => 'flutter_webui/$abi/dartaotruntime';
+
+/// Drops each `bin/<abi>/dartaotruntime` that is byte for byte the root
+/// channel's runtime for that ABI ([rootChannelRuntime]); the module carries
+/// one copy and [withRuntimeLinks] puts the second back at install. Returns
+/// the dropped paths by the path they link to. The app keeps its runtime in
+/// `bin/<abi>/` (its native libraries resolve beside the executable).
+@visibleForTesting
+Map<String, String> dedupeRuntimes(Map<String, List<int>> files) {
+  final links = <String, String>{};
+  final runtime = RegExp(r'^bin/([^/]+)/dartaotruntime$');
+  for (final path in files.keys.toList()) {
+    final abi = runtime.firstMatch(path)?.group(1);
+    if (abi == null) continue;
+    final shared = files[rootChannelRuntime(abi)];
+    if (shared == null || !_sameBytes(shared, files[path]!)) continue;
+    files.remove(path);
+    links[path] = rootChannelRuntime(abi);
+  }
+  return links;
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+/// [customizeSh] followed by a hard link (a copy where linking fails) for
+/// each of [links] (path to the file it shares).
+String withRuntimeLinks(String customizeSh, Map<String, String> links) {
+  final b = StringBuffer(customizeSh);
+  if (customizeSh.isNotEmpty && !customizeSh.endsWith('\n')) b.writeln();
+  b.writeln(
+    '# flutter_p0g: one Dart runtime per ABI, linked where the app runs it (generated at build).',
+  );
+  for (final MapEntry(key: path, value: shared) in links.entries) {
+    final dst = '"\$MODPATH/$path"';
+    final src = '"\$MODPATH/$shared"';
+    b.writeln(
+      'mkdir -p "\$MODPATH/${p.posix.dirname(path)}" && '
+      '{ ln -f $src $dst 2>/dev/null || { cp -f $src $dst && set_perm $dst 0 0 0755; }; }',
+    );
+  }
+  return b.toString();
 }
 
 /// Signing material that must never ship in a module zip: `key.properties`
