@@ -11,6 +11,7 @@ import 'package:flutter_tools/src/runner/flutter_command.dart';
 import '../aera/aerap.dart';
 import '../aera/kit.dart';
 import '../aera/rust.dart';
+import '../aera/window.dart';
 import '../templates.dart';
 
 /// `flutter build bundle` for linux-arm64, plus AOT `libapp.so` for profile
@@ -59,6 +60,13 @@ class BuildAeraCommand extends BuildBundleCommand {
     return super.stringArg(name, global: global);
   }
 
+  /// The generated entrypoint that installs aera_window's binding before
+  /// the app's `main`, while the build runs.
+  String? _aeraEntrypoint;
+
+  @override
+  String get targetFile => _aeraEntrypoint ?? super.targetFile;
+
   @override
   Future<FlutterCommandResult> runCommand() async {
     final Directory app = project.directory;
@@ -77,6 +85,26 @@ class BuildAeraCommand extends BuildBundleCommand {
       );
     }
 
+    // aera_window's binding (the padding AERA reports, as MediaQuery
+    // padding), added for this build only: apps don't depend on it.
+    await precacheAeraWindow();
+    return withAeraWindow(app, super.targetFile, (entry) async {
+      _aeraEntrypoint = entry;
+      try {
+        return await _buildAerap(app, appManifest, buildInfo, target, kit);
+      } finally {
+        _aeraEntrypoint = null;
+      }
+    });
+  }
+
+  Future<FlutterCommandResult> _buildAerap(
+    Directory app,
+    File appManifest,
+    BuildInfo buildInfo,
+    String target,
+    AeraKit kit,
+  ) async {
     final result = await super.runCommand();
 
     final fs = globals.fs;

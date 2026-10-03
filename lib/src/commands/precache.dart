@@ -2,6 +2,7 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../aera/kit.dart';
+import '../aera/window.dart';
 import '../frb/frb.dart';
 import '../squadron.dart';
 import '../webui/dart_android.dart';
@@ -88,6 +89,7 @@ class PrecacheCommand extends FlutterCommand {
         aeraKitUrl(globals.flutterVersion.frameworkVersion, stringArg('aera-mode')!),
       );
     }
+    if (boolArg('aera') || stringArg('aera-kit') != null) await precacheAeraWindow(force: true);
     if (boolArg('webui-packages')) await precacheWebuiPackages(force: true);
     if (boolArg('app-plane')) await precacheAppPlane(force: true);
     return FlutterCommandResult.success();
