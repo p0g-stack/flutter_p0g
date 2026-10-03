@@ -1,3 +1,10 @@
+# 0.8.8
+
+- flutter-webui a455782 (root channel 0.2.3): the channel leaves the
+  manager's cgroup before it starts anything. On KernelSU, closing the page
+  no longer leaves the channel, the app's root process or its service
+  running. The client is unchanged, so nothing changes for the app.
+
 # 0.8.7
 
 - flutter-webui 74d0575 (root channel 0.2.2): the channel holds the module
