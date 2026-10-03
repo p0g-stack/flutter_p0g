@@ -98,6 +98,13 @@ class BuildAeraCommand extends BuildBundleCommand {
         RuntimeMember('usr/share/flutter/flutter_assets/${_rel(f, assets)}', f.readAsBytesSync()),
       );
     }
+    final String? view;
+    try {
+      view = viewJson(jsonDecode(appManifest.readAsStringSync()) as Map<String, Object?>);
+    } on FormatException catch (e) {
+      throwToolExit(e.message);
+    }
+    if (view != null) members.add(RuntimeMember(kViewJsonPath, utf8.encode(view)));
     for (final so in await _rustLibs(app, target)) {
       members.add(RuntimeMember('usr/lib/${so.basename}', so.readAsBytesSync()));
     }

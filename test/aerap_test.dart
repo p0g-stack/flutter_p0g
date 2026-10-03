@@ -189,4 +189,45 @@ void main() {
       );
     });
   });
+
+  group('viewJson', () {
+    test('the app\'s padding, in dp, edges as given', () {
+      expect(
+        jsonDecode(
+          viewJson({
+            'id': 'x',
+            'padding': {'left': 4, 'top': 0, 'right': 4, 'bottom': 8},
+          })!,
+        ),
+        {
+          'padding': {'left': 4, 'top': 0, 'right': 4, 'bottom': 8},
+        },
+      );
+      expect(
+        jsonDecode(
+          viewJson({
+            'padding': {'bottom': 12.5},
+          })!,
+        ),
+        {
+          'padding': {'bottom': 12.5},
+        },
+      );
+    });
+
+    test('no padding key: no file, so the embedder falls through', () {
+      expect(viewJson({'id': 'x'}), isNull);
+    });
+
+    test('bad padding is refused', () {
+      for (final bad in [
+        4,
+        {'middle': 1},
+        {'left': -1},
+        {'left': '4'},
+      ]) {
+        expect(() => viewJson({'padding': bad}), throwsFormatException, reason: '$bad');
+      }
+    });
+  });
 }

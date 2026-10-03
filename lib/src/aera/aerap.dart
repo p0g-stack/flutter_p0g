@@ -75,6 +75,36 @@ const kAppPermissions = {'network', 'audio-output'};
 
 /// Builds `plugin.json`: the app's fields, the packer's fixed fields, and
 /// the payload facts computed from [stream] and [xz].
+/// Where the `.aerap` carries the app's default view settings. flutter-aera's
+/// embedder (src/padding.rs) reads each padding edge from the device's
+/// `$AERA_PLUGIN_DATA/view.json`, then this file, then AERA's givens, then
+/// its built-in default.
+const kViewJsonPath = 'usr/share/flutter/view.json';
+
+/// The app's `view.json`: the edges of `padding` in aera/plugin.json
+/// ([app]), in dp. Each edge the app leaves out stays out, so the embedder
+/// resolves it from the next source; without `padding`, null: no file.
+String? viewJson(Map<String, Object?> app) {
+  final padding = app['padding'];
+  if (padding == null) return null;
+  if (padding is! Map) {
+    throw const FormatException('aera/plugin.json: "padding" must be an object of edges in dp');
+  }
+  final edges = <String, num>{};
+  for (final MapEntry(:key, :value) in padding.entries) {
+    if (!const ['left', 'top', 'right', 'bottom'].contains(key)) {
+      throw FormatException(
+        'aera/plugin.json: padding edge "$key" is not left, top, right or bottom',
+      );
+    }
+    if (value is! num || value < 0 || !value.isFinite) {
+      throw FormatException('aera/plugin.json: padding "$key" must be a number of dp, 0 or more');
+    }
+    edges[key as String] = value;
+  }
+  return '${jsonEncode({'padding': edges})}\n';
+}
+
 Map<String, Object?> pluginManifest({
   required Map<String, Object?> app,
   required Uint8List stream,
