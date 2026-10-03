@@ -9,7 +9,6 @@ import 'package:meta/meta.dart';
 
 import '../adb.dart';
 import 'install.dart';
-import '../aera/window.dart';
 
 /// AERA's per-plugin data directory, as Host API 3 patch 0005 picks it:
 /// internal storage when `/sdcard/AERA` is a directory, else RAM.
@@ -51,18 +50,13 @@ Future<int> runAera({
     await openAeraPlugin(adb, package.id);
     final url = await _vmServiceUrl(adb, dataDir);
     globals.printStatus('${package.id}: VM service at $url. Attaching...');
-    // Attach to the entrypoint the build ran (aera_window's binding first),
-    // with its package config, so hot restart keeps the binding.
-    await precacheAeraWindow();
-    return await withAeraWindow(app, globals.fs.path.join(app.path, target), (entry) async {
-      final attach = await io.Process.start(
-        globals.fs.path.join(Cache.flutterRoot!, 'bin', 'flutter'),
-        ['attach', '--debug-url', url, '-d', 'flutter-tester', '--target', entry],
-        workingDirectory: app.path,
-        mode: io.ProcessStartMode.inheritStdio,
-      );
-      return attach.exitCode;
-    });
+    final attach = await io.Process.start(
+      globals.fs.path.join(Cache.flutterRoot!, 'bin', 'flutter'),
+      ['attach', '--debug-url', url, '-d', 'flutter-tester', '--target', target],
+      workingDirectory: app.path,
+      mode: io.ProcessStartMode.inheritStdio,
+    );
+    return await attach.exitCode;
   } finally {
     await adb.run(['forward', '--remove', 'tcp:$vmPort'], check: false);
   }

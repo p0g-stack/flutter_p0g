@@ -32,9 +32,8 @@ typedef PackageSource = ({Map<String, Object?> config, Map<String, Object?> grap
 ({Map<String, Object?> config, List<String> added}) overlayPackageConfig(
   Map<String, Object?> app,
   List<PackageSource> sources,
-  List<String> seeds, {
-  String what = 'WebUI',
-}) {
+  List<String> seeds,
+) {
   final appPackages = [...(app['packages']! as List).cast<Map<String, Object?>>()];
   final have = {for (final p in appPackages) p['name']! as String};
   final srcPackages = <String, Map<String, Object?>>{};
@@ -61,7 +60,7 @@ typedef PackageSource = ({Map<String, Object?> config, Map<String, Object?> grap
   for (final name in needed) {
     if (have.contains(name)) continue;
     final p = srcPackages[name];
-    if (p == null) throwToolExit('No resolution of package:$name for the $what build.');
+    if (p == null) throwToolExit('No resolution of package:$name for the WebUI build.');
     appPackages.add(p);
     added.add(name);
   }
@@ -196,23 +195,6 @@ dynamic main() {
 /// What the WebUI build adds to the app.
 typedef WebuiOverlay = ({String entrypoint, Set<String> packages});
 
-/// A resolved [PackageSource] from [src]'s `.dart_tool`; [what] names it in
-/// the error when it is not resolved, with [precache] the command that
-/// resolves it.
-PackageSource resolvedSource(Directory src, String what, {String precache = '--webui'}) {
-  final dart = src.childDirectory('.dart_tool');
-  final config = dart.childFile('package_config.json');
-  final graph = dart.childFile('package_graph.json');
-  if (!config.existsSync() || !graph.existsSync()) {
-    throwToolExit('$what is not resolved. Run `flutter_p0g precache $precache`.');
-  }
-  return (
-    config: _json(config.readAsBytesSync()),
-    graph: _json(graph.readAsBytesSync()),
-    dir: dart.uri,
-  );
-}
-
 /// The package config and graph the build uses, overlaid with [kWebuiPlugin]
 /// and the app's `*_webui` packages while [body] runs, then restored; the
 /// project's manifest names the `*_webui` packages as dependencies
@@ -222,55 +204,28 @@ Future<T> withWebuiPlugin<T>(
   Directory project,
   String target,
   Future<T> Function(WebuiOverlay overlay) body,
-) {
-  final sources = [
-    resolvedSource(flutterWebuiSource(), 'flutter-webui'),
-    resolvedSource(webuiPackagesSource(), 'webui-packages'),
-  ];
-  return withEntrypointOverlay(
-    project,
-    target,
-    what: 'WebUI',
-    sources: sources,
-    entryName: 'webui_main.dart',
-    entrypoint: webuiEntrypoint,
-    seeds: (direct) => [kWebuiPlugin, ...direct],
-    direct: (appGraph, appName, appDirect) => webuiPackagesFor(
-      closureOf(appGraph, appName),
-      appDirect,
-      webuiImplementations(),
-      addedDependencies: mergedDependencies(sources),
-      always: {
-        for (final p in kAlwaysWebuiPackages)
-          if (webuiPackagesSource().childDirectory('packages').childDirectory(p).existsSync()) p,
-      },
-    ),
-    body: body,
-  );
-}
-
-/// The app's package config and graph overlaid with the closure of [seeds]
-/// from [sources] while [body] runs, then restored. [direct] (from the app's
-/// graph, name and direct dependencies) become direct dependencies of the
-/// app in the graph and, meanwhile, in the project's manifest. [entrypoint]
-/// (given the app target's import URI) is written to
-/// `.dart_tool/flutter_p0g/<entryName>`, which [body] builds in place of
-/// [target]. [what] names the build in messages.
-Future<T> withEntrypointOverlay<T>(
-  Directory project,
-  String target, {
-  required String what,
-  required List<PackageSource> sources,
-  required String entryName,
-  required String Function(String appImport) entrypoint,
-  required List<String> Function(List<String> direct) seeds,
-  List<String> Function(Map<String, Object?> appGraph, String appName, Set<String> appDirect)?
-  direct,
-  required Future<T> Function(WebuiOverlay overlay) body,
-}) async {
+) async {
   final appConfigFile = findPackageConfigFile(project);
   if (appConfigFile == null) throwToolExit('No package config. Run `flutter pub get`.');
   final appGraphFile = appConfigFile.parent.childFile('package_graph.json');
+  PackageSource source(Directory src, String what) {
+    final dart = src.childDirectory('.dart_tool');
+    final config = dart.childFile('package_config.json');
+    final graph = dart.childFile('package_graph.json');
+    if (!config.existsSync() || !graph.existsSync()) {
+      throwToolExit('$what is not resolved. Run `flutter_p0g precache --webui`.');
+    }
+    return (
+      config: _json(config.readAsBytesSync()),
+      graph: _json(graph.readAsBytesSync()),
+      dir: dart.uri,
+    );
+  }
+
+  final sources = [
+    source(flutterWebuiSource(), 'flutter-webui'),
+    source(webuiPackagesSource(), 'webui-packages'),
+  ];
 
   // A run killed before it could restore leaves its backups: restore first.
   final backups = {
@@ -288,19 +243,25 @@ Future<T> withEntrypointOverlay<T>(
   final flutterProject = globals.projectFactory.fromDirectory(project);
   final appName = flutterProject.manifest.appName;
   final appGraph = _json(originals[appGraphFile]!);
-  final directs =
-      direct?.call(appGraph, appName, flutterProject.manifest.dependencies) ?? <String>[];
-  final overlay = overlayPackageConfig(
-    _json(originals[appConfigFile]!),
-    sources,
-    seeds(directs),
-    what: what,
+  final direct = webuiPackagesFor(
+    closureOf(appGraph, appName),
+    flutterProject.manifest.dependencies,
+    webuiImplementations(),
+    addedDependencies: mergedDependencies(sources),
+    always: {
+      for (final p in kAlwaysWebuiPackages)
+        if (webuiPackagesSource().childDirectory('packages').childDirectory(p).existsSync()) p,
+    },
   );
+  final overlay = overlayPackageConfig(_json(originals[appConfigFile]!), sources, [
+    kWebuiPlugin,
+    ...direct,
+  ]);
   final graph = overlayPackageGraph(
     appGraph,
     root: appName,
     added: overlay.added,
-    direct: directs,
+    direct: direct,
     dependencies: mergedDependencies(sources),
   );
 
@@ -308,21 +269,22 @@ Future<T> withEntrypointOverlay<T>(
   final targetUri = globals.fs.file(target).absolute.uri;
   final appImport = (appConfig.toPackageUri(targetUri) ?? targetUri).toString();
   final entry =
-      project.childDirectory('.dart_tool').childDirectory('flutter_p0g').childFile(entryName)
+      project
+          .childDirectory('.dart_tool')
+          .childDirectory('flutter_p0g')
+          .childFile('webui_main.dart')
         ..createSync(recursive: true)
-        ..writeAsStringSync(entrypoint(appImport));
+        ..writeAsStringSync(webuiEntrypoint(appImport));
 
-  globals.printTrace('$what packages added: ${overlay.added.join(', ')}');
-  if (directs.isNotEmpty) {
-    globals.printStatus('$what plugin implementations: ${directs.join(', ')}');
-  }
+  globals.printTrace('WebUI packages added: ${overlay.added.join(', ')}');
+  if (direct.isNotEmpty) globals.printStatus('WebUI plugin implementations: ${direct.join(', ')}');
   originals.forEach((file, bytes) => backups[file]!.writeAsBytesSync(bytes));
   appConfigFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(overlay.config));
   appGraphFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(graph));
   // flutter_tools reads direct dependencies from the project's manifest.
   final factory = globals.projectFactory;
-  final restoreManifest = directs.isNotEmpty && factory is P0gProjectFactory
-      ? factory.overrideManifest(project, (m) => withDependencies(m, directs))
+  final restoreManifest = direct.isNotEmpty && factory is P0gProjectFactory
+      ? factory.overrideManifest(project, (m) => withDependencies(m, direct))
       : null;
   try {
     return await body((
