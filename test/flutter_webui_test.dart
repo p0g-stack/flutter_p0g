@@ -40,4 +40,11 @@ void main() {
       '/f/cache/artifacts/x',
     );
   });
+
+  test('the released web SDK is used only for its web_ui tree and engine', () {
+    expect(releasedWebSdkFits(tree: kWebSdkTree, engine: kWebSdkEngine), isTrue);
+    expect(releasedWebSdkFits(tree: 'other', engine: kWebSdkEngine), isFalse);
+    expect(releasedWebSdkFits(tree: kWebSdkTree, engine: 'other'), isFalse);
+    expect(kWebSdkUrl, endsWith('/releases/download/$kWebSdkRelease/flutter-webui-web-sdk.tar.xz'));
+  });
 }

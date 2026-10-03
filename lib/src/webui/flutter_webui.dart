@@ -1,3 +1,4 @@
+import 'package:crypto/crypto.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
@@ -17,6 +18,23 @@ import 'dart_android.dart';
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
 const kFlutterWebuiCommit = '74d0575a9a5851ddb879f6a16e473e1741bd9a76';
+
+/// flutter-webui's released patched web SDK (`web-sdk-release` workflow):
+/// `flutter_web_sdk/` and `pkg/sky_engine/lib/ui_web/`, built from the
+/// `web_ui/` tree [kWebSdkTree] against engine [kWebSdkEngine], pinned by
+/// sha256. Used when the pinned flutter-webui has that `web_ui/` tree and
+/// the installed Flutter that engine; otherwise precache builds it.
+const kWebSdkRelease = 'web-sdk-3.47.5-af7e796-93b29c6';
+const kWebSdkTree = '2b9eb411934f0eed8ecf8b7b59fcbfce70686bd0';
+const kWebSdkEngine = 'af7e796e161ae0bb1ff0758c71a7105418bd9ded';
+const kWebSdkSha256 = 'c961ec08b216b5f7a554a6e426003246d17edfd5db922689d710d990363d7ae7';
+const kWebSdkUrl =
+    '$kFlutterWebuiRepo/releases/download/$kWebSdkRelease/flutter-webui-web-sdk.tar.xz';
+
+/// Whether the released SDK fits: same `web_ui/` tree, same engine.
+@visibleForTesting
+bool releasedWebSdkFits({required String tree, required String engine}) =>
+    tree == kWebSdkTree && engine == kWebSdkEngine;
 
 Directory flutterWebuiDir() => p0gCacheDir().childDirectory('flutter-webui');
 Directory flutterWebuiSource() => flutterWebuiDir().childDirectory('src');
@@ -78,13 +96,16 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
       fallbackFontsDir().existsSync()) {
     return;
   }
-  globals.printStatus('Building the patched web SDK (flutter-webui web_ui/tool)...');
   final webUi = src.childDirectory('web_ui').path;
   await run([dartBinary(), 'pub', 'get'], webUi);
-  await run([
-    dartBinary(), 'run', 'tool/build_web_sdk.dart', //
-    '--flutter', Cache.flutterRoot!, '--out', patchedWebSdkRoot().path,
-  ], webUi);
+  final engine = globals.flutterVersion.engineRevision;
+  if (!releasedWebSdkFits(tree: tree, engine: engine) || !await _installReleasedWebSdk()) {
+    globals.printStatus('Building the patched web SDK (flutter-webui web_ui/tool)...');
+    await run([
+      dartBinary(), 'run', 'tool/build_web_sdk.dart', //
+      '--flutter', Cache.flutterRoot!, '--out', patchedWebSdkRoot().path,
+    ], webUi);
+  }
 
   globals.printStatus("Fetching web_ui's fallback fonts...");
   final fonts = fallbackFontsDir();
@@ -95,6 +116,42 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
     '--cache', flutterWebuiDir().childDirectory('fonts-cache').path,
   ], webUi);
   sdkStamp.writeAsStringSync(tree);
+}
+
+/// Downloads [kWebSdkUrl], checks [kWebSdkSha256] and unpacks it as
+/// [patchedWebSdkRoot]. False (after a warning) when any step fails, so the
+/// caller builds the SDK instead.
+Future<bool> _installReleasedWebSdk() async {
+  globals.printStatus('Fetching the patched web SDK ($kWebSdkRelease)...');
+  final work = flutterWebuiDir().childDirectory('sdk-download');
+  try {
+    final bytes = await fetchBytes(kWebSdkUrl);
+    final digest = sha256.convert(bytes).toString();
+    if (digest != kWebSdkSha256) {
+      globals.printWarning('$kWebSdkRelease: sha256 is $digest, the pin says $kWebSdkSha256.');
+      return false;
+    }
+    if (work.existsSync()) work.deleteSync(recursive: true);
+    final unpacked = work.childDirectory('sdk')..createSync(recursive: true);
+    final archive = work.childFile('web-sdk.tar.xz')..writeAsBytesSync(bytes);
+    final r = await globals.processUtils.run([
+      'tar', '-xJf', archive.path, '-C', unpacked.path, //
+    ]);
+    if (r.exitCode != 0 ||
+        !unpacked.childDirectory('flutter_web_sdk').childDirectory('kernel').existsSync()) {
+      globals.printWarning('$kWebSdkRelease: could not unpack it (tar with xz):\n${r.stderr}');
+      return false;
+    }
+    final root = patchedWebSdkRoot();
+    if (root.existsSync()) root.deleteSync(recursive: true);
+    unpacked.renameSync(root.path);
+    return true;
+  } on ToolExit catch (e) {
+    globals.printWarning('$kWebSdkRelease: ${e.message}');
+    return false;
+  } finally {
+    if (work.existsSync()) work.deleteSync(recursive: true);
+  }
 }
 
 /// The git tree id of [src]'s `web_ui/`: the patch series, its tool and the
