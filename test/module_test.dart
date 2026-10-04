@@ -155,6 +155,15 @@ void main() {
       expect(script, contains('pm install-create --user 0 -i com.android.vending -r -S'));
       expect(script, contains('pm install-commit'));
       expect(script.indexOf('after_install\n'), greaterThan(script.indexOf('pm install-commit')));
+      // The maintainer's gap: empty hooks around the session install.
+      final gap = script.indexOf('# ---- GAP');
+      expect(gap, greaterThan(0));
+      expect(script.indexOf('# ---- end of GAP'), greaterThan(gap));
+      expect(script.indexOf('before_install\n'), lessThan(script.indexOf('pm install-create')));
+      expect(
+        script.indexOf('restore_after_install\n'),
+        greaterThan(script.indexOf('pm install-commit')),
+      );
     });
 
     test('a bad app plane package name is refused', () {

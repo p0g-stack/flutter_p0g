@@ -256,7 +256,10 @@ const kAppPlaneInstallScript = 'webui_app_plane/app-install.sh';
 /// Store (`-i com.android.vending`), as j-hc/revanced-magisk-module does.
 /// Skips when [app] at its version is already there; `--if-missing`
 /// installs only when the app is gone. Prints what it did; exits 1 on
-/// failure. After the install, `after_install` applies the two device
+/// failure. `before_install` and `restore_after_install`, between the GAP
+/// markers, are empty for the maintainer to fill (flutter_p0g issue "App
+/// plane: install method"); they run just before the session and just after
+/// it, whatever its result. After the install, `after_install` applies the two device
 /// settings Termux:API's own main screen asks for (draw over other apps,
 /// battery optimization off), both best effort.
 String appPlaneInstallScript(AppPlaneApp app) {
@@ -289,10 +292,16 @@ after_install() {
   dumpsys deviceidle whitelist +"\$PKG" >/dev/null 2>&1
 }
 
+# ---- GAP: install-time settings around the session, filled by the maintainer ----
+before_install() { :; }
+restore_after_install() { :; }
+# ---- end of GAP ----
+
 T=/data/local/tmp/webui-app-plane-\$PKG.apk
 cp -f "\$APK" "\$T" && chmod 644 "\$T" && chown 1000:1000 "\$T"
 chcon u:object_r:apk_data_file:s0 "\$T" 2>/dev/null
 SZ=\$(stat -c %s "\$T")
+before_install
 O=\$(pm install-create --user 0 -i com.android.vending -r -S "\$SZ" 2>&1 </dev/null)
 case "\$O" in
   *'['*']'*)
@@ -303,6 +312,7 @@ case "\$O" in
       *) pm install-abandon "\$S" >/dev/null 2>&1 </dev/null ;;
     esac ;;
 esac
+restore_after_install
 after_install
 rm -f "\$T"
 
