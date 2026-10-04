@@ -149,8 +149,11 @@ root-process place reports itself unavailable. The same holds under
    baked in), which installs the APK with a PackageInstaller session as the
    Play Store (`pm install-create --user 0 -i com.android.vending -r`, then
    `install-write` and `install-commit`, the way j-hc/revanced-magisk-module
-   does). `customize.sh` runs it on every module install and update; it skips
-   when the app at that versionCode is already there. `service.sh` runs it
+   does). Around the session it saves `verifier_verify_adb_installs` and
+   `package_verifier_enable`, sets both to `0`, and restores their original
+   values even if installation fails. `customize.sh` runs it on every module
+   install and update; it skips when the app at that versionCode is already
+   there. `service.sh` runs it
    with `--if-missing` after `sys.boot_completed`, so a removed app comes
    back. `uninstall.sh` runs `pm uninstall com.webui.api.<seg>` once the
    system has booted. The implications match an app in `system/app`: the

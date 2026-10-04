@@ -255,13 +255,11 @@ const kAppPlaneInstallScript = 'webui_app_plane/app-install.sh';
 /// Installs the module's app with a PackageInstaller session as the Play
 /// Store (`-i com.android.vending`), as j-hc/revanced-magisk-module does.
 /// Skips when [app] at its version is already there; `--if-missing`
-/// installs only when the app is gone. Prints what it did; exits 1 on
-/// failure. `before_install` and `restore_after_install`, between the GAP
-/// markers, are empty for the maintainer to fill (flutter_p0g issue "App
-/// plane: install method"); they run just before the session and just after
-/// it, whatever its result. After the install, `after_install` applies the two device
-/// settings Termux:API's own main screen asks for (draw over other apps,
-/// battery optimization off), both best effort.
+/// installs only when the app is gone. Saves and pauses the package verifier
+/// for the session, restoring both settings even if installation fails.
+/// After the install, `after_install` applies the two device settings
+/// Termux:API's own main screen asks for (draw over other apps, battery
+/// optimization off), both best effort. Prints what it did; exits 1 on failure.
 String appPlaneInstallScript(AppPlaneApp app) {
   if (!RegExp(r'^[A-Za-z][A-Za-z0-9_.]*$').hasMatch(app.package)) {
     throw StateError('"${app.package}" is not a package name');
@@ -293,15 +291,39 @@ after_install() {
 }
 
 # ---- GAP: install-time settings around the session, filled by the maintainer ----
-before_install() { :; }
-restore_after_install() { :; }
+before_install() {
+  VERIFIER_ADB=\$(settings get global verifier_verify_adb_installs) || return 1
+  VERIFIER_PACKAGE=\$(settings get global package_verifier_enable) || return 1
+  VERIFIER_PAUSED=1
+  trap 'restore_after_install' 0
+  trap 'exit 1' 1 2 15
+  settings put global verifier_verify_adb_installs 0 &&
+    settings put global package_verifier_enable 0
+}
+
+restore_setting() {
+  case "\$2" in
+    null) settings delete global "\$1" >/dev/null ;;
+    *) settings put global "\$1" "\$2" ;;
+  esac
+}
+
+restore_after_install() {
+  [ "\$VERIFIER_PAUSED" = 1 ] || return 0
+  result=0
+  restore_setting verifier_verify_adb_installs "\$VERIFIER_ADB" || result=1
+  restore_setting package_verifier_enable "\$VERIFIER_PACKAGE" || result=1
+  [ "\$result" = 0 ] && VERIFIER_PAUSED=0
+  return "\$result"
+}
+
 # ---- end of GAP ----
 
 T=/data/local/tmp/webui-app-plane-\$PKG.apk
 cp -f "\$APK" "\$T" && chmod 644 "\$T" && chown 1000:1000 "\$T"
 chcon u:object_r:apk_data_file:s0 "\$T" 2>/dev/null
 SZ=\$(stat -c %s "\$T")
-before_install
+before_install || { echo "! Could not pause package verifier"; exit 1; }
 O=\$(pm install-create --user 0 -i com.android.vending -r -S "\$SZ" 2>&1 </dev/null)
 case "\$O" in
   *'['*']'*)
@@ -312,7 +334,8 @@ case "\$O" in
       *) pm install-abandon "\$S" >/dev/null 2>&1 </dev/null ;;
     esac ;;
 esac
-restore_after_install
+restore_after_install || { echo "! Could not restore package verifier"; exit 1; }
+trap - 0 1 2 15
 after_install
 rm -f "\$T"
 
