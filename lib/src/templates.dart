@@ -69,10 +69,19 @@ if [ -d "$MODPATH/bin" ]; then
 fi
 ''',
   // WebUI X reads webroot/config.json; values from flutter-webui docs/hosts.md.
-  // Back goes to the page, closing at the root is closing a tab (no prompt),
-  // and hidden keeps running: the root shell must survive Home.
+  // Back is native (history, then close: v608 sends no WX_ON_* events, so
+  // "javascript" left Back dead at the root), closing needs no prompt, hidden
+  // keeps running (the root shell must survive Home), and ksu.exec needs the
+  // SHELL permission on v608 (older versions ignore the key).
   'webroot/config.json':
-      '${const JsonEncoder.withIndent('  ').convert({'title': app.name, 'backInterceptor': 'javascript', 'exitConfirm': false, 'killShellWhenBackground': false, 'pullToRefresh': false})}\n',
+      '${const JsonEncoder.withIndent('  ').convert({
+        'title': app.name,
+        'backInterceptor': 'native',
+        'exitConfirm': false,
+        'killShellWhenBackground': false,
+        'pullToRefresh': false,
+        'permissions': ['kernelsu.permission.SHELL'],
+      })}\n',
 };
 
 /// AERA plugin ids: lowercase letters, digits, `-` and `.`.
