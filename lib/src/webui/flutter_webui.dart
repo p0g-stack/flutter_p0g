@@ -17,7 +17,7 @@ import 'dart_android.dart';
 /// `web_ui/` patch series builds the patched web SDK the build compiles
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
-const kFlutterWebuiCommit = '60c0b775773ae2abfce8ed5b333aab5643483972';
+const kFlutterWebuiCommit = '8951e5f59eb5492b55da89a23edb2b43d87d7023';
 
 /// flutter-webui's released patched web SDK (`web-sdk-release` workflow):
 /// `flutter_web_sdk/` and `pkg/sky_engine/lib/ui_web/`, built from the
