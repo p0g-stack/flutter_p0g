@@ -1,3 +1,10 @@
+# 0.8.11
+
+- flutter-webui 60c0b77 (root channel 0.2.3): fixes from the WebUI X v608
+  lab. A shell the host rejects is found by a probe (v608 answers a
+  Rejected exec with an empty string), `hasShortcut` is read as a boolean
+  or a "true"/"false" string, and package results carry a `found` flag.
+
 # 0.8.10
 
 - flutter-webui a1835ca (root channel 0.2.3): WebUI X extras the app can
