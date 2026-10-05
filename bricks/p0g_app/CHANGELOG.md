@@ -1,3 +1,9 @@
+# 0.8.12
+
+- flutter-webui 8951e5f (root channel 0.2.3): `WebUi.shortcut.create()`
+  returns the host's answer when it gives a boolean, else null (the host's
+  own dialog decides). On WebUI X v608 `hasShortcut` stays false.
+
 # 0.8.11
 
 - flutter-webui 60c0b77 (root channel 0.2.3): fixes from the WebUI X v608
