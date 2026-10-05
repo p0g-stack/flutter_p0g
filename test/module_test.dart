@@ -152,7 +152,6 @@ void main() {
 
       final script = byPath[kAppPlaneInstallScript]!;
       expect(script, contains('PKG=com.webui.api.demo\nVC=1009\n'));
-
     });
 
     test('a bad app plane package name is refused', () {
@@ -231,6 +230,27 @@ void main() {
       expect(exec['uninstall.sh'], isTrue);
       expect(exec['META-INF/com/google/android/update-binary'], isTrue);
       expect(exec['module.prop'], isFalse);
+    });
+
+    test('the module.prop icon must ship, under webroot/ or the module', () {
+      List<ModuleFile> build(Map<String, List<int>> web, Map<String, List<int>> webui) =>
+          assembleModule(
+            webBuild: web,
+            webuiFolder: {'module.prop': b('id=demo\nwebuiIcon=icons/i.png\n'), ...webui},
+            buildName: '1',
+            buildNumber: '1',
+          );
+      expect(() => build(const {}, const {}), throwsStateError);
+      expect(build({'icons/i.png': b('png')}, const {}), isNotEmpty);
+      expect(build(const {}, {'icons/i.png': b('png')}), isNotEmpty);
+      expect(moduleIconMissing({'module.prop': b('id=demo\n')}), isNull);
+      expect(
+        moduleIconMissing({
+          'module.prop': b('id=demo\nicon=/logo.png\n'),
+          'webroot/logo.png': b(''),
+        }),
+        isNull,
+      );
     });
 
     test('a missing module.prop is an error', () {

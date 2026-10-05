@@ -114,6 +114,13 @@ List<ModuleFile> assembleModule({
   if (!files.containsKey('module.prop')) {
     throw StateError('webui/module.prop is missing; run `flutter_p0g create .`');
   }
+  final icon = moduleIconMissing(files);
+  if (icon != null) {
+    throw StateError(
+      'module.prop names the icon "$icon", which is in neither webroot/ nor the module; '
+      'add it (web/$icon or webui/$icon) or change the line.',
+    );
+  }
   final paths = files.keys.toList()..sort();
   return [
     for (final path in paths)
@@ -406,6 +413,18 @@ String withUninstall(String uninstallSh) {
 }
 
 bool _expandsVars(String path) => path == 'module.prop' || path == 'webroot/config.json';
+
+/// The `webuiIcon=` (else `icon=`) path in [files]' module.prop when the
+/// module ships no such file; WebUI X looks under `webroot/`, then the
+/// module directory, and refuses a shortcut without it. Null when present
+/// or not named.
+String? moduleIconMissing(Map<String, List<int>> files) {
+  final prop = utf8.decode(files['module.prop']!);
+  final icon = readProp(prop, 'webuiIcon') ?? readProp(prop, 'icon');
+  if (icon == null || icon.isEmpty) return null;
+  final path = p.posix.normalize(icon.replaceFirst(RegExp('^/+'), ''));
+  return files.containsKey('webroot/$path') || files.containsKey(path) ? null : icon;
+}
 
 /// Reads a key from module.prop text.
 String? readProp(String moduleProp, String key) {

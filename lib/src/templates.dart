@@ -10,6 +10,9 @@ import 'dart:convert';
 const kBuildNameVar = r'$(FLUTTER_BUILD_NAME)';
 const kBuildNumberVar = r'$(FLUTTER_BUILD_NUMBER)';
 
+/// The module icon `module.prop` names: the web build's maskable icon.
+const kWebuiIcon = 'icons/Icon-maskable-512.png';
+
 /// What a template needs to know about the app.
 class AppInfo {
   const AppInfo({
@@ -59,6 +62,9 @@ Map<String, String> webuiTemplate(AppInfo app) => {
     'versionCode=$kBuildNumberVar',
     'author=${app.author}',
     'description=${app.description}',
+    // WebUI X v608 draws its home-screen shortcut from this PNG (looked up
+    // under webroot/ first); `flutter create` puts it in web/icons/.
+    'webuiIcon=$kWebuiIcon',
     '',
   ].join('\n'),
   'customize.sh': r'''

@@ -27,6 +27,7 @@ void main() {
     expect(prop, contains('version=v$kBuildNameVar\n'));
     expect(prop, contains('versionCode=$kBuildNumberVar\n'));
     expect(prop, contains('author=Yuv\n'));
+    expect(prop, contains('webuiIcon=icons/Icon-maskable-512.png\n'));
     final config = jsonDecode(files['webroot/config.json']!) as Map;
     expect(config['killShellWhenBackground'], false);
     expect(config['backInterceptor'], 'native');
