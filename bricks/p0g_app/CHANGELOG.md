@@ -1,3 +1,10 @@
+# 0.8.10
+
+- flutter-webui a1835ca (root channel 0.2.3): WebUI X extras the app can
+  opt into where the host has them, detected by presence: predictive back
+  with `backInterceptor: "native"`, `WebUi.shortcut` and `WebUi.packages`.
+  Nothing changes for an app that doesn't use them.
+
 # 0.8.9
 
 - flutter-webui eb81de5 (root channel 0.2.3): on WebUI X v608, Back walks
