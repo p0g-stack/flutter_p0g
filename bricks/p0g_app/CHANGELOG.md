@@ -1,3 +1,12 @@
+# 0.8.9
+
+- flutter-webui eb81de5 (root channel 0.2.3): on WebUI X v608, Back walks
+  the page history and then closes (the module's config.json asks for
+  `backInterceptor: "native"`), and a ksu.exec the host refuses fails at
+  once with `RootChannelException('shell-refused')` naming the missing
+  `kernelsu.permission.SHELL` key, instead of a 30 s timeout. WebUI X now
+  follows the manager colours like KernelSU.
+
 # 0.8.8
 
 - flutter-webui a455782 (root channel 0.2.3): the channel leaves the
