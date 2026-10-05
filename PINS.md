@@ -4,7 +4,7 @@ Pins: what this repo holds fixed, where, and who moves it. Values read from the 
 
 | What | Where | Current | Bumped by |
 | --- | --- | --- | --- |
-| flutter-webui (patched web SDK source, root channel) | `lib/src/webui/flutter_webui.dart` `kFlutterWebuiCommit` | `eb81de5` | flutter_p0g; **must equal bricks' p0g_app pin** |
+| flutter-webui (patched web SDK source, root channel) | `lib/src/webui/flutter_webui.dart` `kFlutterWebuiCommit` | `a1835ca` | flutter_p0g; **must equal bricks' p0g_app pin** |
 | Patched web SDK (flutter-webui `web-sdk-release`) | `lib/src/webui/flutter_webui.dart` `kWebSdkRelease`, `kWebSdkSha256`, `kWebSdkTree`, `kWebSdkEngine` | `web-sdk-3.47.5-af7e796-93b29c6`, sha256 `c961ec08…63d7ae7`, web_ui tree `2b9eb41`, engine `af7e796` | flutter_p0g after flutter-webui cuts a release; precache downloads it only when the pinned flutter-webui's `web_ui/` tree and the installed engine match, else builds locally |
 | webui-packages (`*_webui` plugins) | `lib/src/webui/webui_packages.dart` `kWebuiPackagesCommit` | `0e7bbcb` | flutter_p0g |
 | webui-termux-api APK (app plane) | `lib/src/webui/app_plane.dart` `kAppPlaneTag`, `kAppPlaneSha256` | `webui-v0.53.0-webui.9`, sha256 `659cdd70…4949b` | flutter_p0g after a webui-termux-api release |
