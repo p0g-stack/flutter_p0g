@@ -70,8 +70,10 @@ page, because WebUSB needs a click there.
    the same retry budget (without that, a flapping cable loops forever).
 5. For a write that may have landed, ask the device, or report "uncertain".
    Never resend blindly.
-6. Find a mode by asking the device, not from its USB filter: fastbootd and
-   Super Fastboot share one with the bootloader.
+6. Find a mode by asking the device with the protocol's own query (fastboot:
+   `getvar is-userspace`), not from its USB filter: the bootloader and
+   fastbootd share one. Never probe project- or vendor-specific variables
+   in shared code; an app that needs one gates it behind its own feature.
 7. After a reboot, check which mode the device actually came back in.
 
 Background and a tested prototype of these rules: the web-target notes in the
