@@ -47,6 +47,21 @@ its hash when the source gives one. Each check is a step the user sees. A
 bad file then fails at the plan, with nothing written, instead of halfway
 through the write.
 
+## Never serve last build's code
+
+A service worker, if the build emits one or the app adds one, keeps
+same-origin app code network-first: `index.html`, `flutter_bootstrap.js`,
+`main.dart.js`, the compiled workers, and `pkg/*.js`, `*.wasm` and
+`canvaskit`. The cache is the offline fallback, not the first answer. A
+cache-first shell runs the previous build's Dart and wasm against this
+build's expectations on the first load after a deploy, and the failure looks
+like an app bug.
+
+Stale-while-revalidate is for third-party and engine assets only, where one
+revision behind is harmless. Bump the cache version whenever the strategy
+changes, and leave alone what must reach the network: range requests,
+streamed downloads, and anything answered per request.
+
 ## Keep the tab alive while writing
 
 While a write runs, the app holds a screen wake lock
@@ -59,5 +74,5 @@ the bricks don't ship them.
 ## Devices
 
 A write to a device over WebUSB follows [devices.md](devices.md): it waits
-for a connected phone, names the device in its plan, and sorts errors by
-blame while keeping the original error.
+for a connected phone, names the device in its plan, and reports each error
+with its source and the evidence for it, keeping the original error.
