@@ -1,3 +1,9 @@
+# 0.8.13
+
+- `rust` on the web: the `native` fact asks for the JS glue with a GET, not
+  a HEAD. `flutter run`'s dev server answers HEAD with 404, so under hot
+  reload the Rust strategies never ran and the Dart fallback did.
+
 # 0.8.12
 
 - flutter-webui 8951e5f (root channel 0.2.3): `WebUi.shortcut.create()`
