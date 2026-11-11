@@ -71,6 +71,19 @@ it ends. A sleeping laptop or a closed tab in the middle of a flash is a
 user problem the app can prevent. Both are app code through `package:web`;
 the bricks don't ship them.
 
+## Walk the page by its text
+
+A browser check finds and clicks controls through Flutter's semantics tree,
+never by coordinates. The web engine builds that tree only when asked, so the
+check clicks the engine's `flt-semantics-placeholder` ("Enable
+accessibility") once per load, from outside the app; the app needs no hook
+for it. Controls are then `flt-semantics` nodes with a role and a label
+(demo `tool/web_smoke.mjs`, flasher-web `e2e/lib/browser.dart`). What ran is
+asserted on the console lines the app already logs
+(`objective.<name>: ... ran <strategy> in <place>`), not on pixels.
+flasher-web found a card below the fold missing from the tree in headless
+Chrome, and asserts that result natively instead.
+
 ## Devices
 
 A write to a device over WebUSB follows [devices.md](devices.md): it waits

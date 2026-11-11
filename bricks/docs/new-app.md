@@ -124,11 +124,12 @@ show `root` and `block_devices`.
 
 ## Where things stand
 
-- `flutter_p0g run` (hot reload on WebUI) is not there yet: iterate on the
-  desktop or in Chrome, then build the module.
-- The Android Dart kit that step 4 installs is built by flutter_p0g's CI and
-  not yet released. Until it is, `build webui` stops at the CLI step. See
-  flutter_p0g's README for its current state.
+- `flutter_p0g run` (hot reload on WebUI) works in Chromium; its device path
+  (adb reverse, page swap) has not been run on a device. See flutter_p0g's
+  README for its current state.
+- The Android Dart kit that step 4 installs is flutter_p0g's release
+  `dart-android-<Dart version>`. It is fetched by tag; its sha256 is checked
+  only when passed to `precache` (flutter_p0g `PINS.md`).
 - Rust on the page needs flutter_p0g's patched frb (`precache --frb`). Without
   it, `tool/rust.sh` builds only the native library, and on the web the
   Dart strategies run.

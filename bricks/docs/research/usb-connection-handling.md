@@ -64,14 +64,14 @@ Code links below are pinned to the revisions inspected. Official documentation/s
 
 These are working-tree observations, not upstream or hardware verification. Files were being edited by other work, so symbol names are more durable than line numbers.
 
-- L1: [`webusb.rs`](../../../flasher_web/rust/crates/fastboot-link/src/webusb.rs), notably `open`, `devices`, `bounded`, `BulkTransport`, and the claim-only comment. Repository-relative path from the bricks checkout is `../flasher_web/rust/crates/fastboot-link/src/webusb.rs`.
-- L2: `flasher_web/rust/crates/fastboot-link/src/native.rs`: `open`, `SessionGuard`, `BulkTransport`.
-- L3: `flasher_web/rust/crates/fastboot-link/src/session.rs`: `Session::command`, `command_inner`, `write_download`, `end_download`, `send`, `read_response`, `retire`.
-- L4: `flasher_web/rust/crates/fastboot-link/src/error.rs`: `LinkError::from_transport`, `device`, `protocol`, `session_retired`.
-- L5: `flasher_web/packages/device_link/lib/device_link.dart`: `LinkFailure`, `FastbootTransport`, `FastbootSession`.
-- L6: `flasher_web/app/lib/flash/device_sheet.dart`: `_loadGranted`, `_choose`, `_guidance`, sheet rendering.
-- L7: `flasher_web/app/lib/flash/flash_controller.dart`: `FlashPhase`, `_onEvent`, retry guidance, `_onError`, `_onDone`, `downloadReceipt`, `saveLog`.
-- L8: `flasher_web/app/lib/flash/flash_page.dart`: failure and receipt cards. `flash_target.dart`: `describeLinkFailure`.
+- L1: [`webusb.rs`](../../../flasher-web/rust/crates/fastboot-link/src/webusb.rs), notably `open`, `devices`, `bounded`, `BulkTransport`, and the claim-only comment. Repository-relative path from the bricks checkout is `../flasher-web/rust/crates/fastboot-link/src/webusb.rs`.
+- L2: `flasher-web/rust/crates/fastboot-link/src/native.rs`: `open`, `SessionGuard`, `BulkTransport`.
+- L3: `flasher-web/rust/crates/fastboot-link/src/session.rs`: `Session::command`, `command_inner`, `write_download`, `end_download`, `send`, `read_response`, `retire`.
+- L4: `flasher-web/rust/crates/fastboot-link/src/error.rs`: `LinkError::from_transport`, `device`, `protocol`, `session_retired`.
+- L5: `flasher-web/packages/device_link/lib/device_link.dart`: `LinkFailure`, `FastbootTransport`, `FastbootSession`.
+- L6: `flasher-web/app/lib/flash/device_sheet.dart`: `_loadGranted`, `_choose`, `_guidance`, sheet rendering.
+- L7: `flasher-web/app/lib/flash/flash_controller.dart`: `FlashPhase`, `_onEvent`, retry guidance, `_onError`, `_onDone`, `downloadReceipt`, `saveLog`.
+- L8: `flasher-web/app/lib/flash/flash_page.dart`: failure and receipt cards. `flash_target.dart`: `describeLinkFailure`.
 - L9: `bricks/docs/patterns/devices.md`, plus the archived `web-target/{webusb-wasm-research,link-distill-web,link-distill-bricks,link-profile-critique}.md` and `link-prototype/lib/{link,fastboot}.dart`.
 
 ## 2. What established tools actually do
@@ -278,7 +278,7 @@ The existing pattern requires original errors, source chains, cleanup errors, an
 
 **[INFERENCE]** Separate an exact-target **local receipt** from a shareable diagnostic report. A serial may be needed in the receipt and on screen. Redact serials, device paths, usernames and sensitive URLs by default in an export meant for sharing. Use a per-report consistent pseudonym rather than a globally stable unsalted serial hash. Provide a preview and never upload automatically. A pre-write preparation failure must also allow export, even if no flash receipt exists.
 
-## 8. Comparison with current flasher_web
+## 8. Comparison with current flasher-web
 
 These observations apply to the read snapshots L1–L8, not every transitive backend or executor. Recommendations are marked separately. No build, test, browser run or device check was performed.
 
@@ -324,7 +324,7 @@ These observations apply to the read snapshots L1–L8, not every transitive bac
 | Squadron/process service | Generic execution/stream delivery only. The service can carry app `LinkState` and evidence without owning USB policy. |
 | Future brick | Only a slice that two independent consuming apps actually copied, after comparing their live requirements. Not a registry of speculative protocol profiles or a second strategy vocabulary. |
 
-**[INFERENCE]** Nothing inspected here demonstrates the “second app copies it” extraction bar for this proposed connection handler. Web and native paths of flasher_web remain one consuming app. The archived fake prototype is not a second app. External apps demonstrate established patterns worth adopting, not that a p0g feature brick is already justified. Document the rules now. Extract actual duplicated app code only when that duplication exists.
+**[INFERENCE]** Nothing inspected here demonstrates the “second app copies it” extraction bar for this proposed connection handler. Web and native paths of flasher-web remain one consuming app. The archived fake prototype is not a second app. External apps demonstrate established patterns worth adopting, not that a p0g feature brick is already justified. Document the rules now. Extract actual duplicated app code only when that duplication exists.
 
 ### Disagreements with current devices.md
 
