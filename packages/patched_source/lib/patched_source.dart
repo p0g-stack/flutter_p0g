@@ -28,8 +28,7 @@ Future<Map<String, String>> readPatchPin(File file) async {
     pin[key] = value;
   }
   for (final key in const ['repo', 'commit']) {
-    if (!pin.containsKey(key))
-      throw FormatException('${file.path}: missing $key=');
+    if (!pin.containsKey(key)) throw FormatException('${file.path}: missing $key=');
   }
   if (!_commitPattern.hasMatch(pin['commit']!)) {
     throw FormatException('${file.path}: commit must be a full 40-hex SHA');
@@ -47,9 +46,8 @@ Future<void> setManagedPubOverride({
     throw ArgumentError.value(relativePath, 'relativePath', 'must be relative');
   }
   final text = await overrides.exists() ? await overrides.readAsString() : '';
-  Never conflict(Object detail) => throw StateError(
-    '${overrides.path}: conflicting override for $package: $detail',
-  );
+  Never conflict(Object detail) =>
+      throw StateError('${overrides.path}: conflicting override for $package: $detail');
   dynamic document;
   try {
     document = loadYaml(text);
@@ -57,16 +55,10 @@ Future<void> setManagedPubOverride({
     conflict(error);
   }
   if (document == null &&
-      text
-          .split('\n')
-          .any(
-            (line) =>
-                line.trim().isNotEmpty && !line.trimLeft().startsWith('#'),
-          )) {
+      text.split('\n').any((line) => line.trim().isNotEmpty && !line.trimLeft().startsWith('#'))) {
     conflict('expected a YAML mapping');
   }
-  if (document != null && document is! YamlMap)
-    conflict('expected a YAML mapping');
+  if (document != null && document is! YamlMap) conflict('expected a YAML mapping');
   final dependencies = document?['dependency_overrides'];
   if (document != null &&
       document.containsKey('dependency_overrides') &&
@@ -75,9 +67,7 @@ Future<void> setManagedPubOverride({
   }
   if (dependencies is YamlMap && dependencies.containsKey(package)) {
     final current = dependencies[package];
-    if (current is! YamlMap ||
-        current.length != 1 ||
-        current['path'] is! String) {
+    if (current is! YamlMap || current.length != 1 || current['path'] is! String) {
       conflict(current);
     }
     final path = current['path'] as String;
@@ -115,9 +105,7 @@ Future<Directory> materializePatchedSource({
   }
   await destination.parent.create(recursive: true);
   final parent = await destination.parent.resolveSymbolicLinks();
-  final target = Directory(
-    p.join(parent, p.basename(destination.absolute.path)),
-  );
+  final target = Directory(p.join(parent, p.basename(destination.absolute.path)));
   // POSIX file locks are process-wide; queue same-isolate calls as well.
   final key = target.path;
   final previous = _pending[key];
@@ -147,8 +135,7 @@ Future<Directory> _materialize(
   final patches = <File>[];
   for (final file in input) {
     if (p.extension(file.path) == '.patch' &&
-        await FileSystemEntity.type(file.path, followLinks: false) ==
-            FileSystemEntityType.file) {
+        await FileSystemEntity.type(file.path, followLinks: false) == FileSystemEntityType.file) {
       patches.add(file);
     }
   }
@@ -158,8 +145,7 @@ Future<Directory> _materialize(
   final identities = <Map<String, String>>[];
   for (final patch in patches) {
     final name = p.basename(patch.path);
-    if (!names.add(name))
-      throw ArgumentError('Duplicate patch filename: $name');
+    if (!names.add(name)) throw ArgumentError('Duplicate patch filename: $name');
     final data = await patch.readAsBytes();
     bytes.add(data);
     identities.add({'name': name, 'sha256': sha256.convert(data).toString()});
@@ -171,8 +157,7 @@ Future<Directory> _materialize(
     'patches': identities,
   };
   final type = await FileSystemEntity.type(target.path, followLinks: false);
-  if (type != FileSystemEntityType.notFound &&
-      type != FileSystemEntityType.directory) {
+  if (type != FileSystemEntityType.notFound && type != FileSystemEntityType.directory) {
     throw StateError('${target.path}: destination is not an owned directory');
   }
   final exists = type == FileSystemEntityType.directory;
@@ -195,13 +180,10 @@ Future<Directory> _materialize(
       );
     }
     await _assertUnmodified(target, recorded['patchedTree'] as String);
-    final oldIdentity = Map<String, dynamic>.of(recorded)
-      ..remove('patchedTree');
+    final oldIdentity = Map<String, dynamic>.of(recorded)..remove('patchedTree');
     if (jsonEncode(oldIdentity) == jsonEncode(identity)) return target;
   }
-  final stage = await target.parent.createTemp(
-    '.${p.basename(target.path)}.staging-',
-  );
+  final stage = await target.parent.createTemp('.${p.basename(target.path)}.staging-');
   Directory? backup;
   try {
     await _git(stage, ['init', '-q']);
@@ -223,8 +205,7 @@ Future<Directory> _materialize(
       final code = await process.exitCode;
       await stdoutDone;
       final error = await stderrDone;
-      if (code != 0)
-        throw StateError('${target.path}: git apply failed: $error');
+      if (code != 0) throw StateError('${target.path}: git apply failed: $error');
     }
     await _git(stage, ['add', '-A']);
     identity['patchedTree'] = (await _git(stage, ['write-tree'])).trim();
@@ -238,13 +219,9 @@ Future<Directory> _materialize(
         final recorded = jsonDecode(await stamp.readAsString()) as Map;
         await _assertUnmodified(target, recorded['patchedTree'] as String);
       } else if (!await target.list().isEmpty) {
-        throw StateError(
-          '${target.path}: destination changed during materialization',
-        );
+        throw StateError('${target.path}: destination changed during materialization');
       }
-      final reserved = await target.parent.createTemp(
-        '.${p.basename(target.path)}.previous-',
-      );
+      final reserved = await target.parent.createTemp('.${p.basename(target.path)}.previous-');
       await reserved.delete();
       backup = await target.rename(reserved.path);
     }
@@ -262,14 +239,7 @@ Future<Directory> _materialize(
 }
 
 Future<void> _assertUnmodified(Directory directory, String tree) async {
-  final diff = await Process.run('git', [
-    '-C',
-    directory.path,
-    'diff',
-    '--quiet',
-    tree,
-    '--',
-  ]);
+  final diff = await Process.run('git', ['-C', directory.path, 'diff', '--quiet', tree, '--']);
   final untracked = (await _git(directory, [
     'ls-files',
     '--others',
@@ -277,18 +247,14 @@ Future<void> _assertUnmodified(Directory directory, String tree) async {
     '-z',
   ])).split('\u0000').where((name) => name.isNotEmpty && name != _stampName);
   if (diff.exitCode != 0 || untracked.isNotEmpty) {
-    throw StateError(
-      '${directory.path}: managed source has user changes; refusing replacement',
-    );
+    throw StateError('${directory.path}: managed source has user changes; refusing replacement');
   }
 }
 
 Future<String> _git(Directory directory, List<String> args) async {
   final result = await Process.run('git', ['-C', directory.path, ...args]);
   if (result.exitCode != 0) {
-    throw StateError(
-      '${directory.path}: git ${args.join(' ')} failed: ${result.stderr}',
-    );
+    throw StateError('${directory.path}: git ${args.join(' ')} failed: ${result.stderr}');
   }
   return result.stdout as String;
 }
