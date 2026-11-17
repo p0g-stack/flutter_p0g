@@ -38,4 +38,7 @@ jobs:
           dart pub get
           dart test -p vm test/squadron_vm_test.dart
       - name: Upstream patch matches the applied one
-        run: cmp third_party/squadron/patches/0001-Worker-pluggable-channel-factory.patch third_party/squadron/patches/upstream/0001-Worker-pluggable-channel-factory.patch
+        run: |
+          for patch in third_party/squadron/patches/*.patch; do
+            cmp "$patch" "third_party/squadron/patches/upstream/$(basename "$patch")"
+          done

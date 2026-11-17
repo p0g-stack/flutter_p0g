@@ -15,11 +15,18 @@ dependencies:
   # The channel-factory patch in third_party/squadron/patches is
   # written against this release. tool/squadron.sh materializes the patched
   # tree and points pub at it through pubspec_overrides.yaml.
-  squadron: ">=7.4.4 <7.5.0"
+  squadron: ">=7.4.5 <7.5.0"
   cancelation_token: ^1.1.0
   logger: ^2.1.0
   meta: ^1.11.0
   web: ^1.1.0
+  patched_source:
+    git:
+      url: https://github.com/p0g-stack/flutter_p0g
+      ref: 5715b3daddeff19dc3319cd33aea828a01c68039
+      path: packages/patched_source
+  path: ^1.9.0
+  yaml: ^3.1.3
 
 dev_dependencies:
   lints: ^6.0.0

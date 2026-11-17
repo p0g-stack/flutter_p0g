@@ -1,7 +1,7 @@
-From 0c8ab7cfa8c6bd5a36a6aa14284482c83c68fc44 Mon Sep 17 00:00:00 2001
+From 1a5f2ea80fa50623eb34172d750f7bfea4bdecab Mon Sep 17 00:00:00 2001
 From: squadron_process <noreply@p0g-stack>
 Date: Thu, 1 Oct 2026 05:15:45 +0000
-Subject: [PATCH] Worker: pluggable channel factory
+Subject: [PATCH 1/2] Worker: pluggable channel factory
 
 Worker.start() always opens Channel.open(), so a worker can only run in
 an isolate (VM) or a Web Worker (browser). Channel is already an
@@ -33,7 +33,7 @@ default path).
  create mode 100644 test/13_channel_factory_suite.dart
 
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 07e3362a..171e36f1 100644
+index 65bb757..939b738 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -1,3 +1,8 @@
@@ -42,11 +42,11 @@ index 07e3362a..171e36f1 100644
 +- Add `Worker.channelFactory` (and a `channelFactory` constructor parameter) so a worker can open its channel somewhere other than an isolate or a Web Worker, e.g. another process over a socket. Without a factory, `Worker.start()` opens `Channel.open()` as before.
 +- Export `SquadronCancelationToken` and `StreamId`, which custom `Channel` implementations need.
 +
- ## 7.4.4
+ ## 7.4.5
  
- - Update WASM loader to use the latest version, while still supporting the legacy version. Fixes https://github.com/d-markey/squadron/issues/80.
+ - Update built-in package skill for cancellation (`squadron-cancelation`).
 diff --git a/lib/squadron.dart b/lib/squadron.dart
-index 10fa9210..f82f9b9a 100644
+index 10fa921..f82f9b9 100644
 --- a/lib/squadron.dart
 +++ b/lib/squadron.dart
 @@ -41,10 +41,13 @@ export 'src/squadron_singleton.dart';
@@ -64,7 +64,7 @@ index 10fa9210..f82f9b9a 100644
  export 'src/worker/worker_response.dart';
  export 'src/worker_client.dart';
 diff --git a/lib/src/channel.dart b/lib/src/channel.dart
-index 577b4bd2..8cfc1ef3 100644
+index 577b4bd..8cfc1ef 100644
 --- a/lib/src/channel.dart
 +++ b/lib/src/channel.dart
 @@ -16,6 +16,19 @@ import 'worker/worker_message.dart';
@@ -88,7 +88,7 @@ index 577b4bd2..8cfc1ef3 100644
  /// is used to send a [WorkerRequest] to a platform worker.
  abstract interface class Channel {
 diff --git a/lib/src/worker/worker.dart b/lib/src/worker/worker.dart
-index 9ceae5ce..2783309c 100644
+index 9ceae5c..2783309 100644
 --- a/lib/src/worker/worker.dart
 +++ b/lib/src/worker/worker.dart
 @@ -31,7 +31,9 @@ abstract class Worker
@@ -137,7 +137,7 @@ index 9ceae5ce..2783309c 100644
        return channel;
 diff --git a/test/13_channel_factory_suite.dart b/test/13_channel_factory_suite.dart
 new file mode 100644
-index 00000000..33ba3f19
+index 0000000..33ba3f1
 --- /dev/null
 +++ b/test/13_channel_factory_suite.dart
 @@ -0,0 +1,156 @@
@@ -298,7 +298,7 @@ index 00000000..33ba3f19
 +      Stream.fromIterable(args);
 +}
 diff --git a/test/squadron_browser_test.dart b/test/squadron_browser_test.dart
-index 712efb05..3ab399fa 100644
+index 712efb0..3ab399f 100644
 --- a/test/squadron_browser_test.dart
 +++ b/test/squadron_browser_test.dart
 @@ -19,6 +19,7 @@ import '09_cancelation_suite.dart' as cancelation;
@@ -316,7 +316,7 @@ index 712efb05..3ab399fa 100644
 +  channel_factory.execute(tc);
  }
 diff --git a/test/squadron_vm_test.dart b/test/squadron_vm_test.dart
-index f1e2469e..a3496cab 100644
+index f1e2469..a3496ca 100644
 --- a/test/squadron_vm_test.dart
 +++ b/test/squadron_vm_test.dart
 @@ -17,6 +17,7 @@ import '09_cancelation_suite.dart' as cancelation;
@@ -334,5 +334,5 @@ index f1e2469e..a3496cab 100644
 +  channel_factory.execute(tc);
  }
 -- 
-2.43.0
+2.56.0
 

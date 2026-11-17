@@ -24,7 +24,8 @@ git -C "$src" clean -q -fdx
 for p in "$dir"/patches/*.patch; do
   git -C "$src" apply --whitespace=nowarn "$p"
 done
-echo "squadron $tag ($commit) + $(ls "$dir"/patches/*.patch | wc -l | tr -d ' ') patch(es) at $src"
+version=$(awk '/^version: / { print $2; exit }' "$src/pubspec.yaml")
+echo "squadron $version ($commit) + $(ls "$dir"/patches/*.patch | wc -l | tr -d ' ') patch(es) at $src"
 
 if [ "${1:-}" != "--no-override" ]; then
   cat > "$root/pubspec_overrides.yaml" <<YAML
