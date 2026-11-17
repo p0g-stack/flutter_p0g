@@ -124,7 +124,7 @@ Future<void> precacheDartAndroid({
     globals.printStatus('Dart $version Android kit ($abi): up to date.');
     return;
   }
-  final bytes = await fetchBytes(source!);
+  final bytes = await fetchBytes(source);
   final digest = sha256.convert(bytes).toString();
   if (expected != digest) throwToolExit('Kit sha256 is $digest, expected $expected.');
   final archive = decodeTarGz(bytes);

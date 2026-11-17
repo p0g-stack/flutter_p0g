@@ -43,7 +43,7 @@ List<int> _archive(Map<String, String> members) {
     final bytes = utf8.encode(entry.value);
     archive.addFile(ArchiveFile(entry.key, bytes.length, bytes)..mode = 0x1ed);
   }
-  return GZipEncoder().encode(TarEncoder().encode(archive)!)!;
+  return GZipEncoder().encode(TarEncoder().encode(archive))!;
 }
 
 void main() {

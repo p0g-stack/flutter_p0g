@@ -125,7 +125,7 @@ Future<void> precacheAeraKit(
     globals.printStatus('AERA kit $target-$mode: up to date.');
     return;
   }
-  final bytes = await fetchBytes(source!);
+  final bytes = await fetchBytes(source);
   final digest = sha256.convert(bytes).toString();
   if (digest != expected) throwToolExit('Kit sha256 is $digest, expected $expected.');
   // Asset-ID URLs have no filename; identify gzip by its magic bytes.
