@@ -24,7 +24,7 @@ dependencies:
   flutter_webui_client:
     git:
       url: https://github.com/p0g-stack/flutter-webui
-      ref: 374766e3913972aedca2e0a7778d88b5d398459a
+      ref: 087c6ce43e2d34878deb3889edd137d8f9351bb4
       path: packages/flutter_webui_client
   material_color_utilities: ^0.13.0
   web: ^1.1.0
