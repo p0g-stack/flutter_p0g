@@ -21,7 +21,7 @@ Self-contained; no external base file.
   `lib/io.dart` or conditional imports.
 - No dependency on any embedding (flutter_webui included). Embeddings plug in
   through `ProcessLauncher`, `EndpointStore` and `FactsCheck`.
-- Pinned: Flutter 3.47.5 / Dart 3.13.4, Squadron 7.4.5 (`third_party/squadron/PIN`).
+- Pinned: Flutter 3.47.9 / Dart 3.13.7 in CI, Squadron 7.4.5 (`third_party/squadron/PIN`). The minimum SDK stays `^3.13.4`, the oldest Dart these APIs need.
   Run `tool/squadron.sh` before `dart pub get`. A change to Squadron is a new
   or edited patch in `third_party/squadron/patches/` (git format-patch), with
   Squadron's own VM suite still passing. `patches/upstream/` holds the same

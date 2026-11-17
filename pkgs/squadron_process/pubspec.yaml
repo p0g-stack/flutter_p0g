@@ -8,7 +8,7 @@ publish_to: none
 repository: https://github.com/p0g-stack/squadron_process
 
 environment:
-  # Dart that ships with the pinned Flutter 3.47.5.
+  # Oldest Dart whose APIs this package uses; CI runs the Dart of the pinned Flutter.
   sdk: ^3.13.4
 
 dependencies:
