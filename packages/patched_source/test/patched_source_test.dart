@@ -136,6 +136,8 @@ void main() {
     final pin = File(p.join(temp.path, 'PIN'));
     await pin.writeAsString('# comment\nrepo=${repository.path}\ncommit=$commit\n');
     expect(await readPatchPin(pin), {'repo': repository.path, 'commit': commit});
+    await pin.writeAsString('repo=${repository.path}\ncommit=$commit\npackage=\n');
+    expect((await readPatchPin(pin))['package'], '');
     for (final invalid in ['repo=x\n', 'commit=$commit\n', 'repo=x\ncommit=abc\n',
       'repo=x\nrepo=y\ncommit=$commit\n']) {
       await pin.writeAsString(invalid);

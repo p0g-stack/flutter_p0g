@@ -4,8 +4,10 @@ Pure-Dart Git patch materialization shared by stack bootstraps. No Flutter or
 flutter_tools dependency. Import `package:patched_source/patched_source.dart`.
 
 - `readPatchPin(File)` reads `repo=`, full 40-hex `commit=`, optional `tag=` and
-  optional `package=`. Pub consumers must require `package=` themselves and
-  validate that the resulting package exists. A tag is descriptive, not identity.
+  optional `package=`. `package` is the subdirectory inside the repository;
+  an explicitly empty `package=` means the repository root. Pub consumers must
+  require this key themselves and validate the resulting package manifest.
+  A tag is descriptive, not identity.
 - `materializePatchedSource(destination:, repository:, commit:, patches:)` applies
   regular `.patch` files in filename order (an empty series is valid). Identity
   records the repository, full commit, ordered patch names/SHA256 digests and

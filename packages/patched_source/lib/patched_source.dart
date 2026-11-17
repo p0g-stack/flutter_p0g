@@ -21,7 +21,7 @@ Future<Map<String, String>> readPatchPin(File file) async {
     final key = line.substring(0, at).trim();
     final value = line.substring(at + 1).trim();
     if (!const ['repo', 'commit', 'tag', 'package'].contains(key) ||
-        pin.containsKey(key) || value.isEmpty) {
+        pin.containsKey(key) || (value.isEmpty && key != 'package')) {
       throw FormatException('${file.path}: invalid or duplicate $key=');
     }
     pin[key] = value;
