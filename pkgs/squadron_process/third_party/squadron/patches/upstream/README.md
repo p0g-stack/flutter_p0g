@@ -58,9 +58,11 @@ suite (Chrome, dart2js and dart2wasm, JS and Wasm workers) 2940 passed.
 Existing analyzer infos in Squadron are unchanged; the patch adds none.
 On 2026-11-17, with both patches on the pinned 7.4.5 tree and Dart 3.13.4:
 `dart test -p vm test/squadron_vm_test.dart` passed 694 tests (5 skipped).
-The standalone squadron_process suite passed 89 tests, including cache
-migration and custom-override refusal. Browser qualification of this rebase
-is separate from those VM results.
+The standalone squadron_process suite passed 89 tests before the legacy-cache
+compatibility code was removed. The bootstrap now ignores the old
+`.dart_tool/squadron_process/` directory and only installs beneath
+`.dart_tool/third_party/`; unowned sources and overrides remain refused.
+Browser qualification of this rebase is separate from those VM results.
 
 ### Why it is worth having upstream
 

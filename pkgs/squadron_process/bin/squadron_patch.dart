@@ -8,10 +8,6 @@ import 'package:patched_source/patched_source.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
-const _legacyCommit = '4ab7f15a5d6d395dbbb928542196f58949a5ba0b';
-// Git tree after the 7.4.4 channel-factory patch, including its new test file.
-const _legacyTree = 'c8a7e198a861d171e95dcb7bd79308792b717123';
-
 Future<void> main(List<String> args) async {
   if (args.length > 1) {
     stderr.writeln('Usage: dart run squadron_process:squadron_patch [root]');
@@ -51,7 +47,6 @@ Future<void> main(List<String> args) async {
     );
     final overrides = File(p.join(root.path, 'pubspec_overrides.yaml'));
     final previous = <String>{};
-    Directory? legacy;
     if (await overrides.exists()) {
       final doc = loadYaml(await overrides.readAsString());
       final dependencies = doc is YamlMap ? doc['dependency_overrides'] : null;
@@ -59,12 +54,7 @@ Future<void> main(List<String> args) async {
       final old = entry is YamlMap ? entry['path'] : null;
       if (old is String && old != relative) {
         final directory = Directory(p.join(root.path, old));
-        if (old ==
-            '.dart_tool/squadron_process/squadron-${_legacyCommit.substring(0, 12)}') {
-          await _assertTree(directory, repository, _legacyCommit, _legacyTree);
-          previous.add(old);
-          legacy = directory;
-        } else if (RegExp(r'^\.dart_tool/third_party/squadron-[a-f0-9]{12}$')
+        if (RegExp(r'^\.dart_tool/third_party/squadron-[a-f0-9]{12}$')
             .hasMatch(old)) {
           final stamp = jsonDecode(
             await File(p.join(directory.path, '.patched_source.json'))
@@ -85,7 +75,6 @@ Future<void> main(List<String> args) async {
             repository,
             oldCommit,
             stamp['patchedTree'] as String,
-            stamped: true,
           );
           previous.add(old);
         }
@@ -140,10 +129,6 @@ Future<void> main(List<String> args) async {
       relativePath: p.posix.join(relative, packagePath),
       previousManagedPaths: previous,
     );
-    if (legacy != null) {
-      await _assertTree(legacy, repository, _legacyCommit, _legacyTree);
-      await legacy.delete(recursive: true);
-    }
     stdout.writeln(
       'squadron ${pubspec['version']} ($commit) at ${source.path}',
     );
@@ -158,9 +143,8 @@ Future<void> _assertTree(
   Directory directory,
   String repository,
   String commit,
-  String tree, {
-  bool stamped = false,
-}) async {
+  String tree,
+) async {
   if (await FileSystemEntity.type(directory.path, followLinks: false) !=
           FileSystemEntityType.directory ||
       (await _git(directory, [
@@ -171,11 +155,11 @@ Future<void> _assertTree(
           repository ||
       (await _git(directory, ['rev-parse', 'HEAD'])).trim() != commit) {
     throw StateError(
-      '${directory.path}: conflicting legacy or managed Squadron checkout',
+      '${directory.path}: conflicting managed Squadron checkout',
     );
   }
-  // A disposable index proves all nonignored working content, including the
-  // old patch's untracked test, without staging or modifying the owner's index.
+  // A disposable index proves all nonignored working content without staging
+  // or modifying the owner's index.
   final temp = await Directory.systemTemp.createTemp('squadron-index-');
   final environment = {'GIT_INDEX_FILE': p.join(temp.path, 'index')};
   try {
@@ -185,14 +169,14 @@ Future<void> _assertTree(
       '-A',
       '--',
       '.',
-      if (stamped) ':!.patched_source.json',
+      ':!.patched_source.json',
     ], environment: environment);
     final actual = (await _git(directory, [
       'write-tree',
     ], environment: environment)).trim();
     if (actual != tree) {
       throw StateError(
-        '${directory.path}: source has user changes; refusing migration',
+        '${directory.path}: source has user changes; refusing override update',
       );
     }
   } finally {

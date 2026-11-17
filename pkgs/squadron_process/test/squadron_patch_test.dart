@@ -8,7 +8,6 @@ import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 const _repository = 'https://github.com/d-markey/squadron';
-const _oldCommit = '4ab7f15a5d6d395dbbb928542196f58949a5ba0b';
 const _newCommit = 'fd5becc4a480887aadc04b350b1fda844502065e';
 const _oldPath = '.dart_tool/squadron_process/squadron-4ab7f15a5d6d';
 const _newPath = '.dart_tool/third_party/squadron-fd5becc4a480';
@@ -33,35 +32,6 @@ void main() {
     environment: environment,
   );
 
-  Future<void> oldTree() async {
-    final old = await Directory(p.join(fixture.path, _oldPath))
-        .create(recursive: true);
-    await git(old, ['init', '-q']);
-    await git(old, ['remote', 'add', 'origin', _repository]);
-    await git(old, ['fetch', '-q', upstream.path, _oldCommit]);
-    await git(old, ['checkout', '-q', '--detach', _oldCommit]);
-    // 0001's code/tests are unchanged by the rebase. Only its changelog
-    // context moved from 7.4.4 to 7.4.5; reconstruct the exact old header.
-    await git(old, [
-      'apply',
-      '--exclude=CHANGELOG.md',
-      p.join(
-        packageRoot.path,
-        'third_party/squadron/patches/0001-Worker-pluggable-channel-factory.patch',
-      ),
-    ]);
-    final changelog = File(p.join(old.path, 'CHANGELOG.md'));
-    await changelog.writeAsString(
-      '## Unreleased\n\n'
-      '- Add `Worker.channelFactory` (and a `channelFactory` constructor parameter) so a worker can open its channel somewhere other than an isolate or a Web Worker, e.g. another process over a socket. Without a factory, `Worker.start()` opens `Channel.open()` as before.\n'
-      '- Export `SquadronCancelationToken` and `StreamId`, which custom `Channel` implementations need.\n\n'
-      '${await changelog.readAsString()}',
-    );
-    await File(p.join(fixture.path, 'pubspec_overrides.yaml')).writeAsString(
-      '# retained comment\ndependency_overrides:\n  squadron:\n    path: $_oldPath\n',
-    );
-  }
-
   setUpAll(() async {
     suite = await Directory.systemTemp.createTemp('squadron patch fixtures ');
     upstream = await Directory(p.join(suite.path, 'upstream')).create();
@@ -72,7 +42,6 @@ void main() {
       '--depth',
       '1',
       Platform.environment['SQUADRON_TEST_REPOSITORY'] ?? _repository,
-      _oldCommit,
       _newCommit,
     ]);
     // The command still checks the literal origin recorded in the PIN.
@@ -91,8 +60,13 @@ void main() {
   });
   tearDown(() async => fixture.delete(recursive: true));
 
-  test('old managed override moves to the new verified tree', () async {
-    await oldTree();
+  test('uses the new cache and ignores the old directory', () async {
+    final old = await Directory(p.join(fixture.path, _oldPath))
+        .create(recursive: true);
+    final owner = File(p.join(old.path, 'owner.txt'));
+    await owner.writeAsString('untouched old cache');
+    await File(p.join(fixture.path, 'pubspec_overrides.yaml'))
+        .writeAsString('# retained comment\ndependency_overrides: {}\n');
     final result = await runPatch();
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     expect(result.stdout, contains('squadron 7.4.5'));
@@ -103,7 +77,7 @@ void main() {
       _newPath,
     );
     expect(contents, contains('# retained comment'));
-    expect(await Directory(p.join(fixture.path, _oldPath)).exists(), isFalse);
+    expect(await owner.readAsString(), 'untouched old cache');
     final source = Directory(p.join(fixture.path, _newPath));
     expect(
       await File(p.join(source.path, '.patched_source.json')).exists(),
@@ -131,17 +105,43 @@ void main() {
     expect(await Directory(p.join(fixture.path, _newPath)).exists(), isFalse);
   });
 
-  test('modified legacy checkout and override are preserved', () async {
-    await oldTree();
-    final owner = File(p.join(fixture.path, _oldPath, 'owner.txt'));
+  test(
+    'old-path overrides are refused without touching their source',
+    () async {
+      final old = await Directory(p.join(fixture.path, _oldPath))
+          .create(recursive: true);
+      final owner = File(p.join(old.path, 'owner.txt'));
+      await owner.writeAsString('owner content');
+      await File(p.join(fixture.path, 'pubspec_overrides.yaml')).writeAsString(
+        'dependency_overrides:\n  squadron:\n    path: $_oldPath\n',
+      );
+      final overrides = File(p.join(fixture.path, 'pubspec_overrides.yaml'));
+      final before = await overrides.readAsBytes();
+      final result = await runPatch();
+      expect(result.exitCode, isNot(0));
+      expect(result.stderr, contains('conflicting override for squadron'));
+      expect(await owner.readAsString(), 'owner content');
+      expect(await overrides.readAsBytes(), before);
+      expect(await Directory(p.join(fixture.path, _newPath)).exists(), isFalse);
+    },
+  );
+
+  test('unstamped new destination is refused without adopting it', () async {
+    final source = await Directory(p.join(fixture.path, _newPath))
+        .create(recursive: true);
+    final owner = File(p.join(source.path, 'owner.txt'));
     await owner.writeAsString('owner content');
-    final overrides = File(p.join(fixture.path, 'pubspec_overrides.yaml'));
-    final before = await overrides.readAsBytes();
     final result = await runPatch();
     expect(result.exitCode, isNot(0));
-    expect(result.stderr, contains('user changes'));
+    expect(result.stderr, contains(source.path));
     expect(await owner.readAsString(), 'owner content');
-    expect(await overrides.readAsBytes(), before);
-    expect(await Directory(p.join(fixture.path, _newPath)).exists(), isFalse);
+    expect(
+      await File(p.join(source.path, '.patched_source.json')).exists(),
+      isFalse,
+    );
+    expect(
+      await File(p.join(fixture.path, 'pubspec_overrides.yaml')).exists(),
+      isFalse,
+    );
   });
 }
