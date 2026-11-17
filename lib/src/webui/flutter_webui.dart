@@ -17,17 +17,17 @@ import 'dart_android.dart';
 /// `web_ui/` patch series builds the patched web SDK the build compiles
 /// against.
 const kFlutterWebuiRepo = 'https://github.com/p0g-stack/flutter-webui';
-const kFlutterWebuiCommit = '8951e5f59eb5492b55da89a23edb2b43d87d7023';
+const kFlutterWebuiCommit = '374766e3913972aedca2e0a7778d88b5d398459a';
 
 /// flutter-webui's released patched web SDK (`web-sdk-release` workflow):
 /// `flutter_web_sdk/` and `pkg/sky_engine/lib/ui_web/`, built from the
 /// `web_ui/` tree [kWebSdkTree] against engine [kWebSdkEngine], pinned by
 /// sha256. Used when the pinned flutter-webui has that `web_ui/` tree and
 /// the installed Flutter that engine; otherwise precache builds it.
-const kWebSdkRelease = 'web-sdk-3.47.5-af7e796-93b29c6';
-const kWebSdkTree = '2b9eb411934f0eed8ecf8b7b59fcbfce70686bd0';
-const kWebSdkEngine = 'af7e796e161ae0bb1ff0758c71a7105418bd9ded';
-const kWebSdkSha256 = 'c961ec08b216b5f7a554a6e426003246d17edfd5db922689d710d990363d7ae7';
+const kWebSdkRelease = 'web-sdk-3.47.9-89c39ed-374766e';
+const kWebSdkTree = '95c08d370439fe9c6a7851bc84026ad0ada6e301';
+const kWebSdkEngine = '89c39edfdfae2949f6806e4a315c0c08522238b7';
+const kWebSdkSha256 = 'd85ae5970c84aa7fd808344f2e72467eef5abf077a0d2a95b43f9ab2dbdaa653';
 const kWebSdkUrl =
     '$kFlutterWebuiRepo/releases/download/$kWebSdkRelease/flutter-webui-web-sdk.tar.xz';
 

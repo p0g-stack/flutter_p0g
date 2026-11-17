@@ -7,7 +7,7 @@ repository: https://github.com/p0g-stack/flutter_p0g
 environment:
   sdk: ^3.13.0
   # Pinned: the web_ui and frb patch series are made against this release.
-  flutter: 3.47.5
+  flutter: 3.47.9
 
 executables:
   flutter_p0g: flutter_p0g

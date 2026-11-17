@@ -27,4 +27,4 @@ Self-contained; no external base file.
   manager's name. Every string sent to a device shell is quoted here.
 - Tests are unit tests against fakes and in-memory files. No e2e; device
   claims come from devicelab runs with the device and manager named.
-- Pinned Flutter 3.47.5. Bumping it means re-checking every patch series.
+- Pinned Flutter 3.47.9. Bumping it means re-checking every patch series.

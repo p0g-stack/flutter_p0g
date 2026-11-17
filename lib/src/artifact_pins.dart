@@ -44,6 +44,17 @@ const Map<String, Map<String, PinnedArtifact>> aeraKitPins = {
       '89502b18226472ee3d981eda915f1afee9b5643af67c8da9a1beeb8338ad52aa',
     ),
   },
+  // kit-3.47.9-0c28b4e291849f008d7ee3fd063e2670d0f9116b
+  '3.47.9': {
+    'linux-arm64-debug': PinnedArtifact(
+      'https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.47.9-0c28b4e291849f008d7ee3fd063e2670d0f9116b/flutter-aera-kit-linux-arm64-debug-3.47.9.tar.xz',
+      '31c2131acd5966a50e96b9438c6e48d63126be806fcbe4da747479ae6a56caed',
+    ),
+    'linux-x64-debug': PinnedArtifact(
+      'https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.47.9-0c28b4e291849f008d7ee3fd063e2670d0f9116b/flutter-aera-kit-linux-x64-debug-3.47.9.tar.xz',
+      '928be84c9d962dfc324733349f6ae0f9b363da167b40097fcbc49d57a6ac2a43',
+    ),
+  },
 };
 
 PinnedArtifact pinnedKit(

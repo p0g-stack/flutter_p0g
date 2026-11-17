@@ -9,7 +9,7 @@ import '../p0g_cache.dart';
 /// webui-packages, pinned: the `*_webui` implementations of stock plugins
 /// and `webui_app_plane` (the Termux:API client the app plane runs).
 const kWebuiPackagesRepo = 'https://github.com/p0g-stack/webui-packages';
-const kWebuiPackagesCommit = '0e7bbcb34d6bb638b0961d69f444d747cedd1f0b';
+const kWebuiPackagesCommit = '9f860cbc23d80b7f0c17ad0df0d589677c0605e2';
 
 Directory webuiPackagesDir() => p0gCacheDir().childDirectory('webui-packages');
 Directory webuiPackagesSource() => webuiPackagesDir().childDirectory('src');
