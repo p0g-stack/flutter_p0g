@@ -27,21 +27,10 @@ place.
 
 ## Pickers on embedded hosts
 
-App code calls only the stock federated `file_selector` API: `openFile`,
-`openFiles`, `getDirectoryPath`, `getSaveLocation`. Each embedding implements
-that API with the host's own picker, because an embedded platform has its own
-style and its users expect its picker, not one the app brings along.
-
-When the host picker lacks a mode, the embedding does one of these, in this
-order:
-
-1. Extend the host picker with that mode, shaped the way the host's own API
-   is shaped and behind a negotiated feature flag, so it can go upstream.
-2. Until that lands, return a clear "unsupported" for that mode. Never fake
-   it: no single file returned for `openFiles`, no guessed save path.
-
-An app-drawn picker is the last resort. Use it only when the host can't be
-extended at all, and then match the host's look.
+Pickers follow the general rule in [hosts.md](hosts.md): the app calls the
+stock `file_selector` API, and each embedding answers with the host's own
+picker. A mode the host lacks is added to the host picker, or reported as
+unsupported; it is never faked.
 
 | Host | Native modes | Missing, and the plan |
 |---|---|---|
