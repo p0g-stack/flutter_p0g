@@ -3,13 +3,17 @@
 
 // A Dart port of the socket handling in termux-api.c (termux-api-package
 // 9e7f153, `run_api_command` and `exec_am_broadcast_v2`): two listening
-// abstract AF_UNIX sockets, an `am broadcast` naming them, then stdin to one
-// and the other to stdout. The Termux:API contract is kept as is; the
-// receiving side is webui-termux-api `util/ResultReturner.java`.
+// abstract AF_UNIX sockets, an Android dispatch naming them, then stdin to
+// one and the other to stdout. Target-37 while-in-use APIs dispatch through
+// ApiDispatchActivity; ResultReturner.java keeps the same socket contract.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:flutter_webui_root/flutter_webui_root.dart'
+    show ToolRunner, setWifiEnabled;
 
 import 'termux_api_names.dart';
 
@@ -38,8 +42,20 @@ Future<void> callTermuxApi({
   String package = termuxApiPackage,
   String receiver = termuxApiReceiver,
   AmRunner? am,
+  ToolRunner? rootTools,
   Duration connectTimeout = const Duration(seconds: 10),
 }) async {
+  if (method == 'WifiEnable') {
+    var enabled = false;
+    for (var i = 0; i + 2 < extras.length; i++) {
+      if (extras[i] == '--ez' && extras[i + 1] == 'enabled') {
+        enabled = extras[i + 2].toLowerCase() == 'true';
+      }
+    }
+    final error = await setWifiEnabled(enabled, tools: rootTools);
+    if (error != null) output.add(utf8.encode('${jsonEncode(error)}\n'));
+    return;
+  }
   am ??= (args) => Process.run('/system/bin/am', args);
   // termux-api.c names: "input" is what this side reads (the app's output),
   // "output" what it writes (the app's input).
@@ -60,12 +76,14 @@ Future<void> callTermuxApi({
     });
     unawaited(feeding.catchError((Object _) {}));
 
-    final broadcast = am([
-      'broadcast',
+    final activity = _foregroundMethods.contains(method);
+    final dispatch = am([
+      activity ? 'start' : 'broadcast',
       '--user',
       '0',
+      if (!activity) '--allow-background-activity-starts',
       '-n',
-      '$package/$receiver',
+      '$package/${activity ? 'com.termux.api.ApiDispatchActivity' : receiver}',
       // Reversed for the app: our output is its input (termux-api.c).
       '--es', 'socket_input', outputName,
       '--es', 'socket_output', inputName,
@@ -76,10 +94,13 @@ Future<void> callTermuxApi({
       ...extras,
     ]);
 
-    final result = await broadcast;
-    if (result.exitCode != 0) {
+    final result = await dispatch;
+    // am start can report an Android error on stdout with exit status 0.
+    if (result.exitCode != 0 || '${result.stdout}'.contains('Error:')) {
       throw TermuxApiException(
-        'am broadcast exited ${result.exitCode}: ${result.stderr}'.trim(),
+        'am ${activity ? 'start' : 'broadcast'} exited ${result.exitCode}: '
+                '${result.stderr}${result.stdout}'
+            .trim(),
       );
     }
     // Connections wait in the listen backlog until accepted here.
@@ -87,7 +108,7 @@ Future<void> callTermuxApi({
       connectTimeout,
       onTimeout: () => throw TermuxApiException(
         '$package did not answer $method within ${connectTimeout.inSeconds} s '
-        '(not installed, disabled, or the broadcast was refused)',
+        '(not installed, disabled, or the dispatch was refused)',
       ),
     );
     await output.addStream(socket);
@@ -97,6 +118,16 @@ Future<void> callTermuxApi({
     await outputServer.close();
   }
 }
+
+// Target-37 camera/microphone/location foreground service eligibility needs
+// a visible activity before the API starts its work. Socket extras stay intact.
+const _foregroundMethods = {
+  'CameraPhoto',
+  'MicRecorder',
+  'Location',
+  'SpeechToText',
+  'Sensor',
+};
 
 InternetAddress _abstract(String name) =>
     InternetAddress('@$name', type: InternetAddressType.unix);

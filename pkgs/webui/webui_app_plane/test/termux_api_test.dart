@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:flutter_webui_root/flutter_webui_root.dart' show ToolRunner;
 import 'package:webui_app_plane/termux_api.dart';
 
 /// Plays webui-termux-api's side (util/ResultReturner.java): reads the
@@ -47,6 +48,7 @@ Future<String> call(
   List<String> extras = const [],
   String? input,
   Duration timeout = const Duration(seconds: 5),
+  ToolRunner? rootTools,
 }) async {
   final out = StreamController<List<int>>();
   final text = utf8.decodeStream(out.stream);
@@ -57,6 +59,7 @@ Future<String> call(
     output: out,
     am: am,
     connectTimeout: timeout,
+    rootTools: rootTools,
   );
   await out.close();
   return text;
@@ -72,10 +75,11 @@ void main() {
       input: 'hello',
     );
     expect(text, 'ok:hello');
-    expect(args.take(5), [
+    expect(args.take(6), [
       'broadcast',
       '--user',
       '0',
+      '--allow-background-activity-starts',
       '-n',
       'com.webui.termux.api/com.termux.api.TermuxApiReceiver',
     ]);
@@ -85,6 +89,64 @@ void main() {
     expect(int.parse(extra('api_server_uid')), greaterThanOrEqualTo(0));
     expect(extra('socket_input'), isNot(extra('socket_output')));
     expect(args.sublist(args.length - 3), ['--es', 'action', 'send']);
+  });
+
+  test(
+    'while-in-use APIs launch the root dispatcher with socket extras',
+    () async {
+      for (final method in [
+        'CameraPhoto',
+        'MicRecorder',
+        'Location',
+        'SpeechToText',
+        'Sensor',
+      ]) {
+        late List<String> args;
+        expect(
+          await call(fakeApp(onBroadcast: (a) => args = a), method: method),
+          'ok:',
+        );
+        expect(args.take(5), [
+          'start',
+          '--user',
+          '0',
+          '-n',
+          'com.webui.termux.api/com.termux.api.ApiDispatchActivity',
+        ]);
+        expect(args, isNot(contains('--allow-background-activity-starts')));
+        expect(args[args.indexOf('api_method') + 1], method);
+      }
+    },
+  );
+
+  test(
+    'WifiEnable stays in the root helper and preserves empty success',
+    () async {
+      final commands = <List<String>>[];
+      final result = await call(
+        (_) => throw StateError('WifiEnable must not dispatch to the APK'),
+        method: 'WifiEnable',
+        extras: ['--ez', 'enabled', 'true'],
+        rootTools: (tool, args) async {
+          commands.add([tool, ...args]);
+          return ProcessResult(1, 0, tool == 'id' ? '0' : '', '');
+        },
+      );
+      expect(result, isEmpty);
+      expect(commands.last, ['cmd', 'wifi', 'set-wifi-enabled', 'enabled']);
+    },
+  );
+
+  test('WifiEnable without root returns the APK needs-root response', () async {
+    final result = await call(
+      (_) => throw StateError('must not dispatch'),
+      method: 'WifiEnable',
+      rootTools: (tool, args) async => ProcessResult(1, 0, '2000', ''),
+    );
+    expect(jsonDecode(result), {
+      'error': 'WifiEnable needs root',
+      'code': 'needs_root',
+    });
   });
 
   test('a method without input answers without its input socket', () async {

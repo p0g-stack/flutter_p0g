@@ -21,6 +21,18 @@ manager name.
 Which route each plugin uses, per host, lives in `docs/plugins.md`. A plugin
 with no route on the baseline is not shipped as a stub.
 
+The target-37 app-plane client preserves Termux:API socket extras. APIs that
+need while-in-use eligibility (CameraPhoto, MicRecorder, Location,
+SpeechToText, Sensor) start `com.termux.api.ApiDispatchActivity` through the
+already-root process. Other methods use an explicit receiver broadcast with
+`--allow-background-activity-starts`, so permission and picker dialogs can
+open. The app remains responsible for requesting Android permissions.
+
+`WifiEnable --ez enabled true|false` is handled before contacting the APK:
+flutter-webui's root helper checks UID 0 and runs `cmd wifi set-wifi-enabled`.
+No additional `su` grant is requested. Success has empty output; no root
+returns `{"error":"WifiEnable needs root","code":"needs_root"}`.
+
 ## Packages
 
 | Package | Closed by |

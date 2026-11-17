@@ -21,12 +21,12 @@ import 'package:webui_app_plane/webui_app_plane.dart';
 /// | location, locationWhenInUse | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` |
 /// | locationAlways | `ACCESS_BACKGROUND_LOCATION` |
 /// | sensors | `BODY_SENSORS` |
-/// | storage | `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` |
+/// | storage | legacy storage aliases; the target-37 app requests all-files settings access on Android 11+ |
 /// | notification | `POST_NOTIFICATIONS` (Android 13+; before, whether notifications are on) |
 ///
-/// Notifications ask through Android's own prompt for apps built before
-/// Android 13, which Android shows once: a denial is `permanentlyDenied`
-/// (webui-termux-api webui.9). It is requested on its own call.
+/// Notifications use the target-37 app's runtime permission request on
+/// Android 13+. They are requested on their own call; the app reports the
+/// actual granted, denied or permanentlyDenied state.
 ///
 /// Other permissions are not declared by the app: they report and request
 /// as `denied`. `permanentlyDenied` comes only from a request (Android does
