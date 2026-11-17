@@ -25,14 +25,16 @@ Future<void> main(List<String> args) async {
     final lib = await Isolate.resolvePackageUri(
       Uri.parse('package:squadron_process/squadron_process.dart'),
     );
-    if (lib == null)
+    if (lib == null) {
       throw StateError('squadron_process is not a dependency here');
+    }
     final series = Directory(
       p.join(File.fromUri(lib).parent.parent.path, 'third_party', 'squadron'),
     );
     final pin = await readPatchPin(File(p.join(series.path, 'PIN')));
-    if (!pin.containsKey('package'))
+    if (!pin.containsKey('package')) {
       throw StateError('${series.path}/PIN: missing package=');
+    }
     final packagePath = pin['package']!;
     if (p.isAbsolute(packagePath) ||
         p.split(p.normalize(packagePath)).contains('..')) {
@@ -121,8 +123,9 @@ Future<void> main(List<String> args) async {
       patches: patches,
     );
     final manifest = File(p.join(source.path, packagePath, 'pubspec.yaml'));
-    if (!await manifest.exists())
+    if (!await manifest.exists()) {
       throw StateError('${manifest.path}: missing Squadron package');
+    }
     final pubspec = loadYaml(await manifest.readAsString());
     if (pubspec is! YamlMap ||
         pubspec['name'] != 'squadron' ||
@@ -187,10 +190,11 @@ Future<void> _assertTree(
     final actual = (await _git(directory, [
       'write-tree',
     ], environment: environment)).trim();
-    if (actual != tree)
+    if (actual != tree) {
       throw StateError(
         '${directory.path}: source has user changes; refusing migration',
       );
+    }
   } finally {
     await temp.delete(recursive: true);
   }
@@ -206,9 +210,10 @@ Future<String> _git(
     directory.path,
     ...args,
   ], environment: environment);
-  if (result.exitCode != 0)
+  if (result.exitCode != 0) {
     throw StateError(
       '${directory.path}: git ${args.join(' ')}: ${result.stderr}',
     );
+  }
   return result.stdout as String;
 }

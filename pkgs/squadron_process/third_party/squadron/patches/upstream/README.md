@@ -56,7 +56,11 @@ registered in both `squadron_vm_test.dart` and `squadron_browser_test.dart`:
 Run against the `v7.4.4` tree on 2026-10-01: VM suite 694 passed, browser
 suite (Chrome, dart2js and dart2wasm, JS and Wasm workers) 2940 passed.
 Existing analyzer infos in Squadron are unchanged; the patch adds none.
-Not yet rerun on the 7.4.5 tree.
+On 2026-11-17, with both patches on the pinned 7.4.5 tree and Dart 3.13.4:
+`dart test -p vm test/squadron_vm_test.dart` passed 694 tests (5 skipped).
+The standalone squadron_process suite passed 89 tests, including cache
+migration and custom-override refusal. Browser qualification of this rebase
+is separate from those VM results.
 
 ### Why it is worth having upstream
 
@@ -92,7 +96,8 @@ not touched. CHANGELOG entry under "Unreleased".
 
 None in Squadron's suite yet: checking the value needs a Wasm test worker
 that reports it, i.e. a new service method and rebuilt worker binaries.
-Until then it is checked by the consuming app's blob-worker qualification.
+The consuming app's blob-worker qualification must check the runtime value;
+the bootstrap fixture checks that the installed source contains the assignment.
 
 ### Why it is worth having upstream
 

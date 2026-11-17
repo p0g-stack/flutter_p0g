@@ -23,7 +23,7 @@ dependencies:
   patched_source:
     git:
       url: https://github.com/p0g-stack/flutter_p0g
-      ref: 5715b3daddeff19dc3319cd33aea828a01c68039
+      ref: d3b6de00bd5e88910b9b42036a819b06159085f5
       path: packages/patched_source
   path: ^1.9.0
   yaml: ^3.1.3
