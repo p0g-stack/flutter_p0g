@@ -6,7 +6,7 @@ resolution: workspace
 
 environment:
   sdk: ^3.13.0
-  flutter: ">=3.47.5"
+  flutter: ">=3.47.9"
 
 flutter:
   plugin:
@@ -23,7 +23,7 @@ dependencies:
   flutter_webui:
     git:
       url: https://github.com/p0g-stack/flutter-webui
-      ref: 74d0575a9a5851ddb879f6a16e473e1741bd9a76
+      ref: 374766e3913972aedca2e0a7778d88b5d398459a
       path: packages/flutter_webui
   webui_app_plane:
     path: ../webui_app_plane
