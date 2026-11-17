@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:{{name.snakeCase()}}/home.dart';
-import 'package:{{name.snakeCase()}}/panels/hello_panel.dart';
-import 'package:{{name.snakeCase()}}/places/places.dart';
-import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
-
+{{#sample}}import 'package:{{name.snakeCase()}}/panels/hello_panel.dart';
+{{/sample}}import 'package:{{name.snakeCase()}}/places/places.dart';
+{{#sample}}import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
+{{/sample}}
 void main() {
-  testWidgets('the hello panel shows its place and calls the service', (
+{{#sample}}  testWidgets('the hello panel shows its place and calls the service', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -38,7 +38,7 @@ void main() {
     expect(find.text('Counted: 1, 2, 3, 4, 5'), findsOneWidget);
   });
 
-  testWidgets('the process place is off without a launcher', (tester) async {
+{{/sample}}  testWidgets('the process place is off without a launcher', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: HomePage(

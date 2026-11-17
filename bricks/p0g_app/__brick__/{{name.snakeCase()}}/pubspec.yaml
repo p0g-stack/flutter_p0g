@@ -8,3 +8,14 @@ workspace:
   - core
   - app
   - cli
+
+dev_dependencies:
+  patched_source:
+    git:
+      url: https://github.com/p0g-stack/flutter_p0g
+      path: packages/patched_source
+      ref: d3b6de00bd5e88910b9b42036a819b06159085f5
+  path: ^1.9.1
+  yaml: ^3.1.3
+{{#rust}}  crypto: ^3.0.6
+{{/rust}}

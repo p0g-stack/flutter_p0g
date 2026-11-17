@@ -9,10 +9,12 @@ export 'package:logging/logging.dart' show Level, LogRecord, Logger;
 
 export 'src/facts/facts.dart';
 export 'src/log.dart';
-{{#rust}}export 'src/native/native.dart' show loadNative, sha256Hex;
+{{#rust}}export 'src/native/native.dart'
+    show NativeLoadFailure, loadNative, nativeLoadFailure;
 {{/rust}}export 'src/places/webui_launcher.dart';
-export 'src/service/hello_service.dart';
-{{#rust}}export 'src/strategy/digest.dart';
+{{#rust}}export 'src/rust/api/digest.dart' show sha256Hex;
+{{/rust}}{{#sample}}export 'src/service/hello_service.dart';
+{{/sample}}{{#rust}}export 'src/strategy/digest.dart';
 {{/rust}}export 'src/strategy/objective.dart';
 export 'src/strategy/strategy.dart';
 // p0g:exports (bricks insert exports above this line)

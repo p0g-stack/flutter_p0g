@@ -33,11 +33,14 @@ fetched and instantiated in the place that uses it, the first time it does.
 Keep it that way: a page that never takes the Rust strategy never pays for
 the download.
 
-With `--wasm`, the workers are dart2wasm too, and the crate doesn't load
-inside them yet: Squadron starts a dart2wasm worker from a `blob:` URL, so
-`../pkg/` has nothing to resolve against. Strategies fall back as they
-should (`Fact.native` is false there). The default dart2js build has no
-such gap.
+The loader resolves `pkg/` from `document.baseURI` on a page and `../pkg/`
+from the worker artifact URL in a worker. For dart2wasm's blob worker,
+patched Squadron publishes that artifact as `squadronWorkerScriptUrl`.
+A missing value is an explicit load failure, never an origin-based guess.
+`nativeLoadFailure` retains the original initialization error and stack.
+Presence is only a GET probe of the JS glue (the response body is cancelled),
+not proof that Rust initialized: qualification must require `rust_sha2` and
+the expected result in both JS and wasm workers, without COOP/COEP.
 
 ## Check the input inside the plan
 

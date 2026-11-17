@@ -13,11 +13,16 @@ bash tool/bootstrap.sh     # or: (cd core && dart run build_runner build) && bas
 | `core/lib/src/service/<name>_service.dart` | the service (`@SquadronService`), one example method |
 | `core/test/<name>_service_test.dart` | in-process and in-isolate tests |
 | `cli/lib/src/commands/<name>_command.dart` | `<app> <name> ...`, calling the service in-process |
-| `app/lib/panels/<name>_panel.dart` | a panel bound to the place the user picked |
+| `app/lib/panels/<name>_panel.dart` | a panel bound to the place the user picked (not with `--panel false`) |
 
-The hooks find the app name from `core/pubspec.yaml` and insert the export,
-the command, the `serve` entry and the panel at the `// p0g:` markers, then
-format what they touched.
+The hooks find the app name from `core/pubspec.yaml`. Before anything is
+written, pre_gen checks that every file and `// p0g:` marker the insertions
+need is there, and stops naming what is missing. Then post_gen inserts the
+export, the command, the `serve` entry and (with `panel`) the panel at those
+markers, skipping lines already there, and formats what it touched.
+
+`mason make service --name partitions --panel false` adds a service for the
+CLI and the process place only, with no app panel.
 
 ## Shaping the methods
 

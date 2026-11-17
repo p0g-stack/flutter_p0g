@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FLUTTER_P0G_REF: 9a94692015433723b2f5e0b19b5c00553112ce40
+
 jobs:
   bricks:
     runs-on: ubuntu-latest
@@ -24,23 +27,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-expand
-      # frb codegen at flutter_p0g's base commit, which the rust variant pins.
-      - uses: actions/cache@v4
-        id: frb
-        with:
-          path: ~/.frb-codegen
-          key: frb-codegen-848e438c561491adcc16cbf8b33bb61e541bd475
-      - name: frb codegen
-        if: steps.frb.outputs.cache-hit != 'true'
-        run: >
-          cargo install --locked --root ~/.frb-codegen
-          --git https://github.com/fzyzcjy/flutter_rust_bridge
-          --rev 848e438c561491adcc16cbf8b33bb61e541bd475
-          flutter_rust_bridge_codegen
-      - run: echo "$HOME/.frb-codegen/bin" >> "$GITHUB_PATH"
+          tool: cargo-expand,wasm-pack
+      - name: Install pinned flutter_p0g and patched FRB
+        run: |
+          dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g --git-ref "$FLUTTER_P0G_REF"
+          "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
       - name: Install mason
         run: |
           dart pub global activate mason_cli 0.1.4

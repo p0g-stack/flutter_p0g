@@ -122,6 +122,36 @@ flutter_p0g install --reboot     # adb push, then ksud / apd / magisk
 Open the module's WebUI in the manager. The Process segment's facts should
 show `root` and `block_devices`.
 
+## 7. Keep up with the brick
+
+`mason make p0g_app` also writes `tool/p0g_app.json`, the vars the workspace
+was made with. Commit it as written; `tool/regen.sh` regenerates the
+workspace from it and compares every generated file with yours:
+
+```sh
+BRICKS_REF=<full 40-hex bricks commit> bash tool/regen.sh
+```
+
+`BRICKS_REF` is required and must be a full commit; anything else exits 64
+before fetching. Keep it in your CI environment and your bump instructions,
+not in the script, and advance it when you take a new brick version. The
+check lists the brick's files before `pub get`, then formats them as
+bootstrap does. A file you add is not checked. A generated file must match,
+unless it is listed in:
+
+- `tool/regen.allow`: the file may differ or be absent (a replaced README, an
+  insertion without a `// p0g:` marker).
+- `tool/regen.add`: the file may only gain lines; every generated line must
+  still be there, in order (extra dependencies in a pubspec).
+
+Each entry is `<path>  # <reason>` below the files' header comments; the
+reason is required. An entry that names no generated file, appears twice or
+appears in both files fails the check. Both files are themselves checked as
+additions to their generated headers and cannot be listed. Nothing is
+overwritten: copy what you want from the brick yourself. Brick CI checks a
+local checkout with `bash tool/regen.sh --brick-path <bricks>/bricks/p0g_app`
+instead of `BRICKS_REF`.
+
 ## Where things stand
 
 - `flutter_p0g run` (hot reload on WebUI) works in Chromium; its device path

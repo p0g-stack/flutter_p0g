@@ -24,7 +24,7 @@ void main() {
     expect(await digest.run('abc', without), abc);
   });
 
-  test('the hello service hashes with Rust inside its isolate', () async {
+{{#sample}}  test('the hello service hashes with Rust inside its isolate', () async {
     final worker = HelloServiceWorker();
     addTearDown(worker.terminate);
     expect(await worker.sha256('abc'), {
@@ -32,4 +32,9 @@ void main() {
       'strategy': 'rust_sha2',
     });
   });
-}
+{{/sample}}{{^sample}}  test('digest runs Rust in this place, by its checked facts', () async {
+    final place = await PlaceInfo.current();
+    expect(digest.selectRead(place).chosen?.name, 'rust_sha2');
+    expect(await digest.run('abc', place), abc);
+  });
+{{/sample}}}

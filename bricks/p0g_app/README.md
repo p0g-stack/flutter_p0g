@@ -13,6 +13,7 @@ cd <name> && bash tool/bootstrap.sh
 | `description` | `A p0g-stack app.` | one line for READMEs and `--help` |
 | `org` | `com.example` | passed to `flutter create` for the stock platform folders |
 | `rust` | `false` | adds `rust/` and `flutter_rust_bridge.yaml` (frb `=2.14.0-beta.2`, the base of flutter_p0g's patch series) |
+| `sample` | `true` | includes hello UI/service/commands and, with Rust, the digest CLI demonstration |
 
 What it stamps:
 
@@ -20,16 +21,17 @@ What it stamps:
   `Facts` (squadron_process's `PlaceFacts`) and `PlaceInfo`; `Objective` with
   `ReadStrategy` / `WriteStrategy` (`available(facts)` from `requires`, a
   `Selection` that says why; plan, confirm, receipt); the logging convention
-  (`StrategyRun`, `logTo`); an example Squadron service, `HelloService`.
+  (`StrategyRun`, `logTo`); with `sample`, an example `HelloService`.
 - `app/`: Flutter. `places/` (Squadron's own place, the process place where a
   launcher exists: `P0G_CLI` on a desktop, the WebUI launcher over
   flutter-webui's root channel), `panels/` (one per service), a home page
   with a place picker and the log.
-- `cli/`: `package:args`. `hello`, `facts`, `serve` (squadron_process host
-  for every service, by name). `-v` and `--json` control logging.
-- `tool/`: `bootstrap.sh` (patched Squadron, pub get, codegen,
-  `flutter create` for linux and web, web workers, format) and
-  `build_workers.sh`.
+- `cli/`: `package:args`. `facts`, `serve` (squadron_process host
+  for every service, by name), and `hello` with `sample`. An empty registry
+  refuses `serve` with exit 64, before opening a socket or writing a session.
+- `tool/`: `bootstrap.sh` (platform folders, Pub, patched Squadron, optional
+  app patch series, Pub again, Rust/codegen and worker builds),
+  `third_party.dart`, `build_workers.sh` and the read-only regeneration checker.
 
 squadron_process and flutter_webui_client are git dependencies pinned by commit.
 squadron_process needs Squadron with its channel-factory patch: bootstrap
@@ -61,14 +63,32 @@ fallback. `loadNative()` (`core/lib/src/native/`) loads the library once per
 isolate, Web Worker or process: `P0G_NATIVE_LIB`, then beside the executable
 (`bin/<abi>/` where flutter_p0g packs it, or beside a `dart compile exe`
 binary), then a Linux bundle's `lib/`, then `rust/target/` in the workspace.
-On the web it is frb's wasm under `pkg/`, checked with a HEAD request for the
-`native` fact and instantiated on the first Rust call, which `flutter_p0g build webui`
-builds; a plain `flutter build web` has none, and the Dart strategy runs.
-The hello service's `sha256`, the CLI's `digest` command and the app's
-SHA-256 button go through it. `tool/rust.sh` (run by bootstrap) uses
-flutter_p0g's patched frb when `flutter_p0g precache --frb` has built it,
-native and wasm; otherwise `flutter_rust_bridge_codegen` built from frb
-848e438 (the commit both sides pin), native only. It also needs cargo-expand.
+On the web its JS glue is probed with GET (the unread body is cancelled);
+the wasm loads on the first Rust call. Page, ordinary-worker and blob-worker
+URLs resolve relative to their actual artifact. Blob workers require
+Squadron's `squadronWorkerScriptUrl`, never an origin guess. `nativeLoadFailure`
+retains the original error name, message and stack if initialization fails.
+With `sample`, the hello service, digest CLI command and SHA-256 button use
+the digest objective. With `sample=false`, the Rust API, objective and tests
+remain as the working FFI seed without demonstration UI or commands.
+`tool/rust.sh` requires `flutter_p0g precache --frb --no-webui` first; missing
+or stale patched caches fail rather than silently selecting stock codegen.
+Pub overrides use `.dart_tool/p0g/frb/frb_dart`, so committed locks have no
+developer path. Only ignored Cargo configuration uses the resolved cache path.
+Unowned local links/directories are preserved and reported as conflicts.
+Cargo-expand, wasm-pack and the wasm Rust target are also required.
 
 Generated code (`*.g.dart`, compiled workers) is not committed; bootstrap
 regenerates it.
+
+`sample=false` preserves the home page, place picker, log and empty panel
+registry. Add a real service with the service brick; `--panel false` keeps
+CLI/process registration but omits its panel. Service generation validates
+all required destination markers before writing templates.
+
+Optional app patch series live at `third_party/<name>/PIN`, with `repo=`, a
+full `commit=` and `package=` (empty for the repository root); regular
+`patches/*.patch` files apply in filename order. `dart run tool/third_party.dart
+[root [name...]]` uses the shared materializer. No series directory is a normal
+no-op; every explicitly requested name must exist before any series is applied.
+Put app setup after `# p0g:after-bootstrap`, never before dependency overrides.

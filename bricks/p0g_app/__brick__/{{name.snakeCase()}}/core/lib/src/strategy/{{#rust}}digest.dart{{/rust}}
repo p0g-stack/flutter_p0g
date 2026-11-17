@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart' as crypto;
 
 import '../facts/facts.dart';
 import '../native/native.dart';
+import '../rust/api/digest.dart';
 import 'objective.dart';
 import 'strategy.dart';
 

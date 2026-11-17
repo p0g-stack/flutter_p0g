@@ -6,8 +6,6 @@ import 'native_stub.dart'
     if (dart.library.js_interop) 'native_web.dart'
     as platform;
 
-export '../rust/api/digest.dart' show sha256Hex;
-
 /// Whether this place has the app's Rust library, without loading it where
 /// loading is expensive. The `native` fact. On the web it asks whether the
 /// wasm was built (its JS glue is there) and leaves loading it to the first
@@ -29,14 +27,32 @@ Future<bool> loadNative() => _loaded ??= _load();
 
 Future<bool>? _loaded;
 
+NativeLoadFailure? _loadFailure;
+
+/// The original library-init failure, including timeout failures.
+NativeLoadFailure? get nativeLoadFailure => _loadFailure;
+
+/// The library's error name, message and stack.
+final class NativeLoadFailure {
+  const NativeLoadFailure(this.name, this.message, this.stack);
+  final String name;
+  final String message;
+  final String stack;
+}
+
 Future<bool> _load() async {
   try {
     final library = await platform.openNativeLibrary(_stem);
-    await RustLib.init(externalLibrary: library).timeout(
-      const Duration(seconds: 5),
-    );
+    await RustLib.init(externalLibrary: library)
+        .timeout(const Duration(seconds: 5));
+    _loadFailure = null;
     return true;
-  } on Object {
+  } on Object catch (error, stack) {
+    _loadFailure = NativeLoadFailure(
+      error.runtimeType.toString(),
+      '$error',
+      '$stack',
+    );
     return false;
   }
 }

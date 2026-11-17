@@ -1,6 +1,6 @@
 name: service
-description: Adds a Squadron service to a p0g_app workspace, exposed in the GUI (a panel) and the CLI (a command and serve).
-version: 0.4.0
+description: Adds a Squadron service to a p0g_app workspace, exposed in the CLI (a command and serve) and, by default, the GUI (a panel).
+version: 0.5.0
 repository: https://github.com/p0g-stack/bricks/tree/main/bricks/service
 
 environment:
@@ -12,3 +12,8 @@ vars:
     description: The service name (snake_case), e.g. partitions.
     default: example
     prompt: What is the service called?
+  panel:
+    type: boolean
+    description: Add an app panel for the service.
+    default: true
+    prompt: Add an app panel for the service?

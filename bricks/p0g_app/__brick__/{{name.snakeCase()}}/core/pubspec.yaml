@@ -15,21 +15,19 @@ dependencies:
   squadron_process:
     git:
       url: https://github.com/p0g-stack/squadron_process
-      ref: 28c37ced3034695697802b17ee818a11a36411d3
+      ref: 4abd147bc2c092692825085619ed8d0fc609c33f
   flutter_webui_client:
     git:
       url: https://github.com/p0g-stack/flutter-webui
       path: packages/flutter_webui_client
       ref: 8951e5f59eb5492b55da89a23edb2b43d87d7023
 {{#rust}}  crypto: ^3.0.6
-  # frb at flutter_p0g's base commit (master after 2.14.0-beta.2): the
-  # bindings its codegen writes need it. tool/rust.sh overrides it with
-  # flutter_p0g's patched copy when that is built.
+  # Pinned with flutter_p0g; tool/rust.sh requires its verified patched cache.
   flutter_rust_bridge:
     git:
       url: https://github.com/fzyzcjy/flutter_rust_bridge
       path: frb_dart
-      ref: 848e438c561491adcc16cbf8b33bb61e541bd475
+      ref: 1e4df906b6d0e96aefbfa40dde5fa2833d417c1a
 {{/rust}}
 dev_dependencies:
   build_runner: ^2.16.1

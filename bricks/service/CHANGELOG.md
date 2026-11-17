@@ -1,3 +1,14 @@
+# 0.5.0
+
+- `panel` (default true): with `panel: false` the brick adds no app panel
+  and touches neither `app/lib/panels/panels.dart` nor its format list; the
+  core service, its test, the CLI command and the `serve` entry stay.
+- pre_gen checks every file and `// p0g:` marker the insertions need
+  (the panel's only with `panel`) before Mason writes anything, and aborts
+  naming what is missing. post_gen only applies those checked insertions,
+  still skipping lines already there, and formats. Works with p0g_app
+  0.9.0 `sample: false`, whose registry and panel list start empty.
+
 # 0.4.0
 
 - Logs come back: the service's constructor calls `forwardLogs()`, and the

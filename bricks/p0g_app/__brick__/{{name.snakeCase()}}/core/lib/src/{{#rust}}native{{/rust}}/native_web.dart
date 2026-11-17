@@ -4,9 +4,26 @@ import 'dart:js_interop_unsafe';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:web/web.dart' as web;
 
-/// The path resolves against the script: the page sits at the base, a
-/// Squadron Web Worker in `workers/`.
-String get _prefix => globalContext.has('document') ? 'pkg/' : '../pkg/';
+// Pages and workers resolve from their actual artifact, not the origin.
+String get _prefix {
+  if (globalContext.has('document')) {
+    return Uri.parse(web.document.baseURI).resolve('pkg/').toString();
+  }
+  final location = globalContext.getProperty<JSObject>('location'.toJS);
+  var href = location.getProperty<JSString>('href'.toJS).toDart;
+  if (Uri.parse(href).scheme == 'blob') {
+    final script = globalContext.getProperty<JSAny?>(
+      'squadronWorkerScriptUrl'.toJS,
+    );
+    if (script == null ||
+        !script.isA<JSString>() ||
+        (script as JSString).toDart.isEmpty) {
+      throw StateError('Blob worker has no squadronWorkerScriptUrl');
+    }
+    href = script.toDart;
+  }
+  return Uri.parse(href).resolve('../pkg/').toString();
+}
 
 /// Web: frb's own loader fetches `pkg/<stem>.js` and its wasm, which
 /// `flutter_p0g build webui` builds single-threaded (no COOP/COEP needed).
@@ -29,7 +46,7 @@ external JSPromise<web.Response> _fetch(String url, web.RequestInit init);
 Future<bool> nativeShipped(String stem) async {
   try {
     final r = await _fetch('$_prefix$stem.js', web.RequestInit()).toDart;
-    r.body?.cancel();
+    await r.body?.cancel().toDart;
     return r.ok;
   } on Object {
     return false;

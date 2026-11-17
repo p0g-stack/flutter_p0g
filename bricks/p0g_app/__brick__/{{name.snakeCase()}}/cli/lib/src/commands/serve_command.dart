@@ -8,8 +8,8 @@ import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
 /// binds with. Each worker runs in its own isolate of this process; wrap it
 /// in [withLogs] so its logs reach this CLI's log.
 Map<String, Invoker> services() => {
-  'hello': withLogs(HelloServiceWorker()),
-  // p0g:services (bricks insert services above this line)
+{{#sample}}  'hello': withLogs(HelloServiceWorker()),
+{{/sample}}  // p0g:services (bricks insert services above this line)
 };
 
 /// Hosts the app's Squadron services for the process place.
@@ -34,6 +34,12 @@ class ServeCommand extends Command<int> {
   @override
   Future<int> run() async {
     final hosted = services();
+    // Before any socket or session file: there is nothing to host.
+    if (hosted.isEmpty) {
+      usageException(
+        'No services registered; add a service before using serve.',
+      );
+    }
     Logger('cli.serve').info('serving ${hosted.keys.join(', ')}');
     return serve(hosted, argResults!.rest, facts: checkFacts);
   }

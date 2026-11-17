@@ -10,9 +10,8 @@ publish = false
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-# The version at frb 848e438, the commit core/pubspec.yaml pins. tool/rust.sh
-# patches it (rust/.cargo/config.toml) to flutter_p0g's patched frb, or to
-# that commit when the patched one is not built.
+# The version at frb 1e4df906, the commit core/pubspec.yaml pins.
+# tool/rust.sh patches it to flutter_p0g's verified source cache.
 flutter_rust_bridge = { version = "=2.14.0-beta.2", default-features = false, features = [
     # frb's defaults without thread-pool: single-threaded wasm (no COOP/COEP).
     "anyhow", "dart-opaque", "log", "portable-atomic", "rust-async", "user-utils", "wasm-start",

@@ -1,3 +1,39 @@
+# 0.9.0
+
+- `sample` (default true): include the hello and digest demonstration UI
+  and commands. With `sample: false` the shell stays whole (places, home,
+  place header, theme, logging, strategies, process host) and
+  `defaultPanels` starts empty; `mason make service` adds the first working
+  panel. The hello service, panel, command and their tests are left out; the
+  `digest` command needs both `sample` and `rust`. With `rust` the Rust
+  SHA-256 API, its `digest` strategy and their tests stay, and the digest
+  test calls the objective directly. All `// p0g:` markers are unchanged.
+- `serve` with no services registered is a usage error (exit 64, "No
+  services registered; add a service before using serve.") before it opens
+  a socket or writes a session file.
+- Upgrades are checkable: the generated `tool/regen.sh`, `tool/regen.allow`
+  and `tool/regen.add` compare a workspace with a fresh generation at
+  `BRICKS_REF` (a required full commit hash; missing or invalid exits 64
+  before any fetch). The brick's first `hooks/post_gen.dart` writes
+  `tool/p0g_app.json` with the effective name, description, org, rust and
+  sample. The checker records generated inventory before Pub resolution and
+  formats generated Dart before comparison.
+- `tool/bootstrap.sh` materializes third-party sources through the shared
+  patched_source caller (`dart run tool/third_party.dart`, with the pinned
+  helper and Squadron) between the two pub gets; no `third_party/` is a
+  no-op. Application setup goes at the new `# p0g:after-bootstrap` marker.
+  Stock platform folders are created before Pub so plugin registrants are
+  complete on the first bootstrap rather than appearing on the second run.
+- `rust`: the flutter_rust_bridge override is a relative, portable path into
+  `.dart_tool`, and needs the verified frb `1e4df906` cache; a missing cache
+  fails with its real error instead of using unpatched code.
+- Web loaders resolve absolute URLs from the page or worker artifact (using
+  Squadron's script URL for blob workers), and a failed Rust load keeps its
+  diagnostics: the core library exports `NativeLoadFailure` and
+  `nativeLoadFailure` with `loadNative`. The native loader no longer
+  re-exports `sha256Hex`; the core library exports it from the generated
+  Rust API.
+
 # 0.8.13
 
 - `rust` on the web: the `native` fact asks for the JS glue with a GET, not
