@@ -78,6 +78,13 @@ String? checkPatchedDartSide(PackageConfig config, String patchedFrbDart) {
   if (pkg == null) return 'the app does not depend on flutter_rust_bridge';
   final root = p.normalize(pkg.root.toFilePath());
   if (p.equals(root, p.normalize(patchedFrbDart)) || p.isWithin(patchedFrbDart, root)) return null;
+  // Generated workspaces keep a relative override through .dart_tool/p0g/frb.
+  // Compare the actual directory too, not just its spelling in package_config.
+  if (io.Directory(root).existsSync() &&
+      io.Directory(patchedFrbDart).existsSync() &&
+      io.FileSystemEntity.identicalSync(root, patchedFrbDart)) {
+    return null;
+  }
   return 'flutter_rust_bridge resolves to $root, not the patched copy.\n'
       'Add to the app pubspec and run pub get:\n'
       'dependency_overrides:\n'

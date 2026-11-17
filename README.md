@@ -331,13 +331,16 @@ identity includes `kFrbCommit` and the patched-source identity; moving the pin
 invalidates the old binary stamp without changing the public `frb/src` and
 `frb/bin` cache locations.
 
-An app using frb points its Dart dependency at the patched copy (the build
-says so if it doesn't):
+Generated apps run `flutter_p0g precache --frb --no-webui` before their
+bootstrap. `tool/frb.dart` verifies that cache and owns a workspace-relative
+link at `.dart_tool/p0g/frb`, keeping machine paths out of committed locks.
+The build accepts that link by physical directory identity and still rejects
+an unrelated package. The generated override is:
 
 ```yaml
 dependency_overrides:
   flutter_rust_bridge:
-    path: <flutter>/bin/cache/flutter_p0g/frb/src/frb_dart
+    path: .dart_tool/p0g/frb/frb_dart
 ```
 
 and its crate at `frb_rust` (`[patch.crates-io]`) with
