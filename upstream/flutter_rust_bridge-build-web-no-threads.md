@@ -105,6 +105,7 @@ at 1e4df906, builds here; a plain function reports E0080), and a real
 
 ## Notes
 
-- Branch base is the stack's pin, not current `master`; rebase before opening if the generated file changed
-  upstream.
+- Branch base is the stack's pin (`1e4df906`), 49 commits behind `master` `cf0e5064b0`, but none of those
+  commits touch the files this branch changes (checked with `git log <pin>..master -- <paths>`), so the GitHub
+  PR diff against `master` is exactly this change and a rebase is conflict-free.
 - `frb_dart` `entrypoint.g.dart` will need regenerating if `build_cli` is re-enabled upstream.

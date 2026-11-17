@@ -84,8 +84,9 @@ back to the page) where it previously failed on a null `document`.
 
 ## Notes
 
-- Branch base is the stack's pin; the two changed files are untouched between the pin and `master`'s tip at
-  preparation time except for unrelated commits, so a rebase should be conflict-free.
+- Branch base is the stack's pin (`1e4df906`), 49 commits behind `master` `cf0e5064b0`, but none of those
+  commits touch the two changed files (checked with `git log <pin>..master -- <paths>`), so the PR diff against
+  `master` is exactly this change and a rebase is conflict-free.
 - No regression test is included: exercising this needs a compiled wasm-bindgen module in a worker, which the
   package's unit tests do not have. If reviewers want one, the harness in check 3 is ~30 lines of Dart plus a
   page that starts the worker.
