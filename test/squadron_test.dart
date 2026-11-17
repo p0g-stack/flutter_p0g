@@ -3,15 +3,6 @@ import 'package:flutter_p0g/src/squadron.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('detects an existing squadron override', () {
-    expect(overridesSquadron(null), isFalse);
-    expect(overridesSquadron('dependency_overrides:\n  other:\n    path: x\n'), isFalse);
-    expect(
-      overridesSquadron('dependency_overrides:\n  squadron:\n    path: .dart_tool/s\n'),
-      isTrue,
-    );
-  });
-
   test('finds the workspace member that depends on squadron_process', () {
     final fs = MemoryFileSystem.test();
     final root = fs.directory('/ws')..createSync();

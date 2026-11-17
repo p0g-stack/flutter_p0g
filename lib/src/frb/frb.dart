@@ -11,6 +11,7 @@ import 'package:yaml/yaml.dart';
 
 import '../p0g_cache.dart';
 import '../squadron.dart' show workspaceRoot;
+import '../../patched_source.dart';
 
 /// flutter_rust_bridge, pinned. The patch series in `patches/frb/` is made
 /// against this commit (master after v2.14.0-beta.2; the patches do not
@@ -89,7 +90,20 @@ String? checkPatchedDartSide(PackageConfig config, String patchedFrbDart) {
 Future<void> precacheFrb() async {
   final toolRoot = await toolPackageRoot();
   final patches = frbPatches(toolRoot);
-  final stamp = frbStamp(kFrbCommit, [for (final f in patches) f.readAsBytesSync()]);
+  final src = await materializePatchedSource(
+    destination: io.Directory(frbSourceDir().path),
+    repository: kFrbRepo,
+    commit: kFrbCommit,
+    patches: [for (final patch in patches) io.File(patch.path)],
+  );
+  for (final required in ['frb_dart/pubspec.yaml', 'frb_codegen/Cargo.toml']) {
+    if (!io.File(p.join(src.path, required)).existsSync()) {
+      throwToolExit('Incomplete patched FRB source: ${p.join(src.path, required)}');
+    }
+  }
+  final stamp = frbStamp(kFrbCommit, [
+    io.File(p.join(src.path, '.patched_source.json')).readAsBytesSync(),
+  ]);
   final stampFile = frbCacheDir().childFile('stamp');
   if (stampFile.existsSync() &&
       stampFile.readAsStringSync() == stamp &&
@@ -98,18 +112,6 @@ Future<void> precacheFrb() async {
       'frb ${kFrbCommit.substring(0, 7)} + ${patches.length} patch(es): up to date.',
     );
     return;
-  }
-  final src = frbSourceDir();
-  if (src.existsSync()) src.deleteSync(recursive: true);
-  src.createSync(recursive: true);
-  Future<void> git(List<String> args) => _run(['git', ...args], src.path);
-  await git(['init', '-q']);
-  await git(['remote', 'add', 'origin', kFrbRepo]);
-  await git(['fetch', '-q', '--depth', '1', 'origin', kFrbCommit]);
-  await git(['checkout', '-q', 'FETCH_HEAD']);
-  for (final patch in patches) {
-    globals.printStatus('Applying ${patch.basename}');
-    await git(['apply', patch.path]);
   }
   globals.printStatus('Building flutter_rust_bridge_codegen (cargo)...');
   await _run([

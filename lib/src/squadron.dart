@@ -16,16 +16,6 @@ import 'p0g_cache.dart';
 /// squadron_process's.
 const kSquadronProcess = 'squadron_process';
 
-/// Whether [root]'s `pubspec_overrides.yaml` already overrides squadron.
-@visibleForTesting
-bool overridesSquadron(String? overridesYaml) {
-  if (overridesYaml == null) return false;
-  final doc = loadYaml(overridesYaml);
-  return doc is YamlMap &&
-      doc['dependency_overrides'] is YamlMap &&
-      (doc['dependency_overrides'] as YamlMap).containsKey('squadron');
-}
-
 /// The workspace member (or [root] itself) that depends on squadron_process
 /// directly, where `dart run squadron_process:…` resolves.
 @visibleForTesting
@@ -55,17 +45,13 @@ Directory? squadronProcessUser(Directory root) {
 Directory workspaceRoot(Directory project) =>
     findPackageConfigFile(project)?.parent.parent ?? project;
 
-/// Patches Squadron for [project] when it uses squadron_process and nothing
-/// overrides squadron yet ([force]: always). Returns whether it ran.
+/// Validates the managed Squadron source and override for [project].
+/// [force] also rejects projects that do not depend on squadron_process.
 Future<bool> ensurePatchedSquadron(Directory project, {bool force = false}) async {
   final root = workspaceRoot(project);
-  final overrides = root.childFile('pubspec_overrides.yaml');
   final user = squadronProcessUser(root);
   if (user == null) {
     if (force) throwToolExit('No package in ${root.path} depends on $kSquadronProcess.');
-    return false;
-  }
-  if (!force && overridesSquadron(overrides.existsSync() ? overrides.readAsStringSync() : null)) {
     return false;
   }
   globals.printStatus("Patching Squadron with $kSquadronProcess's series...");
