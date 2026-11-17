@@ -7,6 +7,8 @@ import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:meta/meta.dart';
 
+import '../artifact_cache.dart';
+import '../artifact_pins.dart';
 import '../p0g_cache.dart';
 
 /// flutter-aera's runtime kit for one arch and build mode (flutter-aera
@@ -23,17 +25,40 @@ class AeraKit {
   Directory get payload => dir.childDirectory('payload');
   File get genSnapshot => dir.childDirectory('host').childFile('gen_snapshot');
 
-  bool get isInstalled =>
-      payload.childDirectory('usr').childDirectory('bin').childFile('aera-plugin').existsSync();
+  bool get isInstalled {
+    if (!payload
+        .childDirectory('usr')
+        .childDirectory('bin')
+        .childFile('aera-plugin')
+        .existsSync()) {
+      return false;
+    }
+    final identity = readKitIdentity(dir);
+    final meta = dir.childFile('kit.json');
+    if (identity == null || !meta.existsSync()) return false;
+    try {
+      final json = jsonDecode(meta.readAsStringSync());
+      return json is Map &&
+          json['kit'] == 1 &&
+          identity['version'] == json['flutter'] &&
+          identity['engine'] == engineRevision() &&
+          identity['engine'] == json['engine_revision'] &&
+          identity['target'] == 'linux-${json['arch']}' &&
+          identity['mode'] == json['mode'] &&
+          dir.basename == '${identity['target']}-${identity['mode']}' &&
+          (json['mode'] == 'debug' || genSnapshot.existsSync());
+    } on FormatException {
+      return false;
+    }
+  }
 
   static AeraKit forTarget(String target, String mode) =>
       AeraKit(p0gCacheDir().childDirectory('aera-kit').childDirectory('$target-$mode'));
 }
 
-/// The release kit for [mode] at the pinned Flutter [flutterVersion].
-String aeraKitUrl(String flutterVersion, String mode) =>
-    'https://github.com/p0g-stack/flutter-aera/releases/download/kit-$flutterVersion/'
-    'flutter-aera-kit-linux-arm64-$mode-$flutterVersion.tar.xz';
+/// The pinned release URL for the exact Flutter version, target and mode.
+String aeraKitUrl(String flutterVersion, String mode, {String target = 'linux-arm64'}) =>
+    pinnedKit(aeraKitPins, 'AERA', flutterVersion, '$target-$mode').url;
 
 /// Members that stay out of the payload.
 @visibleForTesting
@@ -57,7 +82,8 @@ String? validateAeraKit(Archive archive, String engineRevision) {
   }
   final mode = json['mode'];
   if (!const {'debug', 'profile', 'release'}.contains(mode)) return 'unknown mode $mode';
-  if (json['arch'] is! String) return 'kit.json lacks arch';
+  if (!const {'arm64', 'x64'}.contains(json['arch'])) return 'unknown arch ${json['arch']}';
+  if (json['flutter'] is! String) return 'kit.json lacks flutter';
   if (archive.findFile('usr/bin/aera-plugin') == null) return 'kit lacks usr/bin/aera-plugin';
   if (mode != 'debug' && archive.findFile('host/gen_snapshot') == null) {
     return '$mode kit lacks host/gen_snapshot';
@@ -75,31 +101,69 @@ String kitMode(Archive archive) =>
     (jsonDecode(utf8.decode(archive.findFile('kit.json')!.content as List<int>)) as Map)['mode']
         as String;
 
-/// Installs a kit `.tar.xz` (or `.tar.gz`) from a path or https URL. A
-/// release URL's `.sha256` sibling is checked when [sha256Hex] isn't given.
-Future<void> precacheAeraKit(String source, {String? sha256Hex}) async {
-  final bytes = await fetchBytes(source);
-  if (sha256Hex == null && source.startsWith('https://')) {
-    sha256Hex = utf8.decode(await fetchBytes('$source.sha256')).trim().split(RegExp(r'\s+')).first;
+/// Installs a verified kit archive without replacing a working kit on failure.
+///
+/// An explicit [source] requires [sha256Hex]. A null source selects the
+/// committed pin for [target] and [mode].
+Future<void> precacheAeraKit(
+  String? source, {
+  String? sha256Hex,
+  String target = 'linux-arm64',
+  String mode = 'debug',
+}) async {
+  final explicit = source != null;
+  if (explicit || sha256Hex != null) sha256Hex = requireKitSha256(sha256Hex);
+  final version = globals.flutterVersion.frameworkVersion;
+  if (!explicit) {
+    final pin = pinnedKit(aeraKitPins, 'AERA', version, '$target-$mode');
+    source = pin.url;
+    sha256Hex ??= pin.sha256;
   }
+  final expected = requireKitSha256(sha256Hex);
+  final existing = AeraKit.forTarget(target, mode);
+  if (!explicit && existing.isInstalled && readKitIdentity(existing.dir)?['sha256'] == expected) {
+    globals.printStatus('AERA kit $target-$mode: up to date.');
+    return;
+  }
+  final bytes = await fetchBytes(source!);
   final digest = sha256.convert(bytes).toString();
-  if (sha256Hex != null && digest != sha256Hex) {
-    throwToolExit('Kit sha256 is $digest, expected $sha256Hex.');
-  }
-  final archive = source.endsWith('.gz') ? decodeTarGz(bytes) : decodeTar(await _unxz(bytes));
-  final problem = validateAeraKit(archive, engineRevision());
+  if (digest != expected) throwToolExit('Kit sha256 is $digest, expected $expected.');
+  // Asset-ID URLs have no filename; identify gzip by its magic bytes.
+  final archive = bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b
+      ? decodeTarGz(bytes)
+      : decodeTar(await _unxz(bytes));
+  final engine = engineRevision();
+  final problem = validateAeraKit(archive, engine);
   if (problem != null) throwToolExit('AERA kit: $problem.');
-  final kit = AeraKit.forTarget(kitTarget(archive), kitMode(archive));
-  if (kit.dir.existsSync()) kit.dir.deleteSync(recursive: true);
-  for (final f in archive.files) {
-    final File out = isKitMetadata(f.name)
-        ? kit.dir.childFile(f.name)
-        : kit.payload.childFile(f.name);
-    out
-      ..parent.createSync(recursive: true)
-      ..writeAsBytesSync(f.content as List<int>);
-    if (f.mode & 0x49 != 0) globals.os.chmod(out, '755');
+  final json = jsonDecode(utf8.decode(archive.findFile('kit.json')!.content as List<int>)) as Map;
+  if (json['flutter'] != version) {
+    throwToolExit('AERA kit: expected Flutter $version, got ${json['flutter']}.');
   }
+  if (!explicit && (kitTarget(archive) != target || kitMode(archive) != mode)) {
+    throwToolExit(
+      'AERA kit: expected $target-$mode, got ${kitTarget(archive)}-${kitMode(archive)}.',
+    );
+  }
+  final kit = AeraKit.forTarget(kitTarget(archive), kitMode(archive));
+  installKitStaged(
+    kit.dir,
+    {
+      'sha256': digest,
+      'version': version,
+      'engine': engine,
+      'target': kitTarget(archive),
+      'mode': kitMode(archive),
+    },
+    (stage) {
+      for (final f in archive.files) {
+        final root = isKitMetadata(f.name) ? stage : stage.childDirectory('payload');
+        final out = kitMemberFile(root, f.name);
+        out.parent.createSync(recursive: true);
+        out.writeAsBytesSync(f.content as List<int>);
+        if (f.mode & 0x49 != 0) globals.os.chmod(out, '755');
+      }
+    },
+  );
   globals.printStatus(
     'AERA kit ${kitTarget(archive)}-${kitMode(archive)} installed (sha256 $digest).',
   );

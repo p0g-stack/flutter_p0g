@@ -1,6 +1,9 @@
+import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
+import '../artifact_cache.dart';
+import '../artifact_pins.dart';
 import '../aera/kit.dart';
 import '../frb/frb.dart';
 import '../squadron.dart';
@@ -64,6 +67,28 @@ class PrecacheCommand extends FlutterCommand {
 
   @override
   Future<FlutterCommandResult> runCommand() async {
+    final androidSource = stringArg('dart-android-kit');
+    final androidHash = stringArg('dart-android-sha256');
+    final androidAbis = stringsArg('dart-android-abi');
+    final aeraSource = stringArg('aera-kit');
+    final aeraHash = stringArg('aera-kit-sha256');
+    validateKitSelection(androidSource, androidHash, androidAbis.length);
+    validateKitSelection(aeraSource, aeraHash, 1);
+    if (androidHash != null && androidSource == null && !boolArg('dart-android')) {
+      throwToolExit('--dart-android-sha256 requires --dart-android or --dart-android-kit.');
+    }
+    if (aeraHash != null && aeraSource == null && !boolArg('aera')) {
+      throwToolExit('--aera-kit-sha256 requires --aera or --aera-kit.');
+    }
+    if (androidSource == null && boolArg('dart-android')) {
+      final version = sdkDartVersion();
+      for (final abi in androidAbis) {
+        pinnedKit(dartAndroidKitPins, 'Dart Android', version, abi);
+      }
+    }
+    if (aeraSource == null && boolArg('aera')) {
+      aeraKitUrl(globals.flutterVersion.frameworkVersion, stringArg('aera-mode')!);
+    }
     if (boolArg('web')) {
       await globals.cache.updateAll({DevelopmentArtifact.web, DevelopmentArtifact.universal});
     }
@@ -76,20 +101,26 @@ class PrecacheCommand extends FlutterCommand {
       if (stringArg('dart-android-kit') case final kit?) {
         await precacheDartAndroid(source: kit, sha256Hex: stringArg('dart-android-sha256'));
       } else {
-        for (final abi in stringsArg('dart-android-abi')) {
-          await precacheDartAndroid(abi: abi);
+        for (final abi in androidAbis) {
+          await precacheDartAndroid(abi: abi, sha256Hex: androidHash);
         }
       }
     }
     if (stringArg('aera-kit') case final kit?) {
       await precacheAeraKit(kit, sha256Hex: stringArg('aera-kit-sha256'));
     } else if (boolArg('aera')) {
-      await precacheAeraKit(
-        aeraKitUrl(globals.flutterVersion.frameworkVersion, stringArg('aera-mode')!),
-      );
+      await precacheAeraKit(null, sha256Hex: aeraHash, mode: stringArg('aera-mode')!);
     }
     if (boolArg('webui-packages')) await precacheWebuiPackages(force: true);
     if (boolArg('app-plane')) await precacheAppPlane(force: true);
     return FlutterCommandResult.success();
+  }
+}
+
+/// Rejects missing, malformed or ambiguous digests before precache does I/O.
+void validateKitSelection(String? source, String? digest, int defaultTargets) {
+  if (source != null || digest != null) requireKitSha256(digest);
+  if (source == null && digest != null && defaultTargets != 1) {
+    throwToolExit('A kit sha256 without a source requires exactly one default target.');
   }
 }

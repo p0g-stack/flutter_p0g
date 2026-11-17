@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_p0g/src/artifact_pins.dart';
+import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_p0g/src/aera/aerap.dart';
 import 'package:flutter_p0g/src/aera/kit.dart';
 import 'package:flutter_p0g/src/templates.dart';
@@ -181,12 +183,29 @@ void main() {
       expect(isKitMetadata('usr/lib/libc.so.6'), isFalse);
     });
 
-    test('release URL', () {
+    test('release URL comes from the exact committed pin', () {
+      expect(aeraKitUrl('3.47.5', 'debug'), aeraKitPins['3.47.5']!['linux-arm64-debug']!.url);
       expect(
-        aeraKitUrl('3.47.5', 'debug'),
-        'https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.47.5/'
-        'flutter-aera-kit-linux-arm64-debug-3.47.5.tar.xz',
+        aeraKitUrl('3.47.5', 'debug', target: 'linux-x64'),
+        aeraKitPins['3.47.5']!['linux-x64-debug']!.url,
       );
+    });
+
+    test('unknown SDK, mode and arch refuse an unpinned release', () {
+      for (final target in [('future', 'debug'), ('3.47.5', 'release')]) {
+        expect(
+          () => aeraKitUrl(target.$1, target.$2),
+          throwsA(
+            isA<ToolExit>().having(
+              (error) => error.message,
+              'message',
+              'No pinned AERA kit for ${target.$1}/linux-arm64-${target.$2}; '
+                  'provide an explicit kit and sha256.',
+            ),
+          ),
+        );
+      }
+      expect(() => aeraKitUrl('3.47.5', 'debug', target: 'linux-mips'), throwsA(isA<ToolExit>()));
     });
   });
 

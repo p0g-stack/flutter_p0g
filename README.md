@@ -224,11 +224,15 @@ So by default (`--cli-format=aot`) the build:
 
 The kits (`precache --dart-android [--dart-android-abi=arm64-v8a,x86_64]`), one per ABI, are both halves built from the pinned
 Dart release with `tools/build.py --mode product --os android` by
-`.github/workflows/dart-android-kit.yml`; `--dart-android-kit=<path|url>`
-swaps in another source with the same layout (`VERSION`, `gen_snapshot`,
-`dartaotruntime`). The pipeline is checked end to end with a host-arch kit;
-the Android kit itself is not built yet. `--cli-format=exe` is kept for a Dart
-SDK that can compile Android executables directly.
+`.github/workflows/dart-android-kit.yml`. The release workflow verifies the
+selected build run and publishes `dart-android-<Dart>-<producer-full-SHA>`
+without replacing existing bytes. Defaults use the URL and SHA256 in
+`lib/src/artifact_pins.dart`; `--dart-android-kit=<path|url>` requires
+`--dart-android-sha256=<64-hex>` and the same layout (`VERSION`,
+`gen_snapshot`, `dartaotruntime`). A hash without a source is accepted only
+for one ABI. Downloads are staged; failed verification preserves the old
+kit. `--cli-format=exe` is kept for a Dart SDK that can compile Android
+executables directly.
 
 ### `run`
 
@@ -273,9 +277,12 @@ AERA's runtime stream, xz-compressed with CRC32 and the ARM64 BCJ filter
 packer's fixed and computed fields. Output: `build/aera/<id>-<version>.aerap`
 and a copy of `plugin.json`.
 
-The kit is flutter-aera's release (`precache --aera [--aera-mode=debug]`
-fetches `kit-<flutter>/flutter-aera-kit-linux-arm64-<mode>-<flutter>.tar.xz`
-and checks its `.sha256`; `--aera-kit=<path|url>` installs another). Its
+`precache --aera [--aera-mode=debug]` selects the exact URL and SHA256 from
+`lib/src/artifact_pins.dart`; unsupported versions/modes fail rather than
+guessing a release. `--aera-kit=<path|url>` requires
+`--aera-kit-sha256=<64-hex>`, including local archives. The cache is replaced
+only after verification and extraction succeed, with a complete identity
+file. No downloaded sibling checksum is trusted as the expected digest. Its
 `kit.json` must name the pinned engine revision and stays out of the
 payload, as does `host/gen_snapshot`, which profile and release kits need
 (only a debug kit is released so far). Checked: a debug

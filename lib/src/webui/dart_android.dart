@@ -6,6 +6,8 @@ import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:meta/meta.dart';
 
+import '../artifact_cache.dart';
+import '../artifact_pins.dart';
 import '../p0g_cache.dart';
 import 'cli_exe.dart';
 
@@ -39,8 +41,18 @@ class DartAndroidKit {
   File get runtime => dir.childFile('dartaotruntime');
   File get versionFile => dir.childFile('VERSION');
 
-  bool get isComplete =>
-      genSnapshot.existsSync() && runtime.existsSync() && versionFile.existsSync();
+  bool get isComplete {
+    if (!genSnapshot.existsSync() || !runtime.existsSync() || !versionFile.existsSync()) {
+      return false;
+    }
+    final identity = readKitIdentity(dir);
+    final abi = dir.childFile('ABI');
+    return identity != null &&
+        identity['version'] == dir.parent.basename &&
+        identity['abi'] == dir.basename &&
+        identity['version'] == versionFile.readAsStringSync().trim() &&
+        identity['abi'] == (abi.existsSync() ? abi.readAsStringSync().trim() : kDefaultAbi);
+  }
 
   static Directory rootFor(String dartVersion) =>
       p0gCacheDir().childDirectory('dart-android').childDirectory(dartVersion);
@@ -62,11 +74,9 @@ String sdkDartVersion() => globals.fs
     .readAsStringSync()
     .trim();
 
-/// Where `precache --dart-android` looks when no kit is given: this repo's
-/// release for the Dart version, built by .github/workflows/dart-android-kit.yml.
+/// The pinned release URL for the exact Dart version and ABI.
 String defaultKitUrl(String dartVersion, String abi) =>
-    'https://github.com/p0g-stack/flutter_p0g/releases/download/dart-android-$dartVersion/'
-    'dart-android-$abi-$dartVersion.tar.gz';
+    pinnedKit(dartAndroidKitPins, 'Dart Android', dartVersion, abi).url;
 
 /// A kit's ABI: its `ABI` member, else arm64-v8a (the first kits had none).
 @visibleForTesting
@@ -91,36 +101,49 @@ String? validateKitArchive(Archive archive, String dartVersion) {
   return null;
 }
 
-/// Installs the kit from a local `.tar.gz` or an https URL, checking
-/// [sha256Hex] when given.
-/// Without [source], fetches the release kit for [abi].
+/// Installs a verified kit from a local archive or HTTPS URL.
+///
+/// An explicit [source] requires [sha256Hex]. Otherwise the committed pin
+/// supplies both the source and digest for [abi].
 Future<void> precacheDartAndroid({
   String? source,
   String? sha256Hex,
   String abi = kDefaultAbi,
 }) async {
+  final explicit = source != null;
+  if (explicit || sha256Hex != null) sha256Hex = requireKitSha256(sha256Hex);
   final version = sdkDartVersion();
-  if (source == null && DartAndroidKit.forAbi(version, abi).isComplete) {
+  if (!explicit) {
+    final pin = pinnedKit(dartAndroidKitPins, 'Dart Android', version, abi);
+    source = pin.url;
+    sha256Hex ??= pin.sha256;
+  }
+  final expected = requireKitSha256(sha256Hex);
+  final existing = DartAndroidKit.forAbi(version, abi);
+  if (!explicit && existing.isComplete && readKitIdentity(existing.dir)?['sha256'] == expected) {
     globals.printStatus('Dart $version Android kit ($abi): up to date.');
     return;
   }
-  source ??= defaultKitUrl(version, abi);
-  final bytes = await fetchBytes(source);
+  final bytes = await fetchBytes(source!);
   final digest = sha256.convert(bytes).toString();
-  if (sha256Hex != null && sha256Hex != digest) {
-    throwToolExit('Kit sha256 is $digest, expected $sha256Hex.');
-  }
+  if (expected != digest) throwToolExit('Kit sha256 is $digest, expected $expected.');
   final archive = decodeTarGz(bytes);
   final problem = validateKitArchive(archive, version);
   if (problem != null) throwToolExit('Dart Android kit: $problem.');
-  final kit = DartAndroidKit.forAbi(version, kitAbi(archive));
-  if (kit.dir.existsSync()) kit.dir.deleteSync(recursive: true);
-  kit.dir.createSync(recursive: true);
-  for (final f in archive.files.where((f) => f.isFile)) {
-    final out = kit.dir.childFile(f.name)..writeAsBytesSync(f.content as List<int>);
-    if (f.name != 'VERSION' && f.name != 'ABI') globals.os.chmod(out, '755');
+  final archiveAbi = kitAbi(archive);
+  if (!explicit && archiveAbi != abi) {
+    throwToolExit('Dart Android kit: expected ABI $abi, got $archiveAbi.');
   }
-  globals.printStatus('Dart $version Android kit (${kitAbi(archive)}) installed (sha256 $digest).');
+  final kit = DartAndroidKit.forAbi(version, archiveAbi);
+  installKitStaged(kit.dir, {'sha256': digest, 'version': version, 'abi': archiveAbi}, (stage) {
+    for (final f in archive.files.where((f) => f.isFile)) {
+      final out = kitMemberFile(stage, f.name);
+      out.parent.createSync(recursive: true);
+      out.writeAsBytesSync(f.content as List<int>);
+      if (f.name != 'VERSION' && f.name != 'ABI') globals.os.chmod(out, '755');
+    }
+  });
+  globals.printStatus('Dart $version Android kit ($archiveAbi) installed (sha256 $digest).');
 }
 
 /// The module's `bin/<name>`: starts the snapshot for the device's ABI

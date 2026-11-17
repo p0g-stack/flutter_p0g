@@ -1,5 +1,13 @@
-# Publishes the kits a dart-android-kit run uploaded as artifacts as the
-# dart-android-<version> release, without rebuilding them.
+# Publishes the kits a dart-android-kit run uploaded as artifacts, without
+# rebuilding them, as the dart-android-<version>-<full commit SHA> release,
+# where the commit is the one the selected build run built. Before anything is
+# published, the run must be this repository's successful dart-android-kit
+# run, and each ABI's provenance.json must name that run, its commit, the
+# requested Dart version and the downloaded kit's sha256; the kit's own
+# VERSION and ABI must match too. Assets are immutable
+# (.github/scripts/immutable-release-upload.sh): identical bytes are skipped,
+# different bytes fail; a rebuilt kit needs a new commit. The old
+# dart-android-<version> releases stay as they are.
 name: dart-android-kit-release
 on:
   workflow_dispatch:
@@ -16,27 +24,70 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id }}
+      DART_VERSION: ${{ inputs.dart_version }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Check the build run
+        run: |
+          set -euo pipefail
+          [[ $RUN_ID =~ ^[0-9]+$ ]] || { echo "::error::run_id must be a run number, got '$RUN_ID'"; exit 1; }
+          [[ $DART_VERSION =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]] || { echo "::error::unsupported dart_version '$DART_VERSION'"; exit 1; }
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")
+          workflow=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/dart-android-kit.yml" -q .id)
+          jq '{repository: .repository.full_name, head_repository: .head_repository.full_name, workflow_id, path,
+               event, status, conclusion, head_sha, run_attempt}' <<<"$run"
+          if ! jq -e --arg repo "$GITHUB_REPOSITORY" --argjson workflow "$workflow" \
+              '.repository.full_name == $repo and .head_repository.full_name == $repo and .workflow_id == $workflow
+               and .status == "completed" and .conclusion == "success"' <<<"$run" >/dev/null; then
+            echo "::error::run $RUN_ID is not a successful dart-android-kit run of $GITHUB_REPOSITORY"
+            exit 1
+          fi
+          sha=$(jq -r .head_sha <<<"$run")
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::run $RUN_ID has no full head SHA"; exit 1; }
+          echo "PRODUCER_SHA=$sha" >> "$GITHUB_ENV"
+          echo "TAG=dart-android-$DART_VERSION-$sha" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           run-id: ${{ inputs.run_id }}
           github-token: ${{ github.token }}
-          pattern: dart-android-*-${{ inputs.dart_version }}
-          merge-multiple: true
-          path: kits
-      - run: cd kits && ls -la && sha256sum -c *.sha256
-      - uses: softprops/action-gh-release@v2
+          name: dart-android-arm64-v8a-${{ inputs.dart_version }}
+          path: ${{ runner.temp }}/kits
+      - uses: actions/download-artifact@v4
         with:
-          tag_name: dart-android-${{ inputs.dart_version }}
-          target_commitish: ${{ github.sha }}
-          files: kits/dart-android-*.tar.gz*
-      # A git copy for sessions that can reach GitHub only through git
-      # (precache --dart-android-kit=<checkout>/<file>).
-      - run: |
-          cd kits
-          git init -q -b kits
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add dart-android-*.tar.gz*
-          git commit -qm "dart-android ${{ inputs.dart_version }} from run ${{ inputs.run_id }}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" kits:kits
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          name: dart-android-x86_64-${{ inputs.dart_version }}
+          path: ${{ runner.temp }}/kits
+      - name: Check the kits
+        working-directory: ${{ runner.temp }}/kits
+        run: |
+          set -euo pipefail
+          ls -la
+          for abi in arm64-v8a x86_64; do
+            name=dart-android-$abi-$DART_VERSION.tar.gz
+            manifest=dart-android-$abi-$DART_VERSION.provenance.json
+            test -f "$name" && test -f "$name.sha256" && test -f "$manifest"
+            sha256sum -c "$name.sha256"
+            cat "$manifest"
+            if ! jq -e --arg repo "$GITHUB_REPOSITORY" --arg run_id "$RUN_ID" --arg commit "$PRODUCER_SHA" \
+                --arg dart "$DART_VERSION" --arg abi "$abi" --arg asset "$name" --arg sha256 "$(sha256sum < "$name" | cut -c1-64)" \
+                '.repository == $repo and (.workflow | startswith($repo + "/.github/workflows/dart-android-kit.yml@"))
+                 and .run_id == $run_id and .commit == $commit and .dart_version == $dart and .abi == $abi
+                 and .asset == $asset and .sha256 == $sha256' "$manifest" >/dev/null; then
+              echo "::error::$manifest does not match run $RUN_ID ($PRODUCER_SHA), Dart $DART_VERSION, $abi and the downloaded $name"
+              exit 1
+            fi
+            test "$(tar -xzOf "$name" VERSION)" = "$DART_VERSION"
+            test "$(tar -xzOf "$name" ABI)" = "$abi"
+          done
+      - name: Publish
+        run: |
+          set -euo pipefail
+          .github/scripts/immutable-release-upload.sh --commit "$PRODUCER_SHA" "$TAG" \
+            "$RUNNER_TEMP"/kits/dart-android-{arm64-v8a,x86_64}-"$DART_VERSION".tar.gz{,.sha256} -- \
+            --title "$TAG" \
+            --notes "Android Dart $DART_VERSION kits (arm64-v8a, x86_64) built by dart-android-kit run $RUN_ID at $PRODUCER_SHA. Assets are never replaced."

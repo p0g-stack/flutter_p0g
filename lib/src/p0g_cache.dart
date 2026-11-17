@@ -27,22 +27,38 @@ String dartBinary() => globals.fs.path.join(
   globals.platform.isWindows ? 'dart.bat' : 'dart',
 );
 
-/// Reads a kit archive from a local path or an https URL (GitHub release
-/// assets use GITHUB_TOKEN when set, for private repos).
+/// Reads a local archive or HTTPS URL, including immutable GitHub asset IDs.
 Future<List<int>> fetchBytes(String source) async {
   if (!source.startsWith('https://')) return globals.fs.file(source).readAsBytesSync();
   final client = io.HttpClient();
   try {
-    final request = await client.getUrl(Uri.parse(source));
-    final token = globals.platform.environment['GITHUB_TOKEN'];
-    if (token != null && source.startsWith('https://github.com/')) {
-      request.headers.set('Authorization', 'Bearer $token');
+    var uri = Uri.parse(source);
+    final token =
+        globals.platform.environment['GITHUB_TOKEN'] ?? globals.platform.environment['GH_TOKEN'];
+    for (var redirects = 0; redirects <= 5; redirects++) {
+      if (uri.scheme != 'https') throwToolExit('Refusing non-HTTPS redirect: $uri.');
+      final request = await client.getUrl(uri);
+      request.followRedirects = false;
+      if (uri.host == 'api.github.com') {
+        request.headers.set('Accept', 'application/octet-stream');
+        if (token != null && token.isNotEmpty) {
+          request.headers.set('Authorization', 'Bearer $token');
+        }
+      }
+      final response = await request.close();
+      if (response.isRedirect) {
+        final location = response.headers.value(io.HttpHeaders.locationHeader);
+        await response.drain<void>();
+        if (location == null) throwToolExit('GET $uri: redirect without Location.');
+        uri = uri.resolve(location);
+        continue;
+      }
+      if (response.statusCode != 200) {
+        throwToolExit('GET $uri: HTTP ${response.statusCode}.');
+      }
+      return [for (final chunk in await response.toList()) ...chunk];
     }
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      throwToolExit('GET $source: HTTP ${response.statusCode}.');
-    }
-    return [for (final chunk in await response.toList()) ...chunk];
+    throwToolExit('GET $source: too many redirects.');
   } finally {
     client.close();
   }

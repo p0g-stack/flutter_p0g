@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:archive/archive.dart';
+import 'package:flutter_p0g/src/artifact_pins.dart';
+import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_p0g/src/webui/dart_android.dart';
 import 'package:test/test.dart';
 
@@ -63,11 +65,25 @@ void main() {
     );
   });
 
-  test('default kit URL names the ABI and Dart version', () {
-    expect(defaultKitUrl('3.13.4', 'x86_64'), endsWith('/dart-android-x86_64-3.13.4.tar.gz'));
-    expect(
-      defaultKitUrl('3.13.4', 'arm64-v8a'),
-      endsWith('/dart-android-3.13.4/dart-android-arm64-v8a-3.13.4.tar.gz'),
-    );
+  test('default kit URL uses the committed exact identity', () {
+    for (final abi in kDartArchForAbi.keys) {
+      expect(defaultKitUrl('3.13.4', abi), dartAndroidKitPins['3.13.4']![abi]!.url);
+    }
+  });
+
+  test('unknown SDK or ABI fails instead of synthesizing a release URL', () {
+    for (final target in [('future', 'x86_64'), ('3.13.4', 'mips')]) {
+      expect(
+        () => defaultKitUrl(target.$1, target.$2),
+        throwsA(
+          isA<ToolExit>().having(
+            (error) => error.message,
+            'message',
+            'No pinned Dart Android kit for ${target.$1}/${target.$2}; '
+                'provide an explicit kit and sha256.',
+          ),
+        ),
+      );
+    }
   });
 }

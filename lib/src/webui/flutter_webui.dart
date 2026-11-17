@@ -99,7 +99,9 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
   final webUi = src.childDirectory('web_ui').path;
   await run([dartBinary(), 'pub', 'get'], webUi);
   final engine = globals.flutterVersion.engineRevision;
-  if (!releasedWebSdkFits(tree: tree, engine: engine) || !await _installReleasedWebSdk()) {
+  if (releasedWebSdkFits(tree: tree, engine: engine)) {
+    await installReleasedWebSdk();
+  } else {
     globals.printStatus('Building the patched web SDK (flutter-webui web_ui/tool)...');
     await run([
       dartBinary(), 'run', 'tool/build_web_sdk.dart', //
@@ -118,18 +120,16 @@ Future<void> precacheFlutterWebui({bool force = false}) async {
   sdkStamp.writeAsStringSync(tree);
 }
 
-/// Downloads [kWebSdkUrl], checks [kWebSdkSha256] and unpacks it as
-/// [patchedWebSdkRoot]. False (after a warning) when any step fails, so the
-/// caller builds the SDK instead.
-Future<bool> _installReleasedWebSdk() async {
+/// Installs the pinned web SDK, propagating download and integrity failures.
+@visibleForTesting
+Future<void> installReleasedWebSdk({Future<List<int>> Function(String) fetch = fetchBytes}) async {
   globals.printStatus('Fetching the patched web SDK ($kWebSdkRelease)...');
   final work = flutterWebuiDir().childDirectory('sdk-download');
   try {
-    final bytes = await fetchBytes(kWebSdkUrl);
+    final bytes = await fetch(kWebSdkUrl);
     final digest = sha256.convert(bytes).toString();
     if (digest != kWebSdkSha256) {
-      globals.printWarning('$kWebSdkRelease: sha256 is $digest, the pin says $kWebSdkSha256.');
-      return false;
+      throwToolExit('$kWebSdkRelease: sha256 is $digest, the pin says $kWebSdkSha256.');
     }
     if (work.existsSync()) work.deleteSync(recursive: true);
     final unpacked = work.childDirectory('sdk')..createSync(recursive: true);
@@ -139,16 +139,11 @@ Future<bool> _installReleasedWebSdk() async {
     ]);
     if (r.exitCode != 0 ||
         !unpacked.childDirectory('flutter_web_sdk').childDirectory('kernel').existsSync()) {
-      globals.printWarning('$kWebSdkRelease: could not unpack it (tar with xz):\n${r.stderr}');
-      return false;
+      throwToolExit('$kWebSdkRelease: could not unpack it (tar with xz):\n${r.stderr}');
     }
     final root = patchedWebSdkRoot();
     if (root.existsSync()) root.deleteSync(recursive: true);
     unpacked.renameSync(root.path);
-    return true;
-  } on ToolExit catch (e) {
-    globals.printWarning('$kWebSdkRelease: ${e.message}');
-    return false;
   } finally {
     if (work.existsSync()) work.deleteSync(recursive: true);
   }

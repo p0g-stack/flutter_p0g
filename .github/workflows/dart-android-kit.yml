@@ -7,6 +7,10 @@
 # product kernel build webui snapshots. The `gen_snapshot` target alone
 # builds the Android one; the host cross-compiler comes from the
 # runtime_precompiled group (gen_snapshot($host_toolchain), under clang_x64/).
+# Artifacts only: each ABI's artifact holds the kit, its .sha256 and a
+# .provenance.json (repository, workflow, commit, run, Dart version, ABI,
+# asset sha256). dart-android-kit-release.yml checks those against this run
+# and is the sole publisher.
 name: dart-android-kit
 on:
   workflow_dispatch:
@@ -15,7 +19,7 @@ on:
         description: Dart release (must match the pinned Flutter's dart-sdk/version)
         default: 3.13.4
 permissions:
-  contents: write # the dart-android-<version> release
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,6 +51,9 @@ jobs:
         run: ./tools/build.py --no-rbe --mode product --arch ${{ matrix.arch }} --os android dartaotruntime runtime_precompiled
       - name: Pack
         working-directory: dart/sdk
+        env:
+          DART_VERSION: ${{ inputs.dart_version }}
+          ABI: ${{ matrix.abi }}
         run: |
           out=out/${{ matrix.out }}
           find "$out" -maxdepth 3 -type f \( -name 'gen_snapshot*' -o -name 'dartaotruntime*' -o -name 'dart_precompiled_runtime*' \) -exec file {} \;
@@ -54,7 +61,7 @@ jobs:
           # the ABI's ELF that is (interpreter /system/bin/linker64). Match on
           # `file -b`: the out/ paths themselves contain "Android". Stripped
           # copies (exe.stripped/) are listed first.
-          gen= rt=
+          gen='' rt=''
           for f in $(find "$out" -maxdepth 3 -type f -name gen_snapshot | awk '{print !index($0, "exe.stripped"), $0}' | sort | cut -d' ' -f2-); do
             d=$(file -b "$f")
             case "$d" in *linker64*) ;; *x86-64*) [ -z "$gen" ] && gen=$f ;; esac
@@ -68,17 +75,22 @@ jobs:
           mkdir kit
           cp "$gen" kit/gen_snapshot
           cp "$rt" kit/dartaotruntime
-          echo "${{ inputs.dart_version }}" > kit/VERSION
-          echo "${{ matrix.abi }}" > kit/ABI
+          echo "$DART_VERSION" > kit/VERSION
+          echo "$ABI" > kit/ABI
           file kit/gen_snapshot kit/dartaotruntime
-          name=dart-android-${{ matrix.abi }}-${{ inputs.dart_version }}.tar.gz
+          name=dart-android-$ABI-$DART_VERSION.tar.gz
           tar czf "$name" -C kit VERSION ABI gen_snapshot dartaotruntime
           sha256sum "$name" | tee "$name.sha256"
+          set -o pipefail
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg workflow "$GITHUB_WORKFLOW_REF" --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg dart_version "$DART_VERSION" \
+            --arg abi "$ABI" --arg asset "$name" --arg sha256 "$(sha256sum < "$name" | cut -c1-64)" \
+            '{repository: $repository, workflow: $workflow, commit: $commit, run_id: $run_id, run_attempt: $run_attempt,
+              dart_version: $dart_version, abi: $abi, asset: $asset, sha256: $sha256}' | tee "dart-android-$ABI-$DART_VERSION.provenance.json"
       - uses: actions/upload-artifact@v4
         with:
           name: dart-android-${{ matrix.abi }}-${{ inputs.dart_version }}
-          path: dart/sdk/dart-android-*.tar.gz*
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: dart-android-${{ inputs.dart_version }}
-          files: dart/sdk/dart-android-*.tar.gz*
+          path: |
+            dart/sdk/dart-android-*.tar.gz
+            dart/sdk/dart-android-*.tar.gz.sha256
+            dart/sdk/dart-android-*.provenance.json
