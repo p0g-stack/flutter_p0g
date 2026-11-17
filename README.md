@@ -9,6 +9,13 @@ targets need on top of `flutter build`.
 
 Pinned to Flutter **3.47.9**; the patch series here are made against it.
 
+WebUI X support tracks latest stable (v660); v438/v608 are retired. New
+modules declare `kernelsu.permission.SHELL` and `kernelsu.permission.PM` for
+the shell and `ksu.pm()` package list. Existing app-owned `webui/` folders
+must add PM permission deliberately; builds do not overwrite their config.
+KernelSU manager plus webui-termux-api remains supported. This host update
+does not change the pinned 3.47.9 patched web SDK.
+
 ## Use
 
 ```sh

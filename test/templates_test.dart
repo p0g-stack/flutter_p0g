@@ -31,7 +31,7 @@ void main() {
     final config = jsonDecode(files['webroot/config.json']!) as Map;
     expect(config['killShellWhenBackground'], false);
     expect(config['backInterceptor'], 'native');
-    expect(config['permissions'], ['kernelsu.permission.SHELL']);
+    expect(config['permissions'], ['kernelsu.permission.SHELL', 'kernelsu.permission.PM']);
     expect(config['exitConfirm'], false);
     expect(config['title'], 'Counter');
   });

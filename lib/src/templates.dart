@@ -75,10 +75,8 @@ if [ -d "$MODPATH/bin" ]; then
 fi
 ''',
   // WebUI X reads webroot/config.json; values from flutter-webui docs/hosts.md.
-  // Back is native (history, then close: v608 sends no WX_ON_* events, so
-  // "javascript" left Back dead at the root), closing needs no prompt, hidden
-  // keeps running (the root shell must survive Home), and ksu.exec needs the
-  // SHELL permission on v608 (older versions ignore the key).
+  // Native history Back, no exit prompt, and a shell that survives Home.
+  // Current WebUI X gates exec and the package manager behind permissions.
   'webroot/config.json':
       '${const JsonEncoder.withIndent('  ').convert({
         'title': app.name,
@@ -86,7 +84,7 @@ fi
         'exitConfirm': false,
         'killShellWhenBackground': false,
         'pullToRefresh': false,
-        'permissions': ['kernelsu.permission.SHELL'],
+        'permissions': ['kernelsu.permission.SHELL', 'kernelsu.permission.PM'],
       })}\n',
 };
 
