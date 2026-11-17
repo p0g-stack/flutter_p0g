@@ -15,6 +15,10 @@ the shell and `ksu.pm()` package list. Existing app-owned `webui/` folders
 must add PM permission deliberately; builds do not overwrite their config.
 KernelSU manager plus webui-termux-api remains supported. This host update
 does not change the pinned 3.47.9 patched web SDK.
+The targetSdk 37 app plane (`webui.10`) uses the already-authorized root
+helper for WifiEnable and visible activity dispatch for while-in-use APIs.
+The compatible flutter-webui source pin is on `webuix660-3.47.9`; main's
+separate Flutter 3.50.0 producer wave is not part of this checkpoint.
 
 ## Use
 
