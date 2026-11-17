@@ -1,3 +1,9 @@
+# 0.9.2
+
+- Follow the current WebUI X v660 client and root WifiEnable helper
+  (`72df180`), retaining KernelSU manager support. The Flutter 3.47.9 web
+  SDK identity is unchanged.
+
 # 0.9.1
 
 - Qualify Flutter 3.47.9 / Dart 3.13.7 with flutter-webui `374766e` and

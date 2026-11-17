@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_P0G_REF: a00aa6af51690ec2353d55621dfd79fd0bccf55c
+  FLUTTER_P0G_REF: 2612b4d73a4f643d49f30d0940917b15f4ae09a3
 
 jobs:
   bricks:
