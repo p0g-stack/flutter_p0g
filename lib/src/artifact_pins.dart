@@ -20,6 +20,17 @@ const Map<String, Map<String, PinnedArtifact>> dartAndroidKitPins = {
       'faa7ef975702a8a52a7500b704ee9ef60ed7cce6cccaccfc0e81d02b06205991',
     ),
   },
+  // dart-android-3.13.7-9a94692015433723b2f5e0b19b5c00553112ce40
+  '3.13.7': {
+    'arm64-v8a': PinnedArtifact(
+      'https://api.github.com/repos/p0g-stack/flutter_p0g/releases/assets/758156337',
+      '2ecff73f4cf0205ec16ed54f81dc94b57b7709bcd1681691859f211b351fcd01',
+    ),
+    'x86_64': PinnedArtifact(
+      'https://api.github.com/repos/p0g-stack/flutter_p0g/releases/assets/758156334',
+      'a82bc739280110274e16499158f94e62aca652fb453d29af7f2ec9bff25ceac3',
+    ),
+  },
 };
 
 const Map<String, Map<String, PinnedArtifact>> aeraKitPins = {
