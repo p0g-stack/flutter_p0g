@@ -45,11 +45,10 @@ registers the `Link` platform view).
   renamed per module to `com.webui.api.<seg>` (`appPlanePackage`: the module
   id with characters outside `[A-Za-z0-9_]` as `_`, `m` prefix before a digit;
   webui-termux-api WEBUI.md, "Renaming per module"). Pre-check `pm path
-  <package>` (once), which also runs `appops set
-  com.webui.termux.api SYSTEM_ALERT_WINDOW allow`: methods that open an
-  activity from the broadcast (Share's chooser) are otherwise blocked as
-  background activity starts on Android 10+ (devicelab: "Background activity
-  launch blocked!" without it, chooser shown with it). A call runs
+  <package>` once. The root client supplies background-activity-start
+  eligibility on broadcasts, and starts ApiDispatchActivity for APIs that
+  need while-in-use eligibility. No SYSTEM_ALERT_WINDOW appop is granted.
+  A call runs
   `<moddir>/webui_app_plane/termux-api [--package P] <Method> [extras]` as an
   attached root process; that launcher runs `bin/webui_termux_api.dart`, the
   Dart port of termux-api from termux-api-package 9e7f153 (`run_api_command`,

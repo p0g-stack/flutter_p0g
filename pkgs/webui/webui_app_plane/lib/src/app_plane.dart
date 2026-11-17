@@ -40,24 +40,15 @@ final class AppPlane {
   Future<bool>? _installed;
 
   /// Whether the app can be called: the root channel exists and
-  /// `pm path <package>` finds the app. The first check also grants the app
-  /// the `SYSTEM_ALERT_WINDOW` appop: methods that open an activity (Share's
-  /// chooser, dialogs) run from a broadcast, and Android 10+ blocks those
-  /// background activity starts without it (devicelab, Android 15).
-  /// Checked once per [AppPlane].
+  /// `pm path <package>` finds the app. Checked once per [AppPlane].
+  /// Activity eligibility is supplied by the root client's dispatch, not
+  /// by granting the app an overlay permission.
   Future<bool> isAvailable() {
     if (!root.available) return Future.value(false);
     return _installed ??= () async {
       try {
         final found = await root.run(['/system/bin/pm', 'path', package]);
         if (!found.ok || !found.text.contains('package:')) return false;
-        await root.run([
-          '/system/bin/appops',
-          'set',
-          package,
-          'SYSTEM_ALERT_WINDOW',
-          'allow',
-        ]);
         return true;
       } on Object {
         return false;

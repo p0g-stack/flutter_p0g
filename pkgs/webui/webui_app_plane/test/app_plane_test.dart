@@ -86,7 +86,7 @@ void main() {
 
   group('AppPlane', () {
     test(
-      'pre-checks with pm path and grants the appop once, then calls',
+      'pre-checks pm path once and calls without granting overlay access',
       () async {
         final fake = FakeRootChannel(
           handler: (run) => run.argv.contains('path')
@@ -106,13 +106,6 @@ void main() {
         expect(r.text, 'echo:hello');
         expect(fake.runs.map((r) => r.argv).toList(), [
           ['/system/bin/pm', 'path', 'com.webui.api.demo'],
-          [
-            '/system/bin/appops',
-            'set',
-            'com.webui.api.demo',
-            'SYSTEM_ALERT_WINDOW',
-            'allow',
-          ],
           [
             '/system/bin/sh',
             '/data/adb/modules/demo/webui_app_plane/termux-api',
