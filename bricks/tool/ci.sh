@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate each brick into a scratch folder and build and test what it made.
-# Usage: tool/ci.sh [out-dir]. Needs flutter (3.47.5) and mason on PATH;
+# Usage: tool/ci.sh [out-dir]. Needs flutter (3.47.9) and mason on PATH;
 # the Rust variants also need cargo, cargo-expand, wasm-pack and the verified
 # patched FRB cache (`flutter_p0g precache --frb --no-webui`).
 set -euo pipefail

@@ -8,7 +8,7 @@ named `notes`. Each step says what it produces and how to check it.
 
 | Tool | Version | Why |
 |---|---|---|
-| Flutter | 3.47.5 (Dart 3.13) | everything is pinned to it |
+| Flutter | 3.47.9 (Dart 3.13.7) | everything is pinned to it |
 | mason_cli | 0.1.4 | the bricks (`dart pub global activate mason_cli 0.1.4`) |
 | flutter_p0g | main | `create`, `build webui`, `install` (`dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g`) |
 | cargo, cargo-expand | stable | only with `rust: true` |

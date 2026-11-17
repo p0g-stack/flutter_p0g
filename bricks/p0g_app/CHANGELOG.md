@@ -1,3 +1,9 @@
+# 0.9.1
+
+- Qualify Flutter 3.47.9 / Dart 3.13.7 with flutter-webui `374766e` and
+  squadron_process `8f639eb` (patched Squadron 7.4.5). Keep the frozen
+  patched_source helper and FRB 2.14.0-beta.2 source identities unchanged.
+
 # 0.9.0
 
 - `sample` (default true): include the hello and digest demonstration UI
