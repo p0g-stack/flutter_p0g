@@ -26,7 +26,7 @@ index 577567513..c978ad7ce 100644
 +    threads: config.threads,
      dartCompileJsEntrypoint: config.dartCompileJsEntrypoint,
      dartCompileWasmEntrypoint: config.dartCompileWasmEntrypoint,
-   );
+     skipToolInstall: config.skipToolInstall,
 diff --git a/frb_dart/lib/src/cli/build_web/entrypoint.g.dart b/frb_dart/lib/src/cli/build_web/entrypoint.g.dart
 index 3833c2008..964cff3fc 100644
 --- a/frb_dart/lib/src/cli/build_web/entrypoint.g.dart
@@ -38,7 +38,7 @@ index 3833c2008..964cff3fc 100644
 +  ..threads = result['threads'] as bool
    ..dartCompileJsEntrypoint = result['dart-compile-js-entrypoint'] as String?
    ..dartCompileWasmEntrypoint =
-       result['dart-compile-wasm-entrypoint'] as String?;
+       result['dart-compile-wasm-entrypoint'] as String?
 @@ -48,6 +49,12 @@ ArgParser _$populateConfigParser(ArgParser parser) => parser
      help:
          'Override WebAssembly target Rust compiler flags when running wasm-pack',
@@ -56,9 +56,9 @@ diff --git a/frb_dart/lib/src/cli/build_web/executor.dart b/frb_dart/lib/src/cli
 index 1ae3338c2..e368acca2 100644
 --- a/frb_dart/lib/src/cli/build_web/executor.dart
 +++ b/frb_dart/lib/src/cli/build_web/executor.dart
-@@ -80,6 +80,9 @@ class BuildWebArgs {
+@@ -83,6 +83,9 @@ class BuildWebArgs {
    /// {@macro flutter_rust_bridge.cli}
-   final List<String> features;
+   final bool skipToolInstall;
  
 +  /// {@macro flutter_rust_bridge.cli}
 +  final bool threads;
@@ -66,10 +66,10 @@ index 1ae3338c2..e368acca2 100644
    /// {@macro flutter_rust_bridge.cli}
    const BuildWebArgs({
      required this.output,
-@@ -93,6 +96,7 @@ class BuildWebArgs {
-     required this.dartCompileJsEntrypoint,
+@@ -96,6 +99,7 @@ class BuildWebArgs {
      required this.dartCompileWasmEntrypoint,
      this.features = const [],
+     this.skipToolInstall = false,
 +    this.threads = true,
    });
  }

@@ -56,6 +56,7 @@ Future<void> compileWorkers(
   List<WorkerEntry> workers,
   Directory webRoot, {
   required bool release,
+  required List<String> dartDefines,
 }) async {
   for (final w in workers) {
     // Absolute: the compiler runs in the worker's source directory, so a
@@ -68,6 +69,7 @@ Future<void> compileWorkers(
       'compile',
       if (wasm) 'wasm' else 'js',
       if (!wasm) ...[release ? '-O2' : '-O0', '--no-source-maps'],
+      for (final define in dartDefines) '-D$define',
       '-o',
       out.path,
       w.source.path,

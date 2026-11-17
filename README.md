@@ -305,8 +305,9 @@ AERA answers `unsupported_operation`.
 
 `patches/frb/` holds the series applied to
 [flutter_rust_bridge](https://github.com/fzyzcjy/flutter_rust_bridge) at
-`848e438` (master just after v2.14.0-beta.2; the series doesn't apply to
-the tag). `precache --frb` fetches that commit, applies the series in order and
+`1e4df906b6d0e96aefbfa40dde5fa2833d417c1a` (upstream Rust crate
+`2.14.0-beta.2`; the series doesn't apply to the tag). `precache --frb`
+fetches that commit, applies the series in order and
 builds the codegen into `<flutter>/bin/cache/flutter_p0g/frb/`. Nothing is
 upstreamed until it has been tested on its own.
 
@@ -314,7 +315,14 @@ upstreamed until it has been tested on its own.
 |---|---|---|
 | `0001-build-web-no-threads` | `build-web --no-threads`, the `LocalKey` thread-pool stub, a clear error for plain fns | standalone-tested 2026-09-30 (Chromium, no COOP/COEP) |
 | `0002` JSPI | | planned |
-| `0003-web-worker-init` | the wasm binding from `globalThis` (not `window`) and module init inside Web Workers, so a Squadron worker can load the crate | from the demo thread (page 3); applies after 0001, not yet standalone-tested |
+| `0003-web-worker-init` | the wasm binding from `globalThis` (not `window`) and module init inside Web Workers, so a Squadron worker can load the crate | standalone-tested 2026-11-17: real Rust export in a classic Chromium worker, no document or COOP/COEP |
+
+Run the independent [web runtime proofs](tool/web_runtime_proof/README.md)
+to reproduce the worker initialization and JS/wasm page/worker define checks.
+The rebased series retains upstream `--skip-tool-install`. Codegen cache
+identity includes `kFrbCommit` and the patched-source identity; moving the pin
+invalidates the old binary stamp without changing the public `frb/src` and
+`frb/bin` cache locations.
 
 An app using frb points its Dart dependency at the patched copy (the build
 says so if it doesn't):

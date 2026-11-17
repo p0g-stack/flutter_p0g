@@ -1,0 +1,16 @@
+[package]
+name = "p0g_frb_worker_proof"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+flutter_rust_bridge = { version = "=2.14.0-beta.2", default-features = false, features = ["anyhow", "dart-opaque", "log", "portable-atomic", "rust-async", "user-utils", "wasm-start"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

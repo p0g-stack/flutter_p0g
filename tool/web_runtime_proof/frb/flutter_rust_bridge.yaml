@@ -1,0 +1,8 @@
+rust_input: crate::api
+rust_root: rust/
+dart_output: lib/generated/
+default_dart_async: false
+default_external_library_loader_web_prefix: pkg/
+dart_format: false
+dart_fix: false
+rust_format: false

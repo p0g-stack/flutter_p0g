@@ -90,7 +90,10 @@ class BuildWebUiCommand extends BuildWebCommand {
 
   @override
   String? stringArg(String name, {bool global = false}) {
-    if (!global && name == 'pwa-strategy' && !argResults!.wasParsed(name)) return 'none';
+    if (!global && name == 'pwa-strategy') {
+      if (!argParser.options.containsKey(name)) return null;
+      if (!argResults!.wasParsed(name)) return 'none';
+    }
     return super.stringArg(name, global: global);
   }
 
@@ -147,7 +150,12 @@ class BuildWebUiCommand extends BuildWebCommand {
     );
 
     final workers = findWorkers(app, wasm: boolArg(FlutterOptions.kWebWasmFlag));
-    await compileWorkers(workers, web, release: buildInfo.isRelease);
+    await compileWorkers(
+      workers,
+      web,
+      release: buildInfo.isRelease,
+      dartDefines: buildInfo.dartDefines,
+    );
 
     final Directory out = app.childDirectory('build').childDirectory('webui');
     if (out.existsSync()) out.deleteSync(recursive: true);

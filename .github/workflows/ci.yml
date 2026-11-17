@@ -21,8 +21,10 @@ jobs:
       - run: flutter test
       - name: frb series applies to the pinned commit
         run: |
+          FRB_COMMIT=$(awk -F "'" '/^const kFrbCommit = / {print $2}' lib/src/frb/frb.dart)
+          test "${#FRB_COMMIT}" = 40
           git init -q /tmp/frb && cd /tmp/frb
           git remote add origin https://github.com/fzyzcjy/flutter_rust_bridge
-          git fetch -q --depth 1 origin 848e438c561491adcc16cbf8b33bb61e541bd475
+          git fetch -q --depth 1 origin "$FRB_COMMIT"
           git checkout -q FETCH_HEAD
           for p in "$GITHUB_WORKSPACE"/patches/frb/*.patch; do git apply --check "$p" && git apply "$p"; done

@@ -1,0 +1,22 @@
+import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
+import 'generated/api.dart';
+import 'generated/frb_generated.dart';
+
+@JS('postMessage')
+external void postMessage(JSString message);
+
+Future<void> main() async {
+  try {
+    await RustLib.init();
+    postMessage(jsonEncode({
+      'value': deterministicValue(),
+      'hasDocument': globalContext.has('document'),
+      'isolated': globalContext.getProperty<JSBoolean>('crossOriginIsolated'.toJS).toDart,
+    }).toJS);
+  } catch (error, stack) {
+    postMessage(jsonEncode({'error': '$error', 'stack': '$stack'}).toJS);
+  }
+}

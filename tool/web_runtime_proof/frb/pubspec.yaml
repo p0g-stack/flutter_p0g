@@ -1,0 +1,5 @@
+name: p0g_frb_worker_proof
+environment:
+  sdk: ^3.13.0
+dependencies:
+  flutter_rust_bridge: 2.14.0-beta.2

@@ -49,7 +49,12 @@ class BuildWebP0gCommand extends BuildWebCommand {
       stringArg('output') ?? fs.path.join(app.path, getWebBuildDirectory()),
     );
     final workers = findWorkers(app, wasm: boolArg(FlutterOptions.kWebWasmFlag));
-    await compileWorkers(workers, web, release: buildInfo.isRelease);
+    await compileWorkers(
+      workers,
+      web,
+      release: buildInfo.isRelease,
+      dartDefines: buildInfo.dartDefines,
+    );
     globals.printStatus(
       'Built ${fs.path.relative(web.path)} '
       '(${workers.length} worker${workers.length == 1 ? '' : 's'}'

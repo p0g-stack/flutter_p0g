@@ -1,0 +1,8 @@
+name: p0g_worker_define_proof
+environment:
+  sdk: ^3.13.0
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  uses-material-design: false

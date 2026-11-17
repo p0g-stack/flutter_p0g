@@ -1,0 +1,11 @@
+// Discovery uses the same artifact contract as generated Squadron entrypoints:
+// Squadron.uri('~/workers/value.web.g.dart.js')
+// Squadron.uri('~/workers/value.web.g.dart.wasm')
+import 'dart:js_interop';
+
+import 'value.dart';
+
+@JS('postMessage')
+external void postMessage(JSString message);
+
+void main() => postMessage(serviceValue().toJS);

@@ -1,0 +1,6 @@
+import 'dart:convert';
+
+String serviceValue() => jsonEncode({
+  'value': const String.fromEnvironment('P0G_WORKER_VALUE'),
+  'flag': const bool.fromEnvironment('P0G_WORKER_FLAG'),
+});

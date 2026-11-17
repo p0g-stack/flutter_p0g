@@ -17,7 +17,7 @@ import '../../patched_source.dart';
 /// against this commit (master after v2.14.0-beta.2; the patches do not
 /// apply to the tag itself).
 const kFrbRepo = 'https://github.com/fzyzcjy/flutter_rust_bridge';
-const kFrbCommit = '848e438c561491adcc16cbf8b33bb61e541bd475';
+const kFrbCommit = '1e4df906b6d0e96aefbfa40dde5fa2833d417c1a';
 
 /// frb's own marker for an app that uses it.
 const kFrbConfigFile = 'flutter_rust_bridge.yaml';
