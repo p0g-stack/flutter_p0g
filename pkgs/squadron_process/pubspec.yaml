@@ -6,7 +6,7 @@ description: >-
 version: 0.9.0
 publish_to: none
 resolution: workspace
-repository: https://github.com/p0g-stack/squadron_process
+repository: https://github.com/p0g-stack/p0g/tree/main/pkgs/squadron_process
 
 environment:
   # Oldest Dart whose APIs this package uses; CI runs the Dart of the pinned Flutter.

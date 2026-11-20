@@ -3,8 +3,8 @@
 
 /// Builds the patched Flutter web SDK.
 ///
-/// Applies `web_ui/patches/*.patch` to the web engine sources of a Flutter
-/// checkout at the pinned release (`web_ui/VERSION`), rewrites them into SDK
+/// Applies `web_sdk/patches/*.patch` to the web engine sources of a Flutter
+/// checkout at the pinned release (`web_sdk/VERSION`), rewrites them into SDK
 /// libraries with the engine's own `sdk_rewriter.dart`, and compiles the
 /// platform kernels and DDC modules with the Dart SDK's `kernel_worker` and
 /// `dartdevc`, as the engine's `web_sdk/BUILD.gn` does with a prebuilt Dart
@@ -16,7 +16,7 @@
 /// precache does this).
 ///
 /// ```
-/// dart run web_ui/tool/build_web_sdk.dart --flutter <flutter root> --out <dir>
+/// dart run web_sdk/tool/build_web_sdk.dart --flutter <flutter root> --out <dir>
 /// ```
 library;
 

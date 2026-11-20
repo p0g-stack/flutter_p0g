@@ -3,8 +3,8 @@ import 'package:squadron_process/squadron_process.dart';
 
 /// The process place on WebUI: `<module>/bin/<app> serve`, started detached
 /// as root through flutter-webui's root channel, and found again after a
-/// reload through its session file. The contract is docs/webui-launch.md in
-/// p0g-stack/bricks.
+/// reload through its session file. The contract is bricks/docs/webui-launch.md
+/// in p0g-stack/p0g.
 ///
 /// [connect] opens the root channel; on a WebUI page that is
 /// `WebUi.connectRootChannel`. It is called again when the channel closed.

@@ -1,7 +1,7 @@
 name: p0g_app
 description: A p0g-stack app as a pub workspace - pure Dart core, Flutter app and Dart CLI, wired for Squadron places, strategies and logging.
 version: 0.9.3
-repository: https://github.com/p0g-stack/bricks/tree/main/bricks/p0g_app
+repository: https://github.com/p0g-stack/p0g/tree/main/bricks/p0g_app
 
 environment:
   mason: ^0.1.1
