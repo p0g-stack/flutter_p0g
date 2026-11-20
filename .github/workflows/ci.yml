@@ -167,20 +167,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: pkgs/squadron_process/tool/squadron.sh
       - uses: ./.github/actions/setup
         with:
           wasm: 'true'
+          pub-get: 'false'
       - name: Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
-      - name: Install the candidate CLI, patched FRB and mason
-        run: |
-          dart pub global activate --source path pkgs/flutter_p0g
-          "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
-          dart pub global activate mason_cli 0.1.4
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       # The generator uses an unpublished local tag and resolves the generated
       # app outside the workspace, including before p0g's first release.
       - name: Generate and test
