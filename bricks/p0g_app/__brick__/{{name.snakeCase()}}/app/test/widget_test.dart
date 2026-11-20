@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:{{name.snakeCase()}}/home.dart';
 {{#sample}}import 'package:{{name.snakeCase()}}/panels/hello_panel.dart';
 {{/sample}}import 'package:{{name.snakeCase()}}/places/places.dart';

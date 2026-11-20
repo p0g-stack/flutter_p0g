@@ -1,3 +1,18 @@
+# 0.9.3
+
+- Flutter 3.50 / Dart 3.14: generated apps and panels import
+  `package:material_ui/material_ui.dart`; `package:flutter/material.dart` is
+  deprecated. `hostColors` passes the host schemes straight through:
+  dynamic_color 2.1.0 already builds material_ui's `ColorScheme`, so the
+  conversion extension is gone.
+- p0g-stack packages come from the monorepo: `squadron_process`,
+  `flutter_webui_client`, `flutter_webui_root` and `patched_source` resolve
+  from `https://github.com/p0g-stack/p0g` at `pkgs/<package>` with
+  `tag_pattern: p0g-v{{version}}` and `^0.9.0`, instead of separate repos
+  pinned by commit. `p0g_lints` in `analysis_options.yaml` names the same tag
+  as `ref:`: the analyzer's synthetic plugin package declares SDK `^3.6.0`,
+  below the `^3.9.0` that `tag_pattern` requires.
+
 # 0.9.2
 
 - Follow the current WebUI X v660 client and root WifiEnable helper

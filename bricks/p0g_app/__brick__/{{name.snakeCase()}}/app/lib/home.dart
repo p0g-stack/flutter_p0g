@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:squadron_process/squadron_process.dart' show PlaceKind;
 
 import 'panels/panels.dart';
