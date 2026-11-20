@@ -21,6 +21,7 @@
 library;
 
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
@@ -98,7 +99,9 @@ Future<void> main(List<String> arguments) async {
     await _run('cp', ['-R', stockSdk, out]);
     final lib = p.join(staging, webUiRel, 'lib');
     final rewriter = p.join(flutter, engineRel, 'web_sdk', 'sdk_rewriter.dart');
-    final packages = p.join(here, '..', '.dart_tool', 'package_config.json');
+    // The package config this tool runs with (the workspace's, or one the
+    // caller passed with --packages): sdk_rewriter needs args and path.
+    final packages = p.fromUri(Isolate.packageConfigSync!);
     Future<void> rewrite(String outDir, List<String> extra) async {
       final target = p.join(out, 'lib', outDir);
       if (Directory(target).existsSync()) {
