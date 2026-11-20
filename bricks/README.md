@@ -57,11 +57,11 @@ variables; `bricks/<brick>/CHANGELOG.md` its versions.
 ## Versions
 
 Bricks have their own versions, independent of the packages: a brick change
-bumps the brick and appends a `CHANGELOG.md` line. The generated workspace
-pins the packages it uses by the `p0g-v<x.y.z>` tag and names the Flutter
-release in `.fvmrc`; there is no separate list to keep in step. A new tag
-makes the bricks at that tag available — pass it as `--git-ref` when adding
-one later.
+bumps the brick and appends a `CHANGELOG.md` line. A generated workspace pins
+the packages it uses by the `p0g-v<x.y.z>` tag; the Flutter release it needs
+is the one in this repository's `.fvmrc`, and the launcher refuses any other.
+A new tag makes the bricks at that tag available — pass it as `--git-ref` when
+adding one later.
 
 ## CI
 

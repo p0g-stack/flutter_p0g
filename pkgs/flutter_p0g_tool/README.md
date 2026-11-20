@@ -56,6 +56,10 @@ Every target command works from the app's directory (the one with the
 | `logs` | `-d/--device-id`, `--[no-]page` |
 | `precache` | `--[no-]web`, `--[no-]webui`, `--[no-]frb`, `--[no-]squadron`, `--[no-]dart-android` (+ `--dart-android-kit`, `--dart-android-sha256`, `--dart-android-abi`), `--[no-]aera` (+ `--aera-mode`, `--aera-kit`, `--aera-kit-sha256`), `--[no-]app-plane` |
 
+`flutter_p0g <command> --help` has the full flag help, including the stock
+flags each target inherits; `precache --web` and `precache --webui` are on by
+default, everything else is opt-in.
+
 Details: [doc/webui-module.md](doc/webui-module.md) (what `build webui`
 assembles), [doc/run.md](doc/run.md), [doc/aera.md](doc/aera.md) (the `.aerap`
 format and its install).
