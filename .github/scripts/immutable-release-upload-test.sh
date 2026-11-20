@@ -2,7 +2,7 @@
 # Fixture for immutable-release-upload.sh: runs it against a fake `gh` that
 # keeps one repository's tags, releases and assets in a temporary directory.
 #   bash .github/scripts/immutable-release-upload-test.sh
-# Kept byte-identical beside every copy of the script.
+# CI runs it on every change to the uploader or immutable-upload.yml.
 set -euo pipefail
 
 script="$(cd "$(dirname "$0")" && pwd)/immutable-release-upload.sh"

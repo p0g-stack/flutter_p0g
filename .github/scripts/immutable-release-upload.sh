@@ -19,9 +19,10 @@
 #                  without them a missing release is an error. A release a
 #                  concurrent job created first is used as it is.
 #
-# Needs gh (signed in) and jq. Canonical copy, kept byte-identical in
-# flutter-aera, flutter_p0g and webui-termux-api under .github/scripts/;
-# immutable-release-upload-test.sh beside it is its fixture.
+# Needs gh (signed in) and jq. Canonical copy: workflows, here and in other
+# repositories, run it through .github/workflows/immutable-upload.yml, which
+# checks it out at its own p0g commit; immutable-release-upload-test.sh
+# beside it is its fixture.
 set -euo pipefail
 shopt -s inherit_errexit
 

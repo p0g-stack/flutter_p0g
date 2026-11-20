@@ -1,27 +1,41 @@
 # Builds the Android Dart kits that `flutter_p0g precache --dart-android`
 # fetches, one per device ABI: gen_snapshot (linux-x64 host, emits Android
 # AOT for that ABI) and dartaotruntime (Android, bionic), from the Dart
-# release inside the pinned Flutter. Same recipe Termux uses for its dart
+# release inside the pinned Flutter (.fvmrc; its Dart version comes from
+# Flutter's release index). Same recipe Termux uses for its dart
 # package (tools/build.py --os android), keeping the host gen_snapshot.
 # x86_64 is for emulators (devicelab's AVD). Product mode, to match the
 # product kernel build webui snapshots. The `gen_snapshot` target alone
 # builds the Android one; the host cross-compiler comes from the
 # runtime_precompiled group (gen_snapshot($host_toolchain), under clang_x64/).
 # Artifacts only: each ABI's artifact holds the kit, its .sha256 and a
-# .provenance.json (repository, workflow, commit, run, Dart version, ABI,
-# asset sha256). dart-android-kit-release.yml checks those against this run
-# and is the sole publisher.
+# .provenance.json (repository, workflow, commit, run, Flutter and Dart
+# version, ABI, asset sha256). dart-android-kit-release.yml checks those
+# against this run and is the sole publisher. Expensive: dispatch only.
 name: dart-android-kit
 on:
   workflow_dispatch:
-    inputs:
-      dart_version:
-        description: Dart release (must match the pinned Flutter's dart-sdk/version)
-        default: 3.13.4
 permissions:
   contents: read
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      flutter: ${{ steps.version.outputs.flutter }}
+      dart: ${{ steps.version.outputs.dart }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .fvmrc
+            .github/scripts/flutter-dart-version.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Dart release of the pinned Flutter
+        id: version
+        run: bash .github/scripts/flutter-dart-version.sh >> "$GITHUB_OUTPUT"
   build:
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
@@ -36,6 +50,9 @@ jobs:
             arch: x64
             out: ProductAndroidX64
             elf: x86-64
+    env:
+      FLUTTER_VERSION: ${{ needs.version.outputs.flutter }}
+      DART_VERSION: ${{ needs.version.outputs.dart }}
     steps:
       - name: Fetch Dart SDK sources
         run: |
@@ -43,7 +60,7 @@ jobs:
           echo "$PWD/depot_tools" >> "$GITHUB_PATH"
           export PATH="$PWD/depot_tools:$PATH"
           mkdir dart && cd dart
-          git clone --branch "${{ inputs.dart_version }}" --depth 1 --no-tags https://dart.googlesource.com/sdk.git sdk
+          git clone --branch "$DART_VERSION" --depth 1 --no-tags https://dart.googlesource.com/sdk.git sdk
           gclient config --name sdk --custom-var download_android_deps=True --unmanaged https://dart.googlesource.com/sdk.git
           gclient sync --jobs 8 --no-history
       - name: Build
@@ -52,7 +69,6 @@ jobs:
       - name: Pack
         working-directory: dart/sdk
         env:
-          DART_VERSION: ${{ inputs.dart_version }}
           ABI: ${{ matrix.abi }}
         run: |
           out=out/${{ matrix.out }}
@@ -83,13 +99,14 @@ jobs:
           sha256sum "$name" | tee "$name.sha256"
           set -o pipefail
           jq -n --arg repository "$GITHUB_REPOSITORY" --arg workflow "$GITHUB_WORKFLOW_REF" --arg commit "$GITHUB_SHA" \
-            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg dart_version "$DART_VERSION" \
-            --arg abi "$ABI" --arg asset "$name" --arg sha256 "$(sha256sum < "$name" | cut -c1-64)" \
+            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg flutter_version "$FLUTTER_VERSION" \
+            --arg dart_version "$DART_VERSION" --arg abi "$ABI" --arg asset "$name" --arg sha256 "$(sha256sum < "$name" | cut -c1-64)" \
             '{repository: $repository, workflow: $workflow, commit: $commit, run_id: $run_id, run_attempt: $run_attempt,
-              dart_version: $dart_version, abi: $abi, asset: $asset, sha256: $sha256}' | tee "dart-android-$ABI-$DART_VERSION.provenance.json"
-      - uses: actions/upload-artifact@v4
+              flutter_version: $flutter_version, dart_version: $dart_version, abi: $abi, asset: $asset, sha256: $sha256}' \
+            | tee "dart-android-$ABI-$DART_VERSION.provenance.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: dart-android-${{ matrix.abi }}-${{ inputs.dart_version }}
+          name: dart-android-${{ matrix.abi }}-${{ needs.version.outputs.dart }}
           path: |
             dart/sdk/dart-android-*.tar.gz
             dart/sdk/dart-android-*.tar.gz.sha256
