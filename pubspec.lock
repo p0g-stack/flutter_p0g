@@ -717,7 +717,7 @@ packages:
   squadron:
     dependency: "direct overridden"
     description:
-      path: "pkgs/squadron_process/third_party/squadron/src"
+      path: ".upstream/squadron"
       relative: true
     source: path
     version: "7.4.5"

@@ -25,13 +25,18 @@ Future<void> main(List<String> args) async {
       throw StateError('squadron_process is not a dependency here');
     }
     final series = Directory(
-      p.join(File.fromUri(lib).parent.parent.path, 'third_party', 'squadron'),
+      p.normalize(
+        p.join(
+          File.fromUri(lib).parent.parent.path,
+          '..',
+          '..',
+          'third_party',
+          'squadron',
+        ),
+      ),
     );
     final pin = await readPatchPin(File(p.join(series.path, 'PIN')));
-    if (!pin.containsKey('package')) {
-      throw StateError('${series.path}/PIN: missing package=');
-    }
-    final packagePath = pin['package']!;
+    final packagePath = pin['package'] ?? '';
     if (p.isAbsolute(packagePath) ||
         p.split(p.normalize(packagePath)).contains('..')) {
       throw StateError(

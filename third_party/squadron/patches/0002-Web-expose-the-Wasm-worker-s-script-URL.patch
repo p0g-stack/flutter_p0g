@@ -1,0 +1,123 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: 1vivy <1vivy@tutanota.com>
+Date: Tue, 17 Nov 2026 02:39:18 -0600
+Subject: Web: expose the Wasm worker's script URL
+
+A Web Assembly worker runs from a blob URL that holds Squadron's loader
+script (EntryPointUri._wasmLoaderScript in
+lib/src/_impl/web/_entry_point_uri.dart), so inside the worker
+self.location is the blob, not the worker's files. Code in the worker
+that loads sibling assets (a wasm-bindgen module next to the worker,
+for instance) has no reliable base URL and ends up guessing from the
+origin, which is wrong whenever the app is not served from the origin
+root.
+
+The loader already derives the absolute URL of the worker's .wasm file
+(workerUri). Assign it to globalThis.squadronWorkerScriptUrl right
+after deriving it, before the Dart runtime is imported or main is
+invoked, so the worker can resolve relative paths against its real
+location. self.location, the blob, the worker packaging and the channel
+protocol are unchanged. JavaScript workers do not need it: they run
+from their own URL. The loader is the only place that knows the
+worker's real URL, and the global is inert for code that ignores it.
+It is deliberately not namespaced (a worker has no module system); the
+name follows the loader's workerUri.
+
+Tests: test/web_worker_script_url_test.dart (browser only) fetches the
+blob's loader script of a Wasm entry point and checks that
+`globalThis.squadronWorkerScriptUrl=workerUri;` comes after
+`const workerUri=` and before `let newRt=`, and that a .js entry point
+keeps its own URL. It does not observe the value inside a running
+worker; that needs a Wasm test worker reporting it, i.e. a new service
+method and rebuilt worker binaries.
+
+Checks run on fd5becc (7.4.5) with this as the only commit (fork branch
+web-worker-script-url @ 915a6517, where the CHANGELOG entry has its own
+"Unreleased" section), Dart 3.13.7, Chrome 157.0.8103.50:
+- `dart analyze` reports no issues.
+- `dart test -p vm`: 689 passed, 5 skipped.
+- After `dart run tool/compile_tests.dart js wasm` (as in
+  tool/run_tests.sh), `dart test -p chrome --compiler dart2js`: 1462
+  passed, 10 skipped, including the JS and the WASM runner suites, so
+  real Wasm workers still load through the changed loader.
+- The new test passes with the change and fails at fd5becc ("wasm
+  worker loader exposes the worker script url"), so it is a regression
+  test.
+
+Rebase notes: in this series the CHANGELOG entry shares the
+"Unreleased" section with the channel factory entry; the test file was
+taken from the fork branch, which the previously carried patch lacked.
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 939b738c236ebdc777ef41027c7d5dcc03c46271..7726369a170ed895603ffc91191904aad4ff4eff 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,7 @@
+ 
+ - Add `Worker.channelFactory` (and a `channelFactory` constructor parameter) so a worker can open its channel somewhere other than an isolate or a Web Worker, e.g. another process over a socket. Without a factory, `Worker.start()` opens `Channel.open()` as before.
+ - Export `SquadronCancelationToken` and `StreamId`, which custom `Channel` implementations need.
++- Web: the loader of a Web Assembly worker sets `globalThis.squadronWorkerScriptUrl` to the absolute URL of the worker's `.wasm` file before it loads the Dart runtime. The worker runs from a blob URL, so `self.location` cannot tell it where its own files are.
+ 
+ ## 7.4.5
+ 
+diff --git a/lib/src/_impl/web/_entry_point_uri.dart b/lib/src/_impl/web/_entry_point_uri.dart
+index ecf4d8b7c681a3cf53f03e95719a7eb26646af31..c20a8aa98a75e6aaedaf5cf18358e7fb6bc5a362 100644
+--- a/lib/src/_impl/web/_entry_point_uri.dart
++++ b/lib/src/_impl/web/_entry_point_uri.dart
+@@ -59,6 +59,7 @@ class EntryPointUri with Releasable {
+ 
+   static String _wasmLoaderScript(String url) => '''(async function(){
+ const workerUri=new URL("${url.replaceAll('"', '\\"')}",self.location.origin).href;
++globalThis.squadronWorkerScriptUrl=workerUri;
+ let newRt=false;
+ try{
+   let d2w_rt; let worker;
+diff --git a/test/web_worker_script_url_test.dart b/test/web_worker_script_url_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..4b121262af07dfc5d7075aaacbf8321ea762b6f5
+--- /dev/null
++++ b/test/web_worker_script_url_test.dart
+@@ -0,0 +1,43 @@
++// Verifies the loader script of a Web Assembly worker (see
++// lib/src/_impl/web/_entry_point_uri.dart): the worker runs from a blob URL, so
++// it cannot derive its own location, and the loader has to publish the URL of
++// the worker's .wasm file before it imports the Dart runtime.
++@TestOn('browser')
++library;
++
++import 'dart:js_interop';
++
++import 'package:squadron/src/_impl/web/_entry_point_uri.dart';
++import 'package:test/test.dart';
++import 'package:web/web.dart' as web;
++
++Future<String> _loaderScript(String entryPoint) async {
++  final uri = EntryPointUri.from(Uri.parse(entryPoint), addRandomHash: false);
++  addTearDown(uri.release);
++  expect(uri.uri, startsWith('blob:'));
++  final response = await web.window.fetch(uri.uri.toJS).toDart;
++  return (await response.text().toDart).toDart;
++}
++
++void main() {
++  test('wasm worker loader exposes the worker script url', () async {
++    final script = await _loaderScript('/workers/js/test_worker.dart.wasm');
++
++    final urlIndex = script.indexOf('const workerUri=');
++    final exposeIndex = script.indexOf('globalThis.squadronWorkerScriptUrl=');
++    final runtimeIndex = script.indexOf('let newRt=');
++
++    expect(urlIndex, isNonNegative);
++    expect(exposeIndex, greaterThan(urlIndex));
++    expect(exposeIndex, lessThan(runtimeIndex));
++    expect(script, contains('globalThis.squadronWorkerScriptUrl=workerUri;'));
++  });
++
++  test('javascript worker entry points keep their own url', () async {
++    final uri = EntryPointUri.from(
++        Uri.parse('https://example.com/worker.js'),
++        addRandomHash: false);
++    expect(uri.uri, 'https://example.com/worker.js');
++    uri.release();
++  });
++}

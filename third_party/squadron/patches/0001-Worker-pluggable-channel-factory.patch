@@ -1,39 +1,67 @@
-From 1a5f2ea80fa50623eb34172d750f7bfea4bdecab Mon Sep 17 00:00:00 2001
-From: squadron_process <noreply@p0g-stack>
-Date: Thu, 1 Oct 2026 05:15:45 +0000
-Subject: [PATCH 1/2] Worker: pluggable channel factory
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: 1vivy <1vivy@tutanota.com>
+Date: Tue, 17 Nov 2026 02:39:14 -0600
+Subject: Worker: pluggable channel factory
 
-Worker.start() always opens Channel.open(), so a worker can only run in
+Worker.start() always calls Channel.open(), so a worker can only run in
 an isolate (VM) or a Web Worker (browser). Channel is already an
-interface, but the worker's channel is private, so a custom Channel has
-no way in.
+interface, but the worker's channel is private and Channel.open() is not
+injectable, so a custom Channel implementation has no way in. Running
+the same service in another process (an elevated helper reached over a
+loopback socket, say) means forking Squadron or re-implementing what
+Worker does.
 
-Add a ChannelFactory typedef and Worker.channelFactory (constructor
-parameter and settable field). When set, start() awaits the factory
-instead of Channel.open(); everything after it (stats, the shared
-_openChannel future, stop()) is unchanged. With no factory, behavior is
-identical to before.
+Add ChannelFactory and Worker.channelFactory (constructor parameter and
+settable field, documented as "must be set before the worker starts").
+When set, the first request awaits the factory instead of
+Channel.open(); everything after it is unchanged: stats, the shared
+_openChannel future (concurrent first requests open the channel once)
+and stop(). A factory's error reaches the caller the way a failing
+Channel.open() does. With no factory, behavior is identical to before,
+and no existing API changes. The factory signature follows the
+Channel.open() parameters without PlatformThreadHook, because a custom
+channel has no platform thread; the thread hook is not called for
+channels opened this way.
 
 Export SquadronCancelationToken and StreamId, which a Channel
 implementation needs for cancelToken() and cancelStream().
 
-Tests: test/13_channel_factory_suite.dart, run by both the VM and
-browser runners (wrapping Channel.open, replacing the channel, one open
-for concurrent first requests, factory errors reaching the caller, the
-default path).
----
- CHANGELOG.md                       |   5 +
- lib/squadron.dart                  |   3 +
- lib/src/channel.dart               |  13 +++
- lib/src/worker/worker.dart         |  23 +++--
- test/13_channel_factory_suite.dart | 156 +++++++++++++++++++++++++++++
- test/squadron_browser_test.dart    |   2 +
- test/squadron_vm_test.dart         |   2 +
- 7 files changed, 196 insertions(+), 8 deletions(-)
- create mode 100644 test/13_channel_factory_suite.dart
+The hook is small and generic: any transport that can carry Squadron's
+request/response lists (a socket, a native port, an in-memory test
+double) becomes a place a worker can run, without Squadron knowing
+about it.
+
+Tests: test/13_channel_factory_suite.dart, in Squadron's TestContext
+style and registered in both the VM and the browser suite: a factory
+that decorates Channel.open(), a factory that replaces the channel with
+one that has no platform thread behind it, one open for concurrent
+first requests, factory errors reaching the caller, and the default
+path.
+
+Checks run:
+- 2026-10-01, on v7.4.4 (4ab7f15a): VM suite 694 passed; browser suite
+  (Chrome, dart2js and dart2wasm, JS and Wasm workers) 2940 passed.
+  Squadron's existing analyzer infos are unchanged; the patch adds none.
+- On fd5becc (7.4.5) as the only commit (fork branch
+  worker-channel-factory @ 493829dc), Dart 3.13.7, Chrome
+  157.0.8103.50: `dart analyze` reports no issues;
+  `dart test -p vm test/squadron_vm_test.dart` 694 passed, 5 skipped;
+  after `dart run tool/compile_tests.dart js`,
+  `dart test -p chrome --compiler dart2js test/squadron_browser_test.dart`
+  735 passed, 5 skipped. The five CHANNEL FACTORY tests pass in both
+  runners.
+- 2026-11-17, this series on fd5becc, Dart 3.13.4:
+  `dart test -p vm test/squadron_vm_test.dart` 694 passed, 5 skipped.
+  Browser runs of that rebase are the ones listed above.
+
+Rebase notes: carried unchanged from v7.4.4 (4ab7f15a) to fd5becc; only
+the CHANGELOG context moved under the 7.4.5 entry. fd5becc is the
+published 7.4.5 (pub.dev's lib/ and pubspec.yaml match it; upstream has
+no tag for it) and, on 2026-11-20, still the latest stable release and
+the head of main.
 
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 65bb757..939b738 100644
+index 65bb7574f3114494441858f4040c6a452aa1aa30..939b738c236ebdc777ef41027c7d5dcc03c46271 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -1,3 +1,8 @@
@@ -46,7 +74,7 @@ index 65bb757..939b738 100644
  
  - Update built-in package skill for cancellation (`squadron-cancelation`).
 diff --git a/lib/squadron.dart b/lib/squadron.dart
-index 10fa921..f82f9b9 100644
+index 10fa9210e432d1d5b01f31471f827dc4f5bc09d8..f82f9b9a8804217d46feda61912d905f6ec785c3 100644
 --- a/lib/squadron.dart
 +++ b/lib/squadron.dart
 @@ -41,10 +41,13 @@ export 'src/squadron_singleton.dart';
@@ -64,7 +92,7 @@ index 10fa921..f82f9b9 100644
  export 'src/worker/worker_response.dart';
  export 'src/worker_client.dart';
 diff --git a/lib/src/channel.dart b/lib/src/channel.dart
-index 577b4bd..8cfc1ef 100644
+index 577b4bd2acfb415fc7d0cf0e4a8371cd2b11a98d..8cfc1ef3db8ea44b0d3a0b95f4751151aa6f5553 100644
 --- a/lib/src/channel.dart
 +++ b/lib/src/channel.dart
 @@ -16,6 +16,19 @@ import 'worker/worker_message.dart';
@@ -88,7 +116,7 @@ index 577b4bd..8cfc1ef 100644
  /// is used to send a [WorkerRequest] to a platform worker.
  abstract interface class Channel {
 diff --git a/lib/src/worker/worker.dart b/lib/src/worker/worker.dart
-index 9ceae5c..2783309 100644
+index 9ceae5ce2ba66dd8aff1e0fccef6737f64822f93..2783309cced79a105b00789d23c7601aa25d481d 100644
 --- a/lib/src/worker/worker.dart
 +++ b/lib/src/worker/worker.dart
 @@ -31,7 +31,9 @@ abstract class Worker
@@ -137,7 +165,7 @@ index 9ceae5c..2783309 100644
        return channel;
 diff --git a/test/13_channel_factory_suite.dart b/test/13_channel_factory_suite.dart
 new file mode 100644
-index 0000000..33ba3f1
+index 0000000000000000000000000000000000000000..33ba3f191e8c885c2e9f7ce28af51906779473dd
 --- /dev/null
 +++ b/test/13_channel_factory_suite.dart
 @@ -0,0 +1,156 @@
@@ -298,7 +326,7 @@ index 0000000..33ba3f1
 +      Stream.fromIterable(args);
 +}
 diff --git a/test/squadron_browser_test.dart b/test/squadron_browser_test.dart
-index 712efb0..3ab399f 100644
+index 712efb0511911b31ee8e3b66ae988828d7b5b91a..3ab399fa233d20f34a9a4960af07abf7ffd35b04 100644
 --- a/test/squadron_browser_test.dart
 +++ b/test/squadron_browser_test.dart
 @@ -19,6 +19,7 @@ import '09_cancelation_suite.dart' as cancelation;
@@ -316,7 +344,7 @@ index 712efb0..3ab399f 100644
 +  channel_factory.execute(tc);
  }
 diff --git a/test/squadron_vm_test.dart b/test/squadron_vm_test.dart
-index f1e2469..a3496ca 100644
+index f1e2469e65e3ba81d2200d920d485ea32d66c8f3..a3496cabc7293fc6d233a880ab0b1725420da229 100644
 --- a/test/squadron_vm_test.dart
 +++ b/test/squadron_vm_test.dart
 @@ -17,6 +17,7 @@ import '09_cancelation_suite.dart' as cancelation;
@@ -333,6 +361,3 @@ index f1e2469..a3496ca 100644
    issues.execute(tc);
 +  channel_factory.execute(tc);
  }
--- 
-2.56.0
-

@@ -3,17 +3,18 @@ library;
 
 import 'dart:io';
 
+import 'package:patched_source/patched_source.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
-const _repository = 'https://github.com/d-markey/squadron';
-const _newCommit = 'fd5becc4a480887aadc04b350b1fda844502065e';
 const _oldPath = '.dart_tool/squadron_process/squadron-4ab7f15a5d6d';
-const _newPath = '.dart_tool/third_party/squadron-fd5becc4a480';
 
 void main() {
   final packageRoot = Directory.current.absolute;
+  late String repository;
+  late String newCommit;
+  late String newPath;
   late Directory suite;
   late Directory upstream;
   late Directory fixture;
@@ -33,6 +34,14 @@ void main() {
   );
 
   setUpAll(() async {
+    final pin = await readPatchPin(
+      File(
+        p.join(packageRoot.path, '..', '..', 'third_party', 'squadron', 'PIN'),
+      ),
+    );
+    repository = pin['repo']!;
+    newCommit = pin['commit']!;
+    newPath = '.dart_tool/third_party/squadron-${newCommit.substring(0, 12)}';
     suite = await Directory.systemTemp.createTemp('squadron patch fixtures ');
     upstream = await Directory(p.join(suite.path, 'upstream')).create();
     await git(upstream, ['init', '-q']);
@@ -41,15 +50,15 @@ void main() {
       '-q',
       '--depth',
       '1',
-      Platform.environment['SQUADRON_TEST_REPOSITORY'] ?? _repository,
-      _newCommit,
+      Platform.environment['SQUADRON_TEST_REPOSITORY'] ?? repository,
+      newCommit,
     ]);
     // The command still checks the literal origin recorded in the PIN.
     // Only network transport is redirected to this local fixture repository.
     environment = {
       'GIT_CONFIG_COUNT': '1',
       'GIT_CONFIG_KEY_0': 'url.${upstream.uri}.insteadOf',
-      'GIT_CONFIG_VALUE_0': _repository,
+      'GIT_CONFIG_VALUE_0': repository,
     };
   });
   tearDownAll(() async => suite.delete(recursive: true));
@@ -69,16 +78,16 @@ void main() {
         .writeAsString('# retained comment\ndependency_overrides: {}\n');
     final result = await runPatch();
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    expect(result.stdout, contains('squadron 7.4.5'));
+    expect(result.stdout, contains('($newCommit)'));
     final file = File(p.join(fixture.path, 'pubspec_overrides.yaml'));
     final contents = await file.readAsString();
     expect(
       loadYaml(contents)['dependency_overrides']['squadron']['path'],
-      _newPath,
+      newPath,
     );
     expect(contents, contains('# retained comment'));
     expect(await owner.readAsString(), 'untouched old cache');
-    final source = Directory(p.join(fixture.path, _newPath));
+    final source = Directory(p.join(fixture.path, newPath));
     expect(
       await File(p.join(source.path, '.patched_source.json')).exists(),
       isTrue,
@@ -102,7 +111,7 @@ void main() {
     expect(result.exitCode, isNot(0));
     expect(result.stderr, contains('squadron'));
     expect(await file.readAsString(), contents);
-    expect(await Directory(p.join(fixture.path, _newPath)).exists(), isFalse);
+    expect(await Directory(p.join(fixture.path, newPath)).exists(), isFalse);
   });
 
   test(
@@ -122,12 +131,12 @@ void main() {
       expect(result.stderr, contains('conflicting override for squadron'));
       expect(await owner.readAsString(), 'owner content');
       expect(await overrides.readAsBytes(), before);
-      expect(await Directory(p.join(fixture.path, _newPath)).exists(), isFalse);
+      expect(await Directory(p.join(fixture.path, newPath)).exists(), isFalse);
     },
   );
 
   test('unstamped new destination is refused without adopting it', () async {
-    final source = await Directory(p.join(fixture.path, _newPath))
+    final source = await Directory(p.join(fixture.path, newPath))
         .create(recursive: true);
     final owner = File(p.join(source.path, 'owner.txt'));
     await owner.writeAsString('owner content');

@@ -1,38 +1,49 @@
 #!/usr/bin/env sh
-# Materialize the patched Squadron into third_party/squadron/src and point pub
-# at it. Run once after cloning, and again whenever PIN or patches/ change.
+# Check out the patched Squadron series (third_party/squadron at the repository
+# root) into .upstream/squadron and point pub at it. Run once after cloning,
+# and again whenever third_party/squadron/PIN or its patches change.
 #
-#   tool/squadron.sh [--no-override]
+#   pkgs/squadron_process/tool/squadron.sh [--no-override]
 #
-# An app that depends on squadron_process needs the same patched tree; it can
-# run this script against its own checkout of squadron_process and add the
-# printed dependency_overrides entry to its pubspec_overrides.yaml.
+# The tree is branch p0g/squadron of `tool/patches.sh squadron checkout`; edit
+# the series there and export it with `tool/patches.sh squadron export`.
+# Apps outside this repository use `dart run squadron_process:squadron_patch`.
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-dir="$root/third_party/squadron"
-src="$dir/src"
-. "$dir/PIN"
+case "${1:-}" in
+  '' | --no-override) ;;
+  *) echo 'usage: tool/squadron.sh [--no-override]' >&2; exit 2 ;;
+esac
 
-if [ ! -d "$src/.git" ]; then
-  git init -q "$src"
-  git -C "$src" remote add origin "$repo"
-fi
-git -C "$src" fetch -q --depth 1 origin "$commit"
-git -C "$src" checkout -q --force --detach "$commit"
-git -C "$src" clean -q -fdx
-for p in "$dir"/patches/*.patch; do
-  git -C "$src" apply --whitespace=nowarn "$p"
-done
+pkg=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH= cd -- "$pkg/../.." && pwd)
+pin="$root/third_party/squadron/PIN"
+package=$(sed -n 's/^package=//p' "$pin")
+src="$root/.upstream/squadron${package:+/$package}"
+
+"$root/tool/patches.sh" squadron checkout
+commit=$(git -C "$root/.upstream/squadron" rev-parse --short=12 HEAD)
 version=$(awk '/^version: / { print $2; exit }' "$src/pubspec.yaml")
-echo "squadron $version ($commit) + $(ls "$dir"/patches/*.patch | wc -l | tr -d ' ') patch(es) at $src"
+echo "squadron $version (p0g/squadron at $commit) at $src"
 
-if [ "${1:-}" != "--no-override" ]; then
-  cat > "$root/pubspec_overrides.yaml" <<YAML
-# Written by tool/squadron.sh. Points pub at the patched Squadron.
-dependency_overrides:
-  squadron:
-    path: third_party/squadron/src
-YAML
-  echo "wrote pubspec_overrides.yaml"
+old="$pkg/third_party/squadron/src"
+if [ -d "$old" ]; then
+  echo "note: $old is no longer used; remove it when convenient"
 fi
+
+[ "${1:-}" = --no-override ] && exit 0
+
+marker='# Written by tool/squadron.sh. Points pub at the patched Squadron.'
+overrides="$pkg/pubspec_overrides.yaml"
+entry="dependency_overrides:
+  squadron:
+    path: ../../.upstream/squadron${package:+/$package}"
+# Replace only a file this script wrote; anything else is the user's.
+if [ -e "$overrides" ] && [ "$(sed -n 1p "$overrides")" != "$marker" ]; then
+  echo "$overrides exists and was not written by tool/squadron.sh; leaving it." >&2
+  echo "Add this entry to it (or remove it and rerun):" >&2
+  echo "$entry" >&2
+  exit 1
+fi
+printf '%s\n%s\n' "$marker" "$entry" > "$overrides"
+echo "wrote $overrides"

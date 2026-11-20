@@ -1,0 +1,6 @@
+# Squadron 7.4.5, the latest stable release. Upstream has no tag for it;
+# pub.dev's 7.4.5 archive matches this commit's lib/ and pubspec.yaml.
+# `package` is empty: the package is the repository root.
+repo=https://github.com/d-markey/squadron
+commit=fd5becc4a480887aadc04b350b1fda844502065e
+package=

@@ -1,8 +1,0 @@
-# Squadron commit the patch series applies to.
-#
-# Upstream has no tag for this commit; its pubspec declares 7.4.5. The full
-# commit is the source identity. `package` is empty: the package is the
-# repository root.
-repo=https://github.com/d-markey/squadron
-commit=fd5becc4a480887aadc04b350b1fda844502065e
-package=
