@@ -1,0 +1,49 @@
+name: roll
+
+# Pub upgrades, which Renovate cannot do for a pub workspace (renovate.json).
+# Opens or updates one PR and never pushes to main, so a schedule is fine.
+# Use a fine-grained ROLL_TOKEN for this repository (Contents and Pull
+# requests: read/write) so updates to the PR branch trigger CI.
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  pub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          pub-get: 'false'
+      # The pubspec_overrides.yaml it writes points pub at the patched
+      # Squadron, so the upgraded lock resolves as CI's does.
+      - run: pkgs/squadron_process/tool/squadron.sh
+      # The workspace root upgrades every member's constraints and the one
+      # lock. bricks/ is outside the workspace.
+      - name: dart pub upgrade --major-versions
+        run: dart pub upgrade --major-versions
+      # Only manifests and the lock: the materialized Squadron and its
+      # override are gitignored.
+      - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          token: ${{ secrets.ROLL_TOKEN }}
+          branch: roll/pub
+          delete-branch: true
+          add-paths: |
+            **/pubspec.yaml
+            pubspec.lock
+          commit-message: Upgrade pub dependencies to their latest major versions
+          title: Upgrade pub dependencies to their latest major versions
+          body: Updated the workspace constraints and lockfile with `dart pub upgrade --major-versions`.
+          labels: dependencies
