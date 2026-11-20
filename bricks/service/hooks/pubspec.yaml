@@ -1,0 +1,7 @@
+name: service_hooks
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  mason: ^0.1.1

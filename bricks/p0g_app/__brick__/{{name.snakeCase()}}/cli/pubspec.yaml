@@ -1,0 +1,33 @@
+name: {{name.snakeCase()}}_cli
+description: The {{name.snakeCase()}} command line. On WebUI it is also the root process (serve).
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+executables:
+  {{name.snakeCase()}}: {{name.snakeCase()}}
+
+dependencies:
+  args: ^2.7.0
+  squadron: ^7.4.5
+  {{name.snakeCase()}}_core: any
+  squadron_process:
+    git:
+      url: https://github.com/p0g-stack/squadron_process
+      ref: 8f639eb8d2e200866ace17cca03c9d7c4705f5f9
+
+dev_dependencies:
+  flutter_webui_client:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      path: packages/flutter_webui_client
+      ref: 72df180304562037fbc720153967fbb70a362eb1
+  flutter_webui_root:
+    git:
+      url: https://github.com/p0g-stack/flutter-webui
+      path: packages/flutter_webui_root
+      ref: 72df180304562037fbc720153967fbb70a362eb1
+  lints: ^6.1.0
+  test: ^1.31.1

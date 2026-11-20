@@ -1,0 +1,14 @@
+.dart_tool/
+build/
+# Written by `dart run squadron_process:squadron_patch` (tool/bootstrap.sh):
+# points pub at the patched Squadron under .dart_tool/.
+pubspec_overrides.yaml
+# Squadron codegen and compiled workers; tool/bootstrap.sh regenerates them.
+*.g.dart
+app/web/workers/
+{{#rust}}# flutter_rust_bridge codegen (tool/bootstrap.sh).
+core/lib/src/rust/
+app/web/pkg/
+rust/src/frb_generated.rs
+rust/target/
+{{/rust}}

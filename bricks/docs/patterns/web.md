@@ -1,0 +1,94 @@
+# Patterns: apps in a browser tab
+
+For a p0g app built with `flutter_p0g build web` and served from any static
+host. The local place is a Squadron Web Worker; there is no process place,
+so `places.lasting` is the worker and work stops when the tab closes. The
+crate in `rust/` runs as single-threaded wasm, in the page and in each
+worker, with no COOP/COEP headers. Nothing here is a brick.
+
+## Long work is a service stream
+
+A job that takes more than a moment (extracting an OTA, hashing a large
+image, a flash) is a service method that returns a `Stream` of progress and
+ends with the result. The page shows the stream and cancels by cancelling
+its subscription; Squadron carries the cancel to the worker. Don't poll a
+status method. The same method works unchanged in an isolate or the process
+place on other platforms.
+
+## Hand the worker the file, not the bytes
+
+A file the user picks in the page (`file_selector`'s `XFile`, a `File` from
+a drop) goes to the worker as the browser's own `File` or `Blob` object
+(a `JSObject`). Squadron passes it without copying, and the worker reads
+only the slices it needs (`blob.slice(start, end)`). Never read a large file
+into a `Uint8List` in the page to send it: that copies it twice and holds it
+in memory. Output that is too big for a download goes to a directory the
+user picks (File System Access, Chromium) or to OPFS.
+
+## Rust loads when it is first used
+
+`Fact.native` only asks whether the wasm was shipped; it doesn't download
+it. A strategy that calls Rust awaits `loadNative()` first, so the wasm is
+fetched and instantiated in the place that uses it, the first time it does.
+Keep it that way: a page that never takes the Rust strategy never pays for
+the download.
+
+The loader resolves `pkg/` from `document.baseURI` on a page and `../pkg/`
+from the worker artifact URL in a worker. For dart2wasm's blob worker,
+patched Squadron publishes that artifact as `squadronWorkerScriptUrl`.
+A missing value is an explicit load failure, never an origin-based guess.
+`nativeLoadFailure` retains the original initialization error and stack.
+Presence is only a GET probe of the JS glue (the response body is cancelled),
+not proof that Rust initialized: qualification must require `rust_sha2` and
+the expected result in both JS and wasm workers, without COOP/COEP.
+
+## Check the input inside the plan
+
+A write's `plan` opens the input and checks it before anything is
+confirmed: the image's header, its size against the target partition, and
+its hash when the source gives one. Each check is a step the user sees. A
+bad file then fails at the plan, with nothing written, instead of halfway
+through the write.
+
+## Never serve last build's code
+
+A service worker, if the build emits one or the app adds one, keeps
+same-origin app code network-first: `index.html`, `flutter_bootstrap.js`,
+`main.dart.js`, the compiled workers, and `pkg/*.js`, `*.wasm` and
+`canvaskit`. The cache is the offline fallback, not the first answer. A
+cache-first shell runs the previous build's Dart and wasm against this
+build's expectations on the first load after a deploy, and the failure looks
+like an app bug.
+
+Stale-while-revalidate is for third-party and engine assets only, where one
+revision behind is harmless. Bump the cache version whenever the strategy
+changes, and leave alone what must reach the network: range requests,
+streamed downloads, and anything answered per request.
+
+## Keep the tab alive while writing
+
+While a write runs, the app holds a screen wake lock
+(`navigator.wakeLock.request('screen')`) and a leave guard
+(`window.onbeforeunload`), and releases both when the stream ends, however
+it ends. A sleeping laptop or a closed tab in the middle of a flash is a
+user problem the app can prevent. Both are app code through `package:web`;
+the bricks don't ship them.
+
+## Walk the page by its text
+
+A browser check finds and clicks controls through Flutter's semantics tree,
+never by coordinates. The web engine builds that tree only when asked, so the
+check clicks the engine's `flt-semantics-placeholder` ("Enable
+accessibility") once per load, from outside the app; the app needs no hook
+for it. Controls are then `flt-semantics` nodes with a role and a label
+(demo `tool/web_smoke.mjs`, flasher-web `e2e/lib/browser.dart`). What ran is
+asserted on the console lines the app already logs
+(`objective.<name>: ... ran <strategy> in <place>`), not on pixels.
+flasher-web found a card below the fold missing from the tree in headless
+Chrome, and asserts that result natively instead.
+
+## Devices
+
+A write to a device over WebUSB follows [devices.md](devices.md): it waits
+for a connected phone, names the device in its plan, and reports each error
+with its source and the evidence for it, keeping the original error.

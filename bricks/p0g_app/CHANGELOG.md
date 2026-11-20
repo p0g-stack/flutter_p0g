@@ -1,0 +1,309 @@
+# 0.9.2
+
+- Follow the current WebUI X v660 client and root WifiEnable helper
+  (`72df180`), retaining KernelSU manager support. The Flutter 3.47.9 web
+  SDK identity is unchanged.
+
+# 0.9.1
+
+- Qualify Flutter 3.47.9 / Dart 3.13.7 with flutter-webui `374766e` and
+  squadron_process `8f639eb` (patched Squadron 7.4.5). Keep the frozen
+  patched_source helper and FRB 2.14.0-beta.2 source identities unchanged.
+
+# 0.9.0
+
+- `sample` (default true): include the hello and digest demonstration UI
+  and commands. With `sample: false` the shell stays whole (places, home,
+  place header, theme, logging, strategies, process host) and
+  `defaultPanels` starts empty; `mason make service` adds the first working
+  panel. The hello service, panel, command and their tests are left out; the
+  `digest` command needs both `sample` and `rust`. With `rust` the Rust
+  SHA-256 API, its `digest` strategy and their tests stay, and the digest
+  test calls the objective directly. All `// p0g:` markers are unchanged.
+- `serve` with no services registered is a usage error (exit 64, "No
+  services registered; add a service before using serve.") before it opens
+  a socket or writes a session file.
+- Upgrades are checkable: the generated `tool/regen.sh`, `tool/regen.allow`
+  and `tool/regen.add` compare a workspace with a fresh generation at
+  `BRICKS_REF` (a required full commit hash; missing or invalid exits 64
+  before any fetch). The brick's first `hooks/post_gen.dart` writes
+  `tool/p0g_app.json` with the effective name, description, org, rust and
+  sample. The checker records generated inventory before Pub resolution and
+  formats generated Dart before comparison.
+- `tool/bootstrap.sh` materializes third-party sources through the shared
+  patched_source caller (`dart run tool/third_party.dart`, with the pinned
+  helper and Squadron) between the two pub gets; no `third_party/` is a
+  no-op. Application setup goes at the new `# p0g:after-bootstrap` marker.
+  Stock platform folders are created before Pub so plugin registrants are
+  complete on the first bootstrap rather than appearing on the second run.
+- `rust`: the flutter_rust_bridge override is a relative, portable path into
+  `.dart_tool`, and needs the verified frb `1e4df906` cache; a missing cache
+  fails with its real error instead of using unpatched code.
+- Web loaders resolve absolute URLs from the page or worker artifact (using
+  Squadron's script URL for blob workers), and a failed Rust load keeps its
+  diagnostics: the core library exports `NativeLoadFailure` and
+  `nativeLoadFailure` with `loadNative`. The native loader no longer
+  re-exports `sha256Hex`; the core library exports it from the generated
+  Rust API.
+
+# 0.8.13
+
+- `rust` on the web: the `native` fact asks for the JS glue with a GET, not
+  a HEAD. `flutter run`'s dev server answers HEAD with 404, so under hot
+  reload the Rust strategies never ran and the Dart fallback did.
+
+# 0.8.12
+
+- flutter-webui 8951e5f (root channel 0.2.3): `WebUi.shortcut.create()`
+  returns the host's answer when it gives a boolean, else null (the host's
+  own dialog decides). On WebUI X v608 `hasShortcut` stays false.
+
+# 0.8.11
+
+- flutter-webui 60c0b77 (root channel 0.2.3): fixes from the WebUI X v608
+  lab. A shell the host rejects is found by a probe (v608 answers a
+  Rejected exec with an empty string), `hasShortcut` is read as a boolean
+  or a "true"/"false" string, and package results carry a `found` flag.
+
+# 0.8.10
+
+- flutter-webui a1835ca (root channel 0.2.3): WebUI X extras the app can
+  opt into where the host has them, detected by presence: predictive back
+  with `backInterceptor: "native"`, `WebUi.shortcut` and `WebUi.packages`.
+  Nothing changes for an app that doesn't use them.
+
+# 0.8.9
+
+- flutter-webui eb81de5 (root channel 0.2.3): on WebUI X v608, Back walks
+  the page history and then closes (the module's config.json asks for
+  `backInterceptor: "native"`), and a ksu.exec the host refuses fails at
+  once with `RootChannelException('shell-refused')` naming the missing
+  `kernelsu.permission.SHELL` key, instead of a 30 s timeout. WebUI X now
+  follows the manager colours like KernelSU.
+
+# 0.8.8
+
+- flutter-webui a455782 (root channel 0.2.3): the channel leaves the
+  manager's cgroup before it starts anything. On KernelSU, closing the page
+  no longer leaves the channel, the app's root process or its service
+  running. The client is unchanged, so nothing changes for the app.
+
+# 0.8.7
+
+- flutter-webui 74d0575 (root channel 0.2.2): the channel holds the module
+  app's `<pkg>/hold` socket while it runs, so the app's foreground service
+  stops itself when the channel dies. The client is unchanged, so nothing
+  changes for the app.
+
+# 0.8.6
+
+- flutter-webui 95be767 (root channel 0.2.1): when the module's app is
+  installed, the channel starts its foreground service as it winds up and
+  stops it on idle exit. The client is unchanged, so nothing changes for
+  the app.
+
+# 0.8.5
+
+- WebUI: the process place's host starts in the module's data folder
+  (`/data/adb/<id>`, or `dataDir:`). It used to start wherever the manager's
+  shell was, usually the read-only `/`, so `fs.persistent` read false there.
+  The page and its Web Workers still report false, because manager WebViews
+  never grant persistent browser storage. The fact's doc comment explains
+  this.
+
+# 0.8.4
+
+- `rust`: when wasm-opt is missing or older than binaryen 117, `tool/rust.sh`
+  puts a pass-through wasm-opt first on PATH, as flutter_p0g does. The wasm
+  then ships unoptimized instead of the bootstrap failing where binaryen
+  cannot be downloaded.
+
+# 0.8.3
+
+- flutter-webui 7985489, the commit flutter_p0g builds with. It only adds
+  the `WebUiClipboard` seam to the web plugin, so nothing changes for the app.
+
+# 0.8.2
+
+- squadron_process 28c37ce: each service log record reaches a page once,
+  however many workers it binds (5d41a99 sent one copy per link). The launch
+  test binds two workers and checks for one copy.
+
+# 0.8.1
+
+- squadron_process 5d41a99: the host relays service log records over the
+  process link, so `withLogs` workers bound to the process place log them on
+  the page too. The CLI's WebUI launch test checks it end to end.
+
+# 0.8.0
+
+- flutter-webui bebb1ec (root channel 0.2.0): `root start` prints the
+  session and the channel keeps its state out of `webroot/`. The app's
+  process place follows: its session file moves from
+  `webroot/.run/<app>.place.json` to `<module>/run/<app>.place.json`, so the
+  token is no longer on the manager's HTTP origin. The CLI's launch test
+  starts the channel the new way.
+- Logs come back from services. A service's constructor calls
+  `forwardLogs()`, and callers wrap workers in `withLogs(...)` (the panels
+  and `serve` do). Records from a worker now reach the app's log, and those
+  from services in the CLI's `serve` reach the CLI's log, under their own
+  logger names. Carrying them from the process place to the page waits on
+  squadron_process.
+- `Places.lasting`: the process place when there is one. Work that must
+  keep going while the page is hidden or rotated goes there, never to a Web
+  Worker (docs/patterns/places.md).
+- docs/patterns/files.md in bricks: saving a file per target. On WebUI,
+  use `getSaveLocation` and then `WebUiRoot.writeFile` (or `dart:io` in the
+  process place), followed by `AppPlane.scanMedia`. Never `XFile.saveTo`.
+
+# 0.7.4
+
+- `rust` on the web: the `native` fact asks for the small JS glue
+  (`pkg/<stem>.js`), not the wasm. Manager WebViews answer a HEAD with the
+  whole file, so the old check downloaded the wasm at start anyway.
+
+# 0.7.3
+
+- flutter-webui 9c5c631: KernelSU brightness follows the manager's theme
+  colours, and the client carries the colour calls dynamic_color_webui
+  uses (flutter_p0g builds with them).
+
+# 0.7.2
+
+- The app takes the host's colours through the stock `dynamic_color`
+  builder: Material You on Android, the accent colour on desktop, and, once
+  flutter_p0g adds `dynamic_color_webui`, the manager's colours in a WebUI.
+  Without them (a plain tab, AERA, tests) it keeps its own scheme from
+  `seed` in `app/lib/theme.dart`. To opt out, have `hostColors` call
+  `builder(null, null)` and drop `dynamic_color`.
+
+# 0.7.1
+
+- `rust` on the web: the Rust wasm loads on the first Rust call, not at
+  start. The `native` fact asks whether the wasm is there (a HEAD request,
+  `nativeShipped()`); a strategy that calls Rust awaits `loadNative()` first
+  (the `digest` example does). Native places still load the library for the
+  fact, which is cheap.
+
+# 0.7.0
+
+- `Availability.waiting`: a strategy that would run once the user acts
+  (connect a phone) says so. It isn't chosen; `Selection.waiting` lists it
+  for the UI and `Selection.why` logs "x waits: ...". Missing facts win.
+- `WriteStrategy`'s doc comment: a write to a device outside this place
+  names the device in its input and refuses if another is connected.
+- docs/patterns/devices.md in bricks: the device-app patterns.
+
+# 0.6.6
+
+- flutter-webui 9ee7918: on KernelSU Next, Back at the root route unwinds
+  history and the next Back closes the WebUI, as in a browser tab.
+
+# 0.6.5
+
+- flutter-webui 8deba51: Back from a pushed route no longer closes the whole
+  WebUI in KernelSU 3.3.0.
+
+# 0.6.4
+
+- `block_devices` was false everywhere, root included: dart:io's `File.open`
+  accepts only regular files, character devices and pipes, and reports a
+  block device as not found. The check now opens through libc
+  (`core/lib/src/facts/posix_open.dart`, `package:ffi`), any device that
+  opens counts.
+
+# 0.6.3
+
+- flutter-webui 020ab92: Back at the root route works in WebUI X. The fix is
+  in the patched web SDK (flutter_p0g rebuilds it); no Dart change here.
+
+# 0.6.2
+
+- flutter-webui 9342a42: host detection survives a throwing
+  `ksu.moduleInfo()` (WebUI X v438).
+- `openProcessPlace` on the web catches anything host detection throws and
+  starts without a process place, so a host bridge can't block the first
+  frame.
+
+# 0.6.1
+
+- `rust`: a Squadron Web Worker loads the wasm from `../pkg/` (it runs from
+  `workers/`), so the `native` fact holds there too. `tool/rust.sh` builds
+  release, the profile the loader tries first, so a stale release build no
+  longer shadows a fresh debug one.
+- `cli/test/webui_launch_test.dart` is format-clean as stamped.
+
+# 0.6.0
+
+- `analysis_options.yaml` turns on the p0g_lints plugin (this repo,
+  `packages/p0g_lints`, pinned by commit): `core_imports_flutter` and
+  `strategy_reads_platform` are warnings. `app/analysis_options.yaml`
+  includes the root file so they apply in the app too.
+- squadron_process d6c561b: reconnect after a dropped link, concurrent
+  clients, malformed-handshake hardening.
+- `rust` follows flutter_p0g's frb (the demo's four fixes): frb_dart by git at
+  848e438, `auto_upgrade_dependency: false`, frb without thread-pool for the
+  single-threaded wasm, `mod frb_generated;` after lib.rs's docs. New
+  `tool/rust.sh` (run by bootstrap) uses flutter_p0g's patched frb when
+  built (native and wasm), else frb at 848e438 (native only), linked through
+  gitignored `rust/.cargo/config.toml` and `pubspec_overrides.yaml`.
+
+# 0.5.0
+
+- `rust`: a working crate end to end. `sha256_hex` (the `sha2` crate) behind
+  the `digest` objective: a Rust strategy that requires the new `native` fact
+  and a Dart fallback (`package:crypto`). `loadNative()` loads the library per
+  place (env, beside the executable as flutter_p0g packs `bin/<abi>/`, a
+  Linux bundle's `lib/`, `rust/target/`; frb's wasm on the web). Used by the
+  hello service (`sha256`), a CLI `digest` command and an app button; tested
+  in core, in an isolate, in the serve process and in a compiled CLI.
+- Bootstrap runs frb codegen and `cargo build` when `rust` is on.
+
+# 0.4.0
+
+- The WebUI launcher moves to `core/lib/src/places/webui_launcher.dart` and
+  depends on flutter-webui's `flutter_webui_client` (git, pinned), plain
+  Dart on a stock SDK. `WebUiRoot` and the `webUiRoot` global are gone: on
+  web, `openProcessPlace` uses `WebUi.host.moduleDir` and
+  `WebUi.connectRootChannel`; a closed channel is reopened on next use.
+- New `cli/test/webui_launch_test.dart`: the hello service in the CLI started
+  through the real `flutter_webui_root` channel (dev dependency) on the VM.
+
+# 0.3.0
+
+- squadron_process 52ee2f6: one `serve` process hosts every service by name
+  (`serve` takes the generated workers); workers bind with `service:`.
+- Patched Squadron through `dart run squadron_process:squadron_patch` in
+  bootstrap (writes the gitignored `pubspec_overrides.yaml`); `tool/squadron.sh`
+  and `.p0g/` are gone.
+- The WebUI launcher matches flutter_webui's `RootChannel` (29e692a) behind
+  `WebUiRoot`, set by the WebUI target's glue: depending on flutter_webui
+  directly breaks a stock `flutter build web` (it needs the patched engine).
+  A plain browser has no process place. Tests for the launcher and store.
+- Desktop session file under `$XDG_RUNTIME_DIR/<app>/` (else mkdtemp).
+- README and AGENTS.md: one app, one CLI; Rust only through frb inside it.
+
+# 0.2.0
+
+- Built on squadron_process (git, pinned) with the patched Squadron through
+  `pubspec_overrides.yaml` and `tool/squadron.sh`; the `process_place`
+  variable is gone, the process place is always there.
+- Layout follows the demo: `core/lib/src/{facts,service,strategy}/`, the app
+  package is `<name>`, `tool/build_workers.sh`.
+- Facts: the keys and their checks live in core (`checkFacts`, `dart:io`
+  and browser); squadron_process carries them as a neutral map.
+- Strategies declare `requires`; `available(facts)` returns an
+  `Availability`, and a `Selection` says what was skipped and why, which
+  `StrategyRun` logs.
+- CLI `serve <service>` hosts one service for the process place; the app has
+  a place picker, per-service panels, a desktop launcher (`P0G_CLI`) and the
+  WebUI launcher (`WebUiLauncher`, `WebUiSessionStore`) over a
+  `RootChannelClient`.
+
+# 0.1.0
+
+- Initial brick: pub workspace with `core/` (pure Dart), `app/` (Flutter), `cli/`
+  (Dart CLI on package:args with `serve` when `process_place` is on), optional
+  `rust/` via flutter_rust_bridge, Squadron with a `hello` service, facts,
+  objectives and strategies (`available(facts)`, plan, confirm, receipt), and
+  the logging convention.
