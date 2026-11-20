@@ -1,0 +1,351 @@
+// Copyright 2026 The p0g-stack authors.
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
+import 'package:web/web.dart' as web;
+
+import '../bridge.dart';
+
+/// [HostBridge] over the page's real globals.
+final class JsHostBridge implements HostBridge {
+  JSObject? get _ksu => _object(globalContext, 'ksu');
+  JSObject? get _webui => _object(globalContext, 'webui');
+
+  static JSObject? _object(JSObject on, String name) {
+    final value = on.getProperty<JSAny?>(name.toJS);
+    return value != null && value.typeofEquals('object')
+        ? value as JSObject
+        : null;
+  }
+
+  static bool _isFunction(JSObject? on, String name) =>
+      on != null && on.getProperty<JSAny?>(name.toJS).typeofEquals('function');
+
+  static Object? _call(JSObject? on, String name, List<Object?> args) {
+    if (!_isFunction(on, name)) return null;
+    final result = on!.callMethodVarArgs<JSAny?>(name.toJS, [
+      for (final a in args) a.jsify(),
+    ]);
+    return result.dartify();
+  }
+
+  @override
+  bool get hasKsu => _ksu != null;
+
+  @override
+  bool ksuHas(String name) => _isFunction(_ksu, name);
+
+  @override
+  bool webuiHas(String name) => _isFunction(_webui, name);
+
+  @override
+  Object? callKsu(String name, [List<Object?> args = const []]) =>
+      _call(_ksu, name, args);
+
+  @override
+  Object? callKsuPm(String name, [List<Object?> args = const []]) {
+    final pm = _ksu!.callMethod<JSAny?>('pm'.toJS);
+    if (pm == null || !pm.typeofEquals('object')) {
+      throw StateError('ksu.pm() refused access; allow kernelsu.permission.PM');
+    }
+    return _call(pm as JSObject, name, args);
+  }
+
+  @override
+  Object? callWebui(String name, [List<Object?> args = const []]) =>
+      _call(_webui, name, args);
+
+  @override
+  Object? webuiProperty(String name) {
+    final value = _webui?.getProperty<JSAny?>(name.toJS);
+    if (value == null || value.typeofEquals('function')) return null;
+    return value.dartify();
+  }
+
+  @override
+  Map<String, Object?>? moduleInfo() {
+    final Object? raw;
+    try {
+      raw = callKsu('moduleInfo');
+    } on Object {
+      // WebUI X throws a Java exception from moduleInfo() when its module
+      // list has a null entry; the id then comes from the build's <meta>.
+      return null;
+    }
+    if (raw is! String) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  @override
+  Object? callModuleGlobal(String moduleId, String name) {
+    final global = '\$${moduleId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}';
+    return _call(_object(globalContext, global), name, const []);
+  }
+
+  @override
+  String? meta(String name) =>
+      web.document.querySelector('meta[name="$name"]')?.getAttribute('content');
+
+  static int _execCount = 0;
+
+  /// How long an exec may go unanswered before [exec] checks whether the
+  /// host refused it.
+  static const Duration refusalCheckAfter = Duration(seconds: 2);
+
+  /// What [_shellRefused] echoes.
+  static const String _refusalProbe = 'flutter-webui';
+
+  /// `ksu.exec('echo flutter-webui')` in its synchronous form: a host that
+  /// runs it answers with that line; a refusing one with null (WebUI X's
+  /// gate) or an empty string (WebUI X v608's method dispatcher turns the
+  /// gate's null into ""; lab, after Reject). A host without that form
+  /// throws, which tells nothing.
+  static bool _shellRefused(JSObject? ksu) {
+    try {
+      final out = ksu!.callMethodVarArgs<JSAny?>('exec'.toJS, [
+        'echo $_refusalProbe'.toJS,
+      ]).dartify();
+      return out == null || (out is String && out.trim().isEmpty);
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<ExecResult> exec(String command) {
+    final ksu = _ksu;
+    if (!_isFunction(ksu, 'exec')) {
+      return Future.error(StateError('ksu.exec is not available'));
+    }
+    final name = '__flutter_webui_exec_${_execCount++}';
+    final completer = Completer<ExecResult>();
+    globalContext.setProperty(
+      name.toJS,
+      ((JSAny? code, JSAny? out, JSAny? err) {
+        globalContext.delete(name.toJS);
+        if (completer.isCompleted) return;
+        completer.complete(
+          ExecResult(
+            (code.dartify() as num?)?.toInt() ?? -1,
+            (out.dartify() as String?) ?? '',
+            (err.dartify() as String?) ?? '',
+          ),
+        );
+      }).toJS,
+    );
+    ksu!.callMethodVarArgs<JSAny?>('exec'.toJS, [
+      command.toJS,
+      '{}'.toJS,
+      name.toJS,
+    ]);
+    // A refused exec returns at once and never calls back; a slow command
+    // and a refused one look the same from here. So after a moment check
+    // with the one-argument exec, which every host answers synchronously
+    // with its stdout, and a refusing host with null or "".
+    Timer(refusalCheckAfter, () {
+      if (completer.isCompleted || !_shellRefused(ksu)) return;
+      globalContext.delete(name.toJS);
+      completer.completeError(ShellRefusedException(command));
+    });
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        globalContext.delete(name.toJS);
+        throw TimeoutException('ksu.exec: $command');
+      },
+    );
+  }
+
+  /// The payload fields of WebUI X's back events. The event object also
+  /// carries its DOM element, so only these are read.
+  static const List<String> _mxFields = [
+    'touchX',
+    'touchY',
+    'progress',
+    'swipeEdge',
+  ];
+
+  @override
+  Stream<HostEvent> mxEvents(List<String> names) {
+    final controller = StreamController<HostEvent>.broadcast(sync: true);
+    void register() {
+      final document = web.document as JSObject;
+      if (!_isFunction(document, 'addMXEventListener')) return;
+      for (final name in names) {
+        document.callMethodVarArgs<JSAny?>('addMXEventListener'.toJS, [
+          name.toJS,
+          ((JSObject? event) {
+            final data = <String, Object?>{
+              for (final field in _mxFields)
+                field: event?.getProperty<JSAny?>(field.toJS).dartify(),
+            };
+            controller.add(HostEvent(name, data));
+          }).toJS,
+        ]);
+      }
+    }
+
+    // WebUI X defines addMXEventListener in its own DOMContentLoaded
+    // listener, added at document start, so it runs before ours.
+    if (web.document.readyState == 'loading') {
+      web.document.addEventListener(
+        'DOMContentLoaded',
+        ((web.Event _) => register()).toJS,
+      );
+    } else {
+      register();
+    }
+    return controller.stream;
+  }
+
+  @override
+  String? cssVariable(String name) {
+    final value = web.window
+        .getComputedStyle(web.document.documentElement!)
+        .getPropertyValue('--$name')
+        .trim();
+    return value.isEmpty ? null : value;
+  }
+
+  @override
+  late final Stream<void> cssColorsChanged = () {
+    final controller = StreamController<void>.broadcast();
+    // The bootstrap's <link id="flutter-webui-colors"> to /internal/colors.css.
+    final element = web.document.getElementById('flutter-webui-colors');
+    if (element == null || !element.isA<web.HTMLLinkElement>()) {
+      return controller.stream;
+    }
+    final link = element as web.HTMLLinkElement;
+    link.addEventListener('load', ((web.Event _) => controller.add(null)).toJS);
+    // KernelSU fills it from its Compose theme, which follows a system theme
+    // change without recreating the activity, and the theme can change in
+    // the manager while the page is hidden: fetch it again then.
+    void reload() => link.href =
+        '/internal/colors.css?t=${DateTime.now().millisecondsSinceEpoch}';
+    web.window
+        .matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', ((web.Event _) => reload()).toJS);
+    web.document.addEventListener(
+      'visibilitychange',
+      ((web.Event _) {
+        if (web.document.visibilityState == 'visible') reload();
+      }).toJS,
+    );
+    return controller.stream;
+  }();
+
+  @override
+  Insets? cssInsets() {
+    final style = web.window.getComputedStyle(web.document.documentElement!);
+    double? side(String name) {
+      final value = style.getPropertyValue('--safe-area-inset-$name').trim();
+      if (value.isEmpty) return null;
+      return double.tryParse(value.replaceAll('px', '').trim());
+    }
+
+    final top = side('top');
+    final right = side('right');
+    final bottom = side('bottom');
+    final left = side('left');
+    if (top == null && right == null && bottom == null && left == null) {
+      return null;
+    }
+    return Insets(
+      top: top ?? 0,
+      right: right ?? 0,
+      bottom: bottom ?? 0,
+      left: left ?? 0,
+    );
+  }
+
+  @override
+  late final Stream<void> cssInsetsChanged = () {
+    final controller = StreamController<void>.broadcast();
+    void changed() => controller.add(null);
+    // Hosts push changes with style.setProperty on <html>.
+    web.MutationObserver(
+      ((
+        JSArray<web.MutationRecord> _,
+        web.MutationObserver _,
+      ) => changed()).toJS,
+    ).observe(
+      web.document.documentElement!,
+      web.MutationObserverInit(
+        attributes: true,
+        attributeFilter: ['style'.toJS].toJS,
+      ),
+    );
+    web.window.addEventListener('resize', ((web.Event _) => changed()).toJS);
+    // The bootstrap's <link id="flutter-webui-insets"> to /internal/insets.css.
+    web.document
+        .getElementById('flutter-webui-insets')
+        ?.addEventListener('load', ((web.Event _) => changed()).toJS);
+    return controller.stream;
+  }();
+
+  @override
+  void historyBack() => web.window.history.back();
+
+  @override
+  int get historyLength => web.window.history.length;
+
+  @override
+  Object? get historyState => web.window.history.state.dartify();
+
+  @override
+  void historyReplaceState(Object? state) =>
+      web.window.history.replaceState(state.jsify(), '');
+
+  @override
+  void historyPushState(Object? state) =>
+      web.window.history.pushState(state.jsify(), '');
+
+  @override
+  void historyGo(int delta) => web.window.history.go(delta);
+
+  bool Function(Object? state)? _popStateFilter;
+
+  @override
+  set popStateFilter(bool Function(Object? state)? filter) {
+    if (_popStateFilter == null && filter != null) {
+      // Capture listeners on the target run before web_ui's (Chromium 89+).
+      web.window.addEventListener(
+        'popstate',
+        ((web.PopStateEvent e) {
+          if (_popStateFilter?.call(e.state.dartify()) ?? false) {
+            e.stopImmediatePropagation();
+          }
+        }).toJS,
+        web.AddEventListenerOptions(capture: true),
+      );
+    }
+    _popStateFilter = filter;
+  }
+
+  @override
+  late final Stream<void> userActivations = () {
+    final controller = StreamController<void>.broadcast(sync: true);
+    // Chromium's activation-triggering events, seen in the capture phase
+    // before the engine handles them.
+    final listener = ((web.Event _) {
+      if (web.window.navigator.userActivation.isActive) controller.add(null);
+    }).toJS;
+    for (final type in ['keydown', 'mousedown', 'pointerup', 'touchend']) {
+      web.window.addEventListener(
+        type,
+        listener,
+        web.AddEventListenerOptions(capture: true, passive: true),
+      );
+    }
+    return controller.stream;
+  }();
+}

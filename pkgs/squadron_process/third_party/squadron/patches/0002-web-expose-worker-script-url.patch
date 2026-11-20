@@ -1,0 +1,49 @@
+From 8a878c7c92c694eeee13ba596b2390f257861dbe Mon Sep 17 00:00:00 2001
+From: squadron_process <noreply@p0g-stack>
+Date: Tue, 17 Nov 2026 00:00:00 +0000
+Subject: [PATCH 2/2] Web: expose the Wasm worker's script URL
+
+A Web Assembly worker runs from a blob URL that holds Squadron's loader
+script, so inside the worker self.location is the blob, not the worker's
+files. Code in the worker that loads sibling assets (a wasm-bindgen
+module next to the worker, for instance) has no reliable base URL and
+ends up guessing from the origin.
+
+The loader already derives the absolute URL of the worker's .wasm file.
+Assign it to globalThis.squadronWorkerScriptUrl right after deriving it,
+before the Dart runtime is imported or main is invoked, so the worker
+can resolve relative paths against its real location. self.location,
+the blob, the worker packaging and the channel protocol are unchanged.
+JavaScript workers do not need it: they run from their own URL.
+---
+ CHANGELOG.md                            | 1 +
+ lib/src/_impl/web/_entry_point_uri.dart | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 939b738..7726369 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,7 @@
+ 
+ - Add `Worker.channelFactory` (and a `channelFactory` constructor parameter) so a worker can open its channel somewhere other than an isolate or a Web Worker, e.g. another process over a socket. Without a factory, `Worker.start()` opens `Channel.open()` as before.
+ - Export `SquadronCancelationToken` and `StreamId`, which custom `Channel` implementations need.
++- Web: the loader of a Web Assembly worker sets `globalThis.squadronWorkerScriptUrl` to the absolute URL of the worker's `.wasm` file before it loads the Dart runtime. The worker runs from a blob URL, so `self.location` cannot tell it where its own files are.
+ 
+ ## 7.4.5
+ 
+diff --git a/lib/src/_impl/web/_entry_point_uri.dart b/lib/src/_impl/web/_entry_point_uri.dart
+index ecf4d8b..c20a8aa 100644
+--- a/lib/src/_impl/web/_entry_point_uri.dart
++++ b/lib/src/_impl/web/_entry_point_uri.dart
+@@ -59,6 +59,7 @@ class EntryPointUri with Releasable {
+ 
+   static String _wasmLoaderScript(String url) => '''(async function(){
+ const workerUri=new URL("${url.replaceAll('"', '\\"')}",self.location.origin).href;
++globalThis.squadronWorkerScriptUrl=workerUri;
+ let newRt=false;
+ try{
+   let d2w_rt; let worker;
+-- 
+2.56.0
+

@@ -1,33 +1,29 @@
-name: flutter_p0g
-description: Builds a stock Flutter app for the WebUI (KernelSU-style module) and AERA targets. Like flutterpi_tool, it is flutter_tools plus a packing step.
-version: 0.1.0
+name: p0g_workspace
 publish_to: none
-repository: https://github.com/p0g-stack/flutter_p0g
 
 environment:
   sdk: ^3.13.0
-  # Pinned: the web_ui and frb patch series are made against this release.
-  flutter: 3.47.9
 
-executables:
-  flutter_p0g: flutter_p0g
-
-dependencies:
-  flutter_tools:
-    sdk: flutter
-  archive: ^3.6.1
-  args: ^2.7.0
-  crypto: ^3.0.6
-  file: ^7.0.1
-  meta: ^1.10.0
-  package_config: ^2.1.0
-  path: ^1.9.0
-  patched_source:
-    path: packages/patched_source
-  unified_analytics: any
-  yaml: ^3.1.0
-  pointycastle: ^4.0.0
+# The CLI wraps flutter_tools from Flutter 3.47.9; flutter_webui needs
+# Flutter >=3.50.0. Resolve pkgs/flutter_p0g separately on its pinned SDK.
+workspace:
+  - pkgs/patched_source
+  - pkgs/squadron_process
+  - pkgs/flutter_webui
+  - pkgs/flutter_webui_client
+  - pkgs/flutter_webui_root
+  - web_sdk
+  - pkgs/webui/clipboard_webui
+  - pkgs/webui/dynamic_color_webui
+  - pkgs/webui/file_selector_webui
+  - pkgs/webui/flutter_local_notifications_webui
+  - pkgs/webui/path_provider_webui
+  - pkgs/webui/permission_handler_webui
+  - pkgs/webui/share_plus_webui
+  - pkgs/webui/shared_preferences_webui
+  - pkgs/webui/url_launcher_webui
+  - pkgs/webui/webui_app_plane
+  - pkgs/p0g_lints
 
 dev_dependencies:
-  lints: ^5.0.0
-  test: ^1.25.0
+  lints: ^6.0.0

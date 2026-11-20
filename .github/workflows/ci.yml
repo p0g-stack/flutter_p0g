@@ -1,14 +1,108 @@
 name: ci
 on:
   push:
+    branches: [main]
   pull_request:
 # A newer push to the same ref supersedes a running check.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test:
+  # The pub workspace (root pubspec.yaml). flutter_webui and web_sdk/ need
+  # Flutter 3.50.0 (web_sdk/VERSION), so the workspace resolves on it.
+  workspace:
     runs-on: ubuntu-latest
+    env:
+      # Workspace members to analyze. Neither bricks/ (Mason templates) nor
+      # the CLI (its own job, pinned Flutter 3.47.9).
+      WORKSPACE_DIRS: >-
+        pkgs/patched_source pkgs/squadron_process pkgs/flutter_webui pkgs/flutter_webui_client
+        pkgs/flutter_webui_root pkgs/webui pkgs/p0g_lints web_sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+      - run: flutter precache --web
+      # Before pub get: the override it writes points pub at the patched tree.
+      - name: Patched Squadron
+        run: pkgs/squadron_process/tool/squadron.sh
+      - run: flutter pub get
+      # Tracked Dart only, so the materialized upstream checkout and other
+      # build output are never traversed; after pub get so each file formats
+      # with its resolved language version. The CLI formats in its own job.
+      - name: dart format
+        run: |
+          git ls-files -z -- '*.dart' ':(exclude)bricks/**' ':(exclude)pkgs/flutter_p0g/**' \
+            | xargs -0 -r dart format --output=none --set-exit-if-changed
+      - name: patched_source tests
+        run: dart test
+        working-directory: pkgs/patched_source
+      - name: squadron_process VM tests
+        run: dart test -p vm
+        working-directory: pkgs/squadron_process
+      - name: squadron_process example
+        run: dart run example/squadron_process_example.dart
+        working-directory: pkgs/squadron_process
+      - name: squadron_process browser tests (dart2js, dart2wasm)
+        working-directory: pkgs/squadron_process
+        run: |
+          dart test -p chrome test/codec_test.dart test/facts_test.dart
+          dart test -p chrome -c dart2wasm test/codec_test.dart test/facts_test.dart
+      - name: Squadron suite with the patch
+        working-directory: pkgs/squadron_process/third_party/squadron/src
+        run: |
+          dart pub get
+          dart test -p vm test/squadron_vm_test.dart
+      - name: Upstream Squadron patch matches the applied one
+        working-directory: pkgs/squadron_process
+        run: |
+          for patch in third_party/squadron/patches/*.patch; do
+            cmp "$patch" "third_party/squadron/patches/upstream/$(basename "$patch")"
+          done
+      - name: flutter_webui_root tests
+        run: dart test
+        working-directory: pkgs/flutter_webui_root
+      - name: flutter_webui_client tests (stock SDK)
+        run: dart test
+        working-directory: pkgs/flutter_webui_client
+      - name: webui_app_plane tests
+        run: dart test
+        working-directory: pkgs/webui/webui_app_plane
+      - name: WebUI plugin tests
+        run: |
+          for p in file_selector path_provider url_launcher share_plus dynamic_color shared_preferences permission_handler clipboard flutter_local_notifications; do
+            (cd pkgs/webui/${p}_webui && flutter test) || exit 1
+          done
+      - name: Patches apply and compile (patched web SDK)
+        run: dart run web_sdk/tool/build_web_sdk.dart --flutter "$FLUTTER_ROOT" --out "$RUNNER_TEMP/patched"
+      - name: Use the patched web SDK
+        run: |
+          cache="$FLUTTER_ROOT/bin/cache"
+          rm -rf "$cache/flutter_web_sdk" "$cache/pkg/sky_engine/lib/ui_web"
+          cp -R "$RUNNER_TEMP/patched/flutter_web_sdk" "$cache/"
+          cp -R "$RUNNER_TEMP/patched/pkg/sky_engine/lib/ui_web" "$cache/pkg/sky_engine/lib/"
+      # After the patched SDK: flutter_webui uses its ui_web additions.
+      - name: dart analyze
+        run: |
+          read -ra dirs <<< "$WORKSPACE_DIRS"
+          dart analyze --fatal-infos "${dirs[@]}"
+      - name: flutter_webui tests
+        run: flutter test
+        working-directory: pkgs/flutter_webui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-webui-web-sdk-3.50.0
+          path: ${{ runner.temp }}/patched
+
+  # The flutter_p0g CLI pins Flutter 3.47.9 (it wraps that release's
+  # flutter_tools), so it resolves on its own.
+  cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pkgs/flutter_p0g
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -23,8 +117,44 @@ jobs:
         run: |
           FRB_COMMIT=$(awk -F "'" '/^const kFrbCommit = / {print $2}' lib/src/frb/frb.dart)
           test "${#FRB_COMMIT}" = 40
+          patches="$PWD/patches/frb"
           git init -q /tmp/frb && cd /tmp/frb
           git remote add origin https://github.com/fzyzcjy/flutter_rust_bridge
           git fetch -q --depth 1 origin "$FRB_COMMIT"
           git checkout -q FETCH_HEAD
-          for p in "$GITHUB_WORKSPACE"/patches/frb/*.patch; do git apply --check "$p" && git apply "$p"; done
+          for p in "$patches"/*.patch; do git apply --check "$p" && git apply "$p"; done
+
+  # Generates apps from the bricks and resolves them as outside consumers
+  # (Flutter 3.47.9, the pinned flutter_p0g and patched FRB).
+  bricks:
+    runs-on: ubuntu-latest
+    env:
+      FLUTTER_P0G_REF: 2612b4d73a4f643d49f30d0940917b15f4ae09a3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.9
+          channel: stable
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand,wasm-pack
+      - name: Install pinned flutter_p0g and patched FRB
+        run: |
+          dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g --git-ref "$FLUTTER_P0G_REF"
+          "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
+      - name: Install mason
+        run: |
+          dart pub global activate mason_cli 0.1.4
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      # ci.sh resolves its own root (bricks/) and reads pkgs/p0g_lints from
+      # the monorepo root, so any working directory works.
+      - name: Generate and test
+        run: bricks/tool/ci.sh "$RUNNER_TEMP/bricks"

@@ -1,0 +1,7 @@
+bricks:
+  p0g_app:
+    path: p0g_app
+  service:
+    path: service
+  strategy:
+    path: strategy

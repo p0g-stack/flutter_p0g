@@ -1,0 +1,25 @@
+import 'package:args/command_runner.dart';
+import 'package:{{name.snakeCase()}}_core/{{name.snakeCase()}}_core.dart';
+
+import '../runner.dart';
+
+/// Runs the `digest` objective here: Rust when this CLI loaded its library.
+class DigestCommand extends Command<int> {
+  @override
+  String get name => 'digest';
+
+  @override
+  String get description => 'SHA-256 of a text, through Rust where loaded.';
+
+  @override
+  String get invocation => '${runner!.executableName} digest <text>';
+
+  @override
+  Future<int> run() async {
+    final text = argResults!.rest.join(' ');
+    final place = await cliPlace();
+    final strategy = digest.selectRead(place).chosen?.name;
+    print('${await digest.run(text, place)}  $strategy');
+    return 0;
+  }
+}

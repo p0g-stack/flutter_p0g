@@ -1,0 +1,4 @@
+.mason/
+mason-lock.json
+.dart_tool/
+*/hooks/build/

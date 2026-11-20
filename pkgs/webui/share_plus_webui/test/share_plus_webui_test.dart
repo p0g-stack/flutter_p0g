@@ -1,0 +1,191 @@
+// Copyright 2026 The p0g-stack authors.
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
+import 'package:share_plus_webui/src/share_plus_webui_impl.dart';
+import 'package:webui_app_plane/testing.dart';
+import 'package:webui_app_plane/webui_app_plane.dart';
+
+class Stock extends SharePlatform {
+  final List<ShareParams> calls = [];
+
+  @override
+  Future<ShareResult> share(ShareParams params) async {
+    calls.add(params);
+    return const ShareResult('stock', ShareResultStatus.success);
+  }
+}
+
+const launcher = '/data/adb/modules/demo/webui_app_plane/termux-api';
+
+FakeRootChannel withApp({String shareOutput = ''}) => FakeRootChannel(
+  handler: (run) {
+    if (run.argv[0] == '/system/bin/pm') {
+      return const FakeProcessResult(
+        stdout: 'package:/data/app/~~x/com.webui.api.demo-y/base.apk',
+      );
+    }
+    if (run.argv.length > 1 && run.argv[1] == launcher) {
+      return FakeProcessResult(stdout: shareOutput);
+    }
+    return const FakeProcessResult();
+  },
+);
+
+/// The hand-off copy run (not the once-per-page sweep).
+FakeRun copyRun(FakeRootChannel fake) => fake.runs.firstWhere(
+  (r) => r.argv[0] == '/system/bin/sh' && !r.argv[2].contains('-mmin'),
+);
+
+void main() {
+  late Stock stock;
+  setUp(() => stock = Stock());
+
+  SharePlusWebUiImpl sharer(FakeRootChannel fake, [FakeBridge? bridge]) =>
+      SharePlusWebUiImpl(stock: stock, plane: AppPlane(fake.root(bridge)));
+
+  test('text goes to Share on stdin with the subject as title', () async {
+    final fake = withApp();
+    final result = await sharer(fake)
+        .share(ShareParams(text: 'héllo', subject: 'Hi'));
+    expect(result, ShareResult.unavailable);
+    final call = fake.runs.last;
+    expect(call.argv.sublist(1), [
+      launcher,
+      '--package',
+      'com.webui.api.demo',
+      'Share',
+      '--es',
+      'action',
+      'send',
+      '--es',
+      'title',
+      'Hi',
+    ]);
+    expect(call.stdinText, 'héllo');
+    expect(stock.calls, isEmpty);
+  });
+
+  test('a URI is shared as text', () async {
+    final fake = withApp();
+    await sharer(fake).share(ShareParams(uri: Uri.parse('https://x.org/a')));
+    expect(fake.runs.last.stdinText, 'https://x.org/a');
+  });
+
+  test(
+    'one file is copied into a hand-off folder and shared by path',
+    () async {
+      final fake = withApp();
+      await sharer(fake).share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              Uint8List.fromList([1, 2, 3]),
+              mimeType: 'image/png',
+              path: 'pic.png',
+            ),
+          ],
+        ),
+      );
+      final write = copyRun(fake);
+      expect(write.argv.take(2), ['/system/bin/sh', '-c']);
+      final dir = write.shArgs.first;
+      expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+      expect(write.shArgs, [dir, '$dir/pic.png']);
+      expect(write.stdin, [1, 2, 3]);
+      expect(fake.runs.last.argv.sublist(4), [
+        'Share',
+        '--es',
+        'action',
+        'send',
+        '--es',
+        'file',
+        '$dir/pic.png',
+        '--es',
+        'content-type',
+        'image/png',
+      ]);
+    },
+  );
+
+  test('a root path is copied by root, its bytes never read', () async {
+    final fake = withApp();
+    await sharer(fake).share(
+      ShareParams(files: [XFile('/data/adb/demo/tmp/open-1/report.pdf')]),
+    );
+    final copy = copyRun(fake);
+    final dir = copy.shArgs[2];
+    expect(dir, startsWith('/data/data/com.webui.api.demo/cache/handoff/'));
+    expect(copy.shArgs.first, '/data/adb/demo/tmp/open-1/report.pdf');
+    expect(copy.shArgs.last, '$dir/report.pdf');
+    expect(copy.stdin, isEmpty);
+    expect(fake.runs.last.argv, contains('$dir/report.pdf'));
+  });
+
+  test('fileNameOverrides names the copy', () async {
+    final fake = withApp();
+    await sharer(fake).share(
+      ShareParams(
+        files: [XFile.fromData(Uint8List(1), path: 'x')],
+        fileNameOverrides: ['report.pdf'],
+      ),
+    );
+    expect(copyRun(fake).shArgs.last, endsWith('/report.pdf'));
+  });
+
+  test('more than one file is refused', () async {
+    await expectLater(
+      sharer(withApp()).share(
+        ShareParams(
+          files: [
+            XFile.fromData(Uint8List(1), path: 'a'),
+            XFile.fromData(Uint8List(1), path: 'b'),
+          ],
+        ),
+      ),
+      throwsA(
+        isA<PlatformException>().having(
+          (e) => e.code,
+          'code',
+          'webui-share-multiple-files',
+        ),
+      ),
+    );
+  });
+
+  test("ShareAPI's error text becomes a PlatformException", () async {
+    await expectLater(
+      sharer(withApp(shareOutput: 'Error: Nothing to share\n'))
+          .share(ShareParams(text: ' ')),
+      throwsA(
+        isA<PlatformException>().having(
+          (e) => e.message,
+          'message',
+          'Error: Nothing to share',
+        ),
+      ),
+    );
+  });
+
+  test('without the app it is stock web', () async {
+    final fake = FakeRootChannel(
+      handler: (_) => const FakeProcessResult(exitCode: 1),
+    );
+    final result = await sharer(fake).share(ShareParams(text: 't'));
+    expect(result.raw, 'stock');
+    expect(fake.runs.single.argv, [
+      '/system/bin/pm',
+      'path',
+      'com.webui.api.demo',
+    ]);
+  });
+
+  test('a browser tab is stock web without touching root', () async {
+    final fake = withApp();
+    await sharer(fake, FakeBridge.browser()).share(ShareParams(text: 't'));
+    expect(stock.calls, hasLength(1));
+    expect(fake.runs, isEmpty);
+  });
+}
