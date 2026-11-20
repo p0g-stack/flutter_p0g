@@ -97,23 +97,34 @@ jobs:
           name: flutter-webui-web-sdk-3.50.0
           path: ${{ runner.temp }}/patched
 
-  # The flutter_p0g CLI pins Flutter 3.47.9 (it wraps that release's
-  # flutter_tools), so it resolves on its own.
+  # The launcher is a workspace member; its implementation resolves against
+  # this installation's flutter_tools via tool/resolve.sh.
   cli:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: pkgs/flutter_p0g
+        working-directory: pkgs/flutter_p0g_tool
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.9
+          flutter-version: 3.50.0
           channel: stable
-      - run: flutter pub get
+      - name: Resolve workspace for launcher checks
+        working-directory: .
+        run: |
+          pkgs/squadron_process/tool/squadron.sh
+          flutter pub get
+      - name: Check launcher
+        working-directory: pkgs/flutter_p0g
+        run: |
+          dart format --output=none --set-exit-if-changed .
+          dart analyze --fatal-infos
+          dart test
+      - run: tool/resolve.sh
       - run: dart format --output=none --set-exit-if-changed .
       - run: dart analyze --fatal-infos
-      - run: flutter test
+      - run: dart test
       - name: FRB patch series round-trip
         working-directory: .
         run: |
@@ -121,15 +132,14 @@ jobs:
           tool/patches.sh flutter_rust_bridge export
           test -z "$(git status --porcelain -- third_party/flutter_rust_bridge)"
 
-  # Generates apps from the bricks and resolves them as outside consumers
-  # (Flutter 3.47.9, the pinned flutter_p0g and patched FRB).
+  # Test generated apps from outside the workspace against the candidate tag.
   bricks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.9
+          flutter-version: 3.50.0
           channel: stable
       - name: Linux build dependencies
         run: |
@@ -141,15 +151,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-expand,wasm-pack
-      - name: Install this checkout's flutter_p0g and patched FRB
-        run: |
-          dart pub global activate --source path pkgs/flutter_p0g
-          "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
-      - name: Install mason
-        run: |
-          dart pub global activate mason_cli 0.1.4
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-      # ci.sh resolves its own root (bricks/) and reads pkgs/p0g_lints from
-      # the monorepo root, so any working directory works.
       - name: Generate and test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bricks/tool/ci.sh "$RUNNER_TEMP/bricks"
