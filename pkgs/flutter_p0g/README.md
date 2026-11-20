@@ -23,8 +23,8 @@ separate Flutter 3.50.0 producer wave is not part of this checkpoint.
 ## Use
 
 ```sh
-dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g
-# (or --source path <checkout>; run it with the pinned Flutter's dart)
+dart pub global activate --source git https://github.com/p0g-stack/p0g --git-path pkgs/flutter_p0g
+# (or --source path <checkout>/pkgs/flutter_p0g; run it with the pinned Flutter's dart)
 
 cd my_app
 flutter_p0g create .          # adds webui/ and aera/ (and web/ if missing)
