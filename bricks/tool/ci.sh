@@ -201,14 +201,19 @@ check_module() { # app-dir cli-name
 import pathlib, sys, zipfile
 app, cli = pathlib.Path(sys.argv[1]), sys.argv[2]
 [module] = (app / 'build' / 'webui').glob('*.zip')
-names = set(zipfile.ZipFile(module).namelist())
+with zipfile.ZipFile(module) as archive:
+    names = set(archive.namelist())
+    install = archive.read('customize.sh').decode()
 need = ['module.prop', 'customize.sh', 'META-INF/com/google/android/update-binary',
         'webroot/index.html', 'webroot/flutter_bootstrap.js', 'webroot/flutter_webui.js',
         'webroot/main.dart.js', 'flutter_webui/root',
         'flutter_webui/arm64-v8a/flutter_webui_root.aot', 'flutter_webui/arm64-v8a/dartaotruntime',
-        f'bin/{cli}', f'bin/arm64-v8a/{cli}.aot', 'bin/arm64-v8a/dartaotruntime']
+        f'bin/{cli}', f'bin/arm64-v8a/{cli}.aot']
 missing = [n for n in need if n not in names]
 assert not missing, (module.name, missing)
+# The CLI and the root channel share a runtime. The installer links the
+# single archived copy into bin/<abi> rather than shipping it twice.
+assert 'ln -f "$MODPATH/flutter_webui/arm64-v8a/dartaotruntime" "$MODPATH/bin/arm64-v8a/dartaotruntime"' in install, module.name
 assert any(n.startswith('webroot/workers/') and n.endswith('.js') for n in names), module.name
 print(f'{module.name}: {len(names)} files')
 PY
