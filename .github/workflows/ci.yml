@@ -3,38 +3,62 @@ on:
   push:
     branches: [main]
   pull_request:
+permissions:
+  contents: read
 # A newer push to the same ref supersedes a running check.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # The pub workspace (root pubspec.yaml). flutter_webui and web_sdk/ need
-  # Flutter 3.50.0 (web_sdk/VERSION), so the workspace resolves on it.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.paths.outputs.build }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify changes
+        id: paths
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # PR checkout is the test merge, so compare its tree with the base.
+          # For a new/rewritten main with no reachable base, run everything.
+          build=true
+          if git cat-file -e "$BASE^{commit}" 2>/dev/null &&
+             git diff --quiet "$BASE" HEAD -- . ':(exclude)*.md' ':(exclude)docs/**'; then
+            build=false
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+      - name: Immutable release uploader fixtures
+        run: bash .github/scripts/immutable-release-upload-test.sh
+
   workspace:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     env:
       # Workspace members to analyze. Neither bricks/ (Mason templates) nor
-      # the CLI (its own job, pinned Flutter 3.47.9).
+      # flutter_p0g (analyzed and tested in the CLI job).
       WORKSPACE_DIRS: >-
         pkgs/patched_source pkgs/squadron_process pkgs/flutter_webui pkgs/flutter_webui_client
         pkgs/flutter_webui_root pkgs/webui pkgs/p0g_lints web_sdk
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          flutter-version: 3.50.0
-          channel: stable
-      - run: flutter precache --web
-      # Before pub get: the override it writes points pub at the patched tree.
-      - name: Patched Squadron
-        run: pkgs/squadron_process/tool/squadron.sh
-      - run: flutter pub get
+          persist-credentials: false
+      - run: pkgs/squadron_process/tool/squadron.sh
+      - uses: ./.github/actions/setup
+        with:
+          precache: web
       # Tracked Dart only, so the materialized upstream checkout and other
       # build output are never traversed; after pub get so each file formats
       # with its resolved language version. The CLI formats in its own job.
       - name: dart format
         run: |
-          git ls-files -z -- '*.dart' ':(exclude)bricks/**' ':(exclude)pkgs/flutter_p0g/**' \
+          git ls-files -z -- '*.dart' ':(exclude)bricks/**' ':(exclude)pkgs/flutter_p0g*/**' \
             | xargs -0 -r dart format --output=none --set-exit-if-changed
       - name: patched_source tests
         run: dart test
@@ -55,13 +79,6 @@ jobs:
         run: |
           dart pub get
           dart test -p vm test/squadron_vm_test.dart
-      - name: Carried patch series round-trip
-        run: |
-          for u in squadron flutter_file_picker web_sdk; do
-            tool/patches.sh "$u" checkout
-            tool/patches.sh "$u" export
-          done
-          test -z "$(git status --porcelain -- third_party web_sdk/patches)"
       - name: flutter_webui_root tests
         run: dart test
         working-directory: pkgs/flutter_webui_root
@@ -92,66 +109,103 @@ jobs:
       - name: flutter_webui tests
         run: flutter test
         working-directory: pkgs/flutter_webui
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: flutter-webui-web-sdk-3.50.0
+          name: flutter-webui-web-sdk
           path: ${{ runner.temp }}/patched
 
-  # The launcher is a workspace member; its implementation resolves against
-  # this installation's flutter_tools via tool/resolve.sh.
   cli:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pkgs/flutter_p0g_tool
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          flutter-version: 3.50.0
-          channel: stable
-      - name: Resolve workspace for launcher checks
-        working-directory: .
+          persist-credentials: false
+      - run: pkgs/squadron_process/tool/squadron.sh
+      - uses: ./.github/actions/setup
+      - name: Resolve the CLI engine against this flutter_tools
         run: |
-          pkgs/squadron_process/tool/squadron.sh
-          flutter pub get
-      - name: Check launcher
-        working-directory: pkgs/flutter_p0g
+          flutter --version
+          pkgs/flutter_p0g_tool/tool/resolve.sh
+      - name: Format launcher and engine
         run: |
-          dart format --output=none --set-exit-if-changed .
-          dart analyze --fatal-infos
-          dart test
-      - run: tool/resolve.sh
-      - run: dart format --output=none --set-exit-if-changed .
-      - run: dart analyze --fatal-infos
+          git ls-files -z -- 'pkgs/flutter_p0g*/*.dart' |
+            xargs -0 -r dart format --output=none --set-exit-if-changed
+      - run: dart analyze --fatal-infos pkgs/flutter_p0g pkgs/flutter_p0g_tool
       - run: dart test
-      - name: FRB patch series round-trip
-        working-directory: .
-        run: |
-          tool/patches.sh flutter_rust_bridge checkout
-          tool/patches.sh flutter_rust_bridge export
-          test -z "$(git status --porcelain -- third_party/flutter_rust_bridge)"
+        working-directory: pkgs/flutter_p0g
+      - run: flutter test --no-pub
+        working-directory: pkgs/flutter_p0g_tool
 
-  # Test generated apps from outside the workspace against the candidate tag.
-  bricks:
+  patches:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          flutter-version: 3.50.0
-          channel: stable
+          persist-credentials: false
+      - name: Check out and re-export each carried series
+        run: |
+          for series in third_party/*/ web_sdk; do
+            upstream=$(basename "$series")
+            tool/patches.sh "$upstream" checkout
+            tool/patches.sh "$upstream" export
+            status=$(git status --porcelain --untracked-files=all)
+            if [[ -n "$status" ]]; then
+              printf '%s round trip changed the checkout:\n%s\n' "$upstream" "$status" >&2
+              exit 1
+            fi
+          done
+
+  bricks:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: pkgs/squadron_process/tool/squadron.sh
+      - uses: ./.github/actions/setup
+        with:
+          wasm: 'true'
       - name: Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-expand,wasm-pack
+      - name: Install the candidate CLI, patched FRB and mason
+        run: |
+          dart pub global activate --source path pkgs/flutter_p0g
+          "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
+          dart pub global activate mason_cli 0.1.4
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      # The generator uses an unpublished local tag and resolves the generated
+      # app outside the workspace, including before p0g's first release.
       - name: Generate and test
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bricks/tool/ci.sh "$RUNNER_TEMP/bricks"
+
+  # Require only this check. In particular, a failed changes job followed by
+  # skipped builds is not a successful documentation-only run.
+  gate:
+    name: p0g CI
+    needs: [changes, workspace, cli, patches, bricks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all expected results
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          BUILD: ${{ needs.changes.outputs.build }}
+          RESULTS: ${{ needs.workspace.result }} ${{ needs.cli.result }} ${{ needs.patches.result }} ${{ needs.bricks.result }}
+        run: |
+          [[ "$CHANGES" == success ]]
+          case "$BUILD" in
+            true) expected=success ;;
+            false) expected=skipped ;;
+            *) exit 1 ;;
+          esac
+          for result in $RESULTS; do [[ "$result" == "$expected" ]]; done
