@@ -1,0 +1,112 @@
+# Builds the patched Flutter web SDK (web_sdk/patches on the Flutter release
+# in .fvmrc, which web_sdk/VERSION must name) and publishes it as a GitHub
+# release, so flutter_p0g downloads it by sha256 instead of rebuilding it.
+# Expensive: dispatch only, once per commit that changes web_sdk/.
+#
+# Tag:    web-sdk-<Flutter version>-<engine commit, 7>-<p0g commit, 7>
+# Assets: flutter-webui-web-sdk.tar.xz         flutter_web_sdk/ and
+#                                             pkg/sky_engine/lib/ui_web/, to
+#                                             unpack over <flutter>/bin/cache
+#         flutter-webui-web-sdk.tar.xz.sha256  `sha256sum` line
+#         manifest.json                        pins: Flutter, engine,
+#                                             repository and commit, web_sdk
+#                                             tree, patches, asset sha256
+# The tarball and manifest are reproducible (sorted, mtime 0, owner 0, xz):
+# the same pins give the same bytes on any machine. Assets are immutable
+# (immutable-upload.yml): a rerun on the same commit skips identical bytes and
+# fails on different ones.
+name: web-sdk-release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: web-sdk-release-${{ github.sha }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      tag: ${{ steps.pack.outputs.tag }}
+    env:
+      ASSET: flutter-webui-web-sdk.tar.xz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          precache: web
+          pub-get: 'false'
+      # Before pub get: the override it writes points pub at the patched tree.
+      - name: Patched Squadron
+        run: pkgs/squadron_process/tool/squadron.sh
+      - run: flutter pub get
+      - name: Build
+        env:
+          FLUTTER_VERSION: ${{ steps.setup.outputs.flutter-version }}
+        run: |
+          set -euo pipefail
+          pinned=$(<web_sdk/VERSION)
+          [ "$pinned" = "$FLUTTER_VERSION" ] ||
+            { echo "::error::web_sdk/VERSION is $pinned, .fvmrc is $FLUTTER_VERSION; rebase the web_sdk series first"; exit 1; }
+          dart run web_sdk/tool/build_web_sdk.dart --flutter "$FLUTTER_ROOT" --out "$RUNNER_TEMP/sdk"
+      - name: Pack
+        id: pack
+        env:
+          FLUTTER_VERSION: ${{ steps.setup.outputs.flutter-version }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+            -C "$RUNNER_TEMP/sdk" -cf - flutter_web_sdk pkg | xz -T1 -9 > "dist/$ASSET"
+          (cd dist && sha256sum "$ASSET" > "$ASSET.sha256")
+          sha=$(cut -d' ' -f1 "dist/$ASSET.sha256")
+          engine=$(<"$FLUTTER_ROOT/bin/internal/engine.version")
+          framework=$(flutter --version --machine | jq -r .frameworkRevision)
+          tree=$(git rev-parse HEAD:web_sdk)
+          tag=web-sdk-$FLUTTER_VERSION-${engine:0:7}-${GITHUB_SHA:0:7}
+          jq -n \
+            --arg flutter "$FLUTTER_VERSION" \
+            --arg framework "$framework" \
+            --arg engine "$engine" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg commit "$GITHUB_SHA" \
+            --arg tree "$tree" \
+            --arg asset "$ASSET" \
+            --arg sha256 "$sha" \
+            --argjson patches "$(cd web_sdk/patches && printf '%s\n' *.patch | jq -R . | jq -s .)" \
+            '{flutter: $flutter, flutterFramework: $framework, engine: $engine,
+              repository: $repository, commit: $commit, webSdkTree: $tree, patches: $patches,
+              asset: $asset, sha256: $sha256}' > dist/manifest.json
+          cat dist/manifest.json
+          {
+            echo "Patched Flutter web SDK: p0g \`web_sdk/patches\` on Flutter $FLUTTER_VERSION (engine \`$engine\`), built at $GITHUB_REPOSITORY \`$GITHUB_SHA\`."
+            echo
+            echo "Unpack \`$ASSET\` over \`<flutter>/bin/cache\` (it holds \`flutter_web_sdk/\` and \`pkg/sky_engine/lib/ui_web/\`)."
+            echo
+            echo "- sha256: \`$sha\`"
+            echo "- web_sdk tree: \`$tree\`"
+          } > dist/notes.md
+          echo "tag=$tag" | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-sdk-release
+          if-no-files-found: error
+          path: dist/
+  publish:
+    needs: build
+    permissions:
+      contents: write
+    uses: ./.github/workflows/immutable-upload.yml
+    with:
+      artifact: web-sdk-release
+      files: |
+        flutter-webui-web-sdk.tar.xz
+        flutter-webui-web-sdk.tar.xz.sha256
+        manifest.json
+      tag: ${{ needs.build.outputs.tag }}
+      commit: ${{ github.sha }}
+      notes-file: notes.md

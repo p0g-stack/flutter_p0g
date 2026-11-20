@@ -1,0 +1,125 @@
+name: p0g setup
+description: >-
+  Installs the Flutter release named by p0g's .fvmrc (cached stock SDK),
+  optionally Rust for the wasm build, and runs `flutter pub get`. Inside p0g:
+  `uses: ./.github/actions/setup`; elsewhere (demo, flasher-web, devicelab):
+  `uses: p0g-stack/p0g/.github/actions/setup@<full SHA> # p0g-v<x.y.z>`, which
+  installs the Flutter version of that p0g commit.
+
+inputs:
+  flutter-version-file:
+    description: >-
+      .fvmrc naming the Flutter version, relative to the caller's workspace.
+      Empty: the .fvmrc of the p0g commit this action runs from.
+    default: ''
+  precache:
+    description: Space-separated platforms for `flutter precache`, e.g. `web`. Cached with the SDK.
+    default: ''
+  wasm:
+    description: >-
+      'true' installs stable Rust with wasm32-unknown-unknown, cargo-expand and
+      wasm-pack (flutter_rust_bridge's web build).
+    default: 'false'
+  rust-toolchain:
+    description: Rust toolchain to install, e.g. `stable`. Empty skips Rust unless wasm, rust-targets or rust-tools requests it.
+    default: ''
+  rust-targets:
+    description: Comma-separated rustup targets beyond `wasm`'s, e.g. `aarch64-unknown-linux-gnu`. Installs stable Rust.
+    default: ''
+  rust-tools:
+    description: Comma-separated tools beyond `wasm`'s for taiki-e/install-action, e.g. `cargo-ndk`. Installs stable Rust.
+    default: ''
+  pub-get:
+    description: >-
+      'true' runs `flutter pub get` in `working-directory`. 'false' when
+      something must run first (p0g: pkgs/squadron_process/tool/squadron.sh).
+    default: 'true'
+  working-directory:
+    description: Where `flutter pub get` runs, relative to the caller's workspace.
+    default: '.'
+
+outputs:
+  flutter-version:
+    description: The installed Flutter version.
+    value: ${{ steps.flutter.outputs.VERSION }}
+  flutter-root:
+    description: The Flutter SDK directory, also exported as FLUTTER_ROOT; flutter and dart are on PATH.
+    value: ${{ steps.flutter.outputs.CACHE-PATH }}/flutter
+
+runs:
+  using: composite
+  steps:
+    # GITHUB_ACTION_PATH is this directory in the p0g commit being run.
+    - id: config
+      shell: bash
+      env:
+        VERSION_FILE: ${{ inputs.flutter-version-file }}
+        WASM: ${{ inputs.wasm }}
+        TOOLCHAIN: ${{ inputs.rust-toolchain }}
+        TARGETS: ${{ inputs.rust-targets }}
+        TOOLS: ${{ inputs.rust-tools }}
+        PRECACHE: ${{ inputs.precache }}
+      run: |
+        fvmrc=${VERSION_FILE:+$GITHUB_WORKSPACE/$VERSION_FILE}
+        fvmrc=${fvmrc:-$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)/.fvmrc}
+        test -f "$fvmrc" || { echo "::error::No .fvmrc at $fvmrc"; exit 1; }
+        if [ "$WASM" = true ]; then
+          TARGETS=wasm32-unknown-unknown${TARGETS:+,$TARGETS}
+          TOOLS=cargo-expand,wasm-pack${TOOLS:+,$TOOLS}
+        fi
+        if [[ -n "$TARGETS$TOOLS" ]]; then TOOLCHAIN=${TOOLCHAIN:-stable}; fi
+        read -ra platforms <<< "$PRECACHE"
+        {
+          echo "fvmrc=$fvmrc"
+          echo "rust=$TOOLCHAIN"
+          echo "rust-targets=$TARGETS"
+          echo "rust-tools=$TOOLS"
+          echo "precache=${platforms[*]}"
+          echo "precache-key=$(printf '%s\n' "${platforms[@]}" | sort -u | paste -sd- -)"
+        } >> "$GITHUB_OUTPUT"
+
+    # flutter-action's own cache saves the SDK directory after the job, when
+    # callers may have patched it (web SDK overlay, flutter_p0g precache). So
+    # resolve path and key, restore, install (no-op on a hit) with its cache
+    # off, precache, and save the stock SDK before any caller step runs.
+    - id: resolve
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        flutter-version-file: ${{ steps.config.outputs.fvmrc }}
+        dry-run: 'true'
+    - id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.resolve.outputs.CACHE-PATH }}
+        key: ${{ steps.resolve.outputs.CACHE-KEY }}-precache-${{ steps.config.outputs.precache-key }}
+    - id: flutter
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        flutter-version-file: ${{ steps.config.outputs.fvmrc }}
+    - if: steps.config.outputs.precache != ''
+      shell: bash
+      env:
+        PLATFORMS: ${{ steps.config.outputs.precache }}
+      run: |
+        read -ra platforms <<< "$PLATFORMS"
+        flutter precache "${platforms[@]/#/--}"
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.resolve.outputs.CACHE-PATH }}
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    - if: steps.config.outputs.rust != ''
+      uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master 2026-11-15
+      with:
+        toolchain: ${{ steps.config.outputs.rust }}
+        targets: ${{ steps.config.outputs.rust-targets }}
+    - if: steps.config.outputs.rust-tools != ''
+      uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
+      with:
+        tool: ${{ steps.config.outputs.rust-tools }}
+
+    - if: inputs.pub-get == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: flutter pub get

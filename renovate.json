@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency PRs for everything except pub. Pub is excluded: Renovate's pub manager expects a pubspec.lock beside each pubspec.yaml and does not support pub workspaces, whose one lock sits at the root (renovatebot/renovate#40361, closed as not planned). .github/workflows/roll.yml upgrades pub dependencies instead (`dart pub upgrade --major-versions`).",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "enabledManagers": ["github-actions", "cargo", "npm", "gradle", "gradle-wrapper", "fvm"],
+  "ignorePaths": ["**/node_modules/**", "**/__brick__/**"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Etc/UTC",
+  "prConcurrentLimit": 5,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "description": "Flutter moves only with its artifacts (web SDK, AERA kits, Dart Android kits): the PR is the signal to cut them, and pins follow once they are published.",
+      "matchManagers": ["fvm"],
+      "groupName": "Flutter",
+      "labels": ["flutter-bump"]
+    },
+    {
+      "description": "Actions are pinned by full SHA with a version comment; group their updates.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}

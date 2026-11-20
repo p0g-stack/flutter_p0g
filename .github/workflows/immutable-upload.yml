@@ -1,0 +1,167 @@
+# Publishes the files of one artifact of the calling run as assets of a GitHub
+# release, without ever replacing an asset: the reusable form of
+# .github/scripts/immutable-release-upload.sh (identical bytes are skipped,
+# different bytes refuse and upload nothing, a missing release is created, and
+# with `commit` the tag must resolve to that commit). It always runs the
+# uploader from its own commit of p0g-stack/p0g (job.workflow_repository at
+# job.workflow_sha), also when another repository calls it, so every caller
+# gets the same canonical script. Fixture:
+# bash .github/scripts/immutable-release-upload-test.sh
+#
+# Caller (the calling job needs `permissions: contents: write`; the files come
+# from an artifact an earlier job of the same run uploaded):
+#   publish:
+#     needs: build
+#     permissions:
+#       contents: write
+#     uses: p0g-stack/p0g/.github/workflows/immutable-upload.yml@<full SHA> # p0g-v<x.y.z>
+#     with:
+#       artifact: dist
+#       tag: kit-${{ github.sha }}
+#       commit: ${{ github.sha }}
+#       title: Runtime kit
+#       notes: Assets are never replaced.
+name: immutable-upload
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: Artifact of the calling run whose files are published.
+        type: string
+        required: true
+      files:
+        description: >-
+          Newline-separated file paths relative to the artifact root, in upload
+          order. Empty: every regular file at the artifact's top level except
+          `notes-file`, sorted by name.
+        type: string
+        default: ''
+      tag:
+        description: Release tag.
+        type: string
+        required: true
+      commit:
+        description: >-
+          Full 40-hex commit SHA the tag must resolve to (uploader --commit);
+          a missing release is created with its tag there. Empty: no check.
+        type: string
+        default: ''
+      repository:
+        description: Release OWNER/REPO (defaults to the calling repository).
+        type: string
+        default: ''
+      create:
+        description: >-
+          Create the release when it is missing (with title, notes, notes-file,
+          prerelease, target). false: a missing release fails.
+        type: boolean
+        default: true
+      title:
+        description: Title of a created release (defaults to the tag).
+        type: string
+        default: ''
+      notes:
+        description: Notes of a created release (ignored with notes-file).
+        type: string
+        default: ''
+      notes-file:
+        description: Path relative to the artifact root of the created release's notes; never uploaded by default.
+        type: string
+        default: ''
+      prerelease:
+        description: Create the release as a prerelease.
+        type: boolean
+        default: false
+      target:
+        description: >-
+          Branch or commit a created release's new tag points at, when `commit`
+          is empty (with `commit`, the tag is created at `commit`).
+        type: string
+        default: ''
+    secrets:
+      token:
+        description: >-
+          Token for the release repository when github.token cannot write to
+          it (another repository). Default: the calling run's github.token.
+        required: false
+permissions:
+  contents: write
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Identify the called workflow, not its caller
+        id: source
+        env:
+          JOB: ${{ toJSON(job) }}
+        run: |
+          # Fail closed if the host doesn't expose the reusable workflow's
+          # identity. Empty checkout inputs would select the caller instead.
+          jq -er '
+            .workflow_repository as $repo | .workflow_sha as $sha |
+            select(($repo | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")) and
+                   ($sha | test("^[0-9a-f]{40}$"))) |
+            "repository=\($repo)\nsha=\($sha)"' <<< "$JOB" >> "$GITHUB_OUTPUT"
+      - name: Canonical uploader
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.source.outputs.repository }}
+          ref: ${{ steps.source.outputs.sha }}
+          path: .immutable-upload/source
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.artifact }}
+          path: .immutable-upload/files
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ secrets.token || github.token }}
+          REPO: ${{ inputs.repository || github.repository }}
+          FILES: ${{ inputs.files }}
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ inputs.commit }}
+          CREATE: ${{ inputs.create }}
+          TITLE: ${{ inputs.title || inputs.tag }}
+          NOTES: ${{ inputs.notes }}
+          NOTES_FILE: ${{ inputs.notes-file }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          script=$PWD/.immutable-upload/source/.github/scripts/immutable-release-upload.sh
+          root=$PWD/.immutable-upload/files
+          # Artifact-relative paths only: nothing outside the downloaded artifact.
+          inside() { [[ $1 != /* && /$1/ != */../* ]] || { echo "::error::$1: not a path inside the artifact"; exit 1; }; }
+          files=()
+          if [ -n "$FILES" ]; then
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              inside "$f"
+              files+=("$root/$f")
+            done <<<"$FILES"
+          else
+            while IFS= read -r -d '' f; do
+              [ -n "$NOTES_FILE" ] && [ "$f" -ef "$root/$NOTES_FILE" ] && continue
+              files+=("$f")
+            done < <(find "$root" -mindepth 1 -maxdepth 1 -type f -print0 | sort -z)
+          fi
+          [ ${#files[@]} -gt 0 ] || { echo "::error::artifact has no files to publish"; exit 1; }
+          args=(-R "$REPO")
+          [ -z "$COMMIT" ] || args+=(--commit "$COMMIT")
+          create=()
+          if [ "$CREATE" = true ]; then
+            [ -z "$COMMIT" ] || [ -z "$TARGET" ] || { echo "::error::give commit or target, not both"; exit 1; }
+            create=(-- --title "$TITLE")
+            if [ -n "$NOTES_FILE" ]; then
+              inside "$NOTES_FILE"
+              create+=(--notes-file "$root/$NOTES_FILE")
+            else
+              create+=(--notes "$NOTES")
+            fi
+            [ "$PRERELEASE" != true ] || create+=(--prerelease)
+            [ -z "$TARGET" ] || create+=(--target "$TARGET")
+          fi
+          "$script" "${args[@]}" "$TAG" "${files[@]}" "${create[@]}"
