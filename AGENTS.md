@@ -1,10 +1,11 @@
 # p0g: working agreements
 
-One repository, one workspace, one version: `pkgs/*`, `web_sdk/` and the CLI
-resolve together and ship under the tag `p0g-v<x.y.z>`. The truth about what
-is pinned lives in the lock files — `.fvmrc` (Flutter), `artifacts.lock.json`
-(binary url/sha256), `third_party/<upstream>/PIN` (carried commits) and the
-pubspecs. No document repeats those values.
+One repository, one version: `pkgs/*`, `web_sdk/` and the launcher
+(`pkgs/flutter_p0g`) resolve as one workspace and ship under the tag
+`p0g-v<x.y.z>`. The truth about what is pinned lives in the lock files —
+`.fvmrc` (Flutter), `artifacts.lock.json` (binary url/sha256),
+`third_party/<upstream>/PIN` (carried commits) and the pubspecs. No document
+repeats those values.
 
 ## Local commands
 
@@ -31,7 +32,7 @@ Tests (unit tests only; no e2e, no devices):
 | `pkgs/flutter_webui{,_client,_root}` | `dart test` (`flutter test` for the web plugin) |
 | `pkgs/webui/webui_app_plane` | `dart test` |
 | `pkgs/webui/<plugin>_webui` | `flutter test` |
-| `bricks/` | `bash tool/ci.sh` (generates an app and tests it as an outside consumer) |
+| `bricks/` | `cd bricks && bash tool/ci.sh` (generates apps and tests them as an outside consumer; needs Chrome, cargo, wasm-pack for the Rust variants) |
 
 ## Carried patches
 

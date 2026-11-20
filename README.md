@@ -78,7 +78,8 @@ dependency_overrides:
 ```
 
 They pin the sibling to the same tag instead of letting pub mix a tag with a
-commit-pinned path edge. A tool that adds itself at build time only
+commit-pinned path edge. (`^0.9.0` is what the generator writes today; it
+tracks the tag's version.) A tool that adds itself at build time only
 (`flutter_webui`) never appears in a consumer's manifest.
 
 An analyzer plugin cannot use `tag_pattern` (the analysis server resolves it in

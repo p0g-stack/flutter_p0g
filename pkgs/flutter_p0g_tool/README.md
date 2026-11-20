@@ -129,8 +129,8 @@ tool/resolve.sh             resolve against an SDK (above)
 ## Tests
 
 ```sh
-pkgs/flutter_p0g_tool/tool/resolve.sh   # once, and after the SDK moves
-dart test                                # 138 unit tests, no devices
+pkgs/flutter_p0g_tool/tool/resolve.sh      # from the repository root, once and after the SDK moves
+(cd pkgs/flutter_p0g_tool && dart test)    # unit tests; no devices
 ```
 
 The web runtime proofs (`tool/web_runtime_proof/README.md`) run in a real
