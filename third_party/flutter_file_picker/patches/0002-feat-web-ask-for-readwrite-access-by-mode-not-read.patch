@@ -1,0 +1,357 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: 1vivy <1vivy@tutanota.com>
+Date: Mon, 9 Nov 2026 19:26:30 -0600
+Subject: feat(web): ask for readwrite access by mode, not read
+
+The permission helpers only ever asked about 'read', so a handle the page kept
+to write into later, such as one from showSaveFilePicker() that an app stores
+to resume an interrupted save, could not be checked or renewed, and
+createWritable() threw NotAllowedError after a reload.
+
+FilePermissionMode names the two modes the browser's permission methods take.
+hasAccess() and requestAccess() on WebPlatformFile take one, defaulting to
+read, so a persisted file is still checked as before. hasPermission() and
+requestPermission() take it for a bare handle that is not a WebPlatformFile.
+
+Checked on this commit (the series tip, on 7b8aec33) with Flutter 3.47.9,
+Dart 3.13.7 and Chrome 157.0.8103.50:
+
+- `flutter pub get && flutter analyze` in packages/file_picker_web:
+  No issues found!
+- `flutter test --platform chrome test/web_file_system_access_test.dart`:
+  18 passed (dialog choice and fallback, handle store round trip, both
+  permission modes, WebPlatformFile read and write paths).
+- `flutter test --platform chrome` for the whole package: 67 passed.
+
+Not run: the Android, iOS and desktop suites; the change is web-only.
+
+The two commits can be reviewed in order or squashed; this one builds on the
+API the previous one adds.
+
+diff --git a/packages/file_picker/README.md b/packages/file_picker/README.md
+index b60dadf02bcecee39a768ad4882ef276bff18a91..3a38a59e49651e879cdc709874e84523472c321c 100644
+--- a/packages/file_picker/README.md
++++ b/packages/file_picker/README.md
+@@ -288,7 +288,12 @@ A remembered file keeps its read permission only while another tab of the site
+ has it, or when the user allowed it on every visit, so check
+ `WebPlatformFile.hasAccess()` and renew it from a click with `requestAccess()`
+ before reading. `WebPlatformFile.forget(token)` drops it. Files picked through
+-the input have no handle, so `persist()` returns `null` for them.
++the input have no handle, so `persist()` returns `null` for them. Both methods
++take a `FilePermissionMode`: a handle the app keeps to write into later, such
++as one from `showSaveFilePicker()`, needs
++`requestAccess(mode: FilePermissionMode.readWrite)`, or the bare
++`requestPermission(handle, mode: FilePermissionMode.readWrite)` when it is not a
++`WebPlatformFile`.
+ 
+ #### Recover a pick on Android
+ 
+diff --git a/packages/file_picker_web/CHANGELOG.md b/packages/file_picker_web/CHANGELOG.md
+index 6a5a01ba20763431f9ced76f80f307dcdea0531f..ae74ea83a3a1f0dffbbc81a4ba68db98611b5902 100644
+--- a/packages/file_picker_web/CHANGELOG.md
++++ b/packages/file_picker_web/CHANGELOG.md
+@@ -1,7 +1,8 @@
+ ## 4.3.0
+ 
+ - Added `FilePickerWebOptions.dialog`, `pickerId` and `types`. `WebFileDialog.fileSystemAccess` picks through the browser's file system access dialog, and `supportsShowOpenFilePicker` tells whether the browser supports it. The picked file keeps the browser's `File`, which ranged reads go through, and the handle it came from. [#770](https://github.com/vicajilau/flutter_file_picker/issues/770)
+-- Added `WebPlatformFile.persist()`, `restore()`, `forget()`, `hasAccess()` and `requestAccess()`, which remember a picked file across page reloads in IndexedDB and renew the browser's read permission for it.
++- Added `WebPlatformFile.persist()`, `restore()`, `forget()`, `hasAccess()` and `requestAccess()`, which remember a picked file across page reloads in IndexedDB and renew the browser's read permission for it. Both take a `FilePermissionMode`, so a handle the user picked to save to can be checked and renewed for `readWrite`.
++- Added `hasPermission()` and `requestPermission()`, which take a `FilePermissionMode` and work on a handle that is not a `WebPlatformFile`, such as one the page remembered to write into.
+ 
+ ## 4.2.1
+ 
+diff --git a/packages/file_picker_web/README.md b/packages/file_picker_web/README.md
+index 20e4f97e8630b94e90205f0565819d04a1aca4e2..57bd8315c8a43163988b0095e3e6a1b4302de48a 100644
+--- a/packages/file_picker_web/README.md
++++ b/packages/file_picker_web/README.md
+@@ -75,3 +75,23 @@ Tokens live in the origin's own storage. A browser that clears site data, or a
+ different browser profile, loses them: `restore()` then returns `null`, and the
+ app has to ask for the file again.
+ 
++### Writing a file the page remembered
++
++A handle the user picked to save to needs the `readwrite` mode, not `read`.
++`hasAccess()` and `requestAccess()` take it as `FilePermissionMode.readWrite`,
++and `hasPermission()`/`requestPermission()` do the same for a bare handle the
++app kept on its own, such as one loaded from `loadHandle()`:
++
++```dart
++final handle = await loadHandle(writeToken);
++if (handle != null && await hasPermission(handle, mode: FilePermissionMode.readWrite)) {
++  final file = await handle.getFile();    // readable content of the same file
++  final writable = await handle.createWritable();
++  // ...
++}
++```
++
++Without `readwrite` — after a reload, unless the user allowed the site on every
++visit — `createWritable()` throws a `NotAllowedError`, so call
++`requestPermission` from the click that starts the write.
++
+diff --git a/packages/file_picker_web/lib/file_picker_web.dart b/packages/file_picker_web/lib/file_picker_web.dart
+index 367cd44cff8518fa242cdd5ab9f2c642b6527fe7..c1d039ac4fc7f8fad6057eebeb0e70ffd35aafbd 100644
+--- a/packages/file_picker_web/lib/file_picker_web.dart
++++ b/packages/file_picker_web/lib/file_picker_web.dart
+@@ -4,5 +4,10 @@ library;
+ export 'src/file_picker_web.dart';
+ export 'src/file_picker_web_options.dart';
+ export 'src/save_file_dialog.dart' show supportsShowSaveFileDialog;
+-export 'src/web_file_system_access.dart' show supportsShowOpenFilePicker;
++export 'src/web_file_system_access.dart'
++    show
++        FilePermissionMode,
++        hasPermission,
++        requestPermission,
++        supportsShowOpenFilePicker;
+ export 'src/web_platform_file.dart';
+diff --git a/packages/file_picker_web/lib/src/web_file_system_access.dart b/packages/file_picker_web/lib/src/web_file_system_access.dart
+index 86039d0761dcc9c00ed1fbea3b1d2f02670ffd96..ce4d09576836294323a9648f01608420f4c4b628 100644
+--- a/packages/file_picker_web/lib/src/web_file_system_access.dart
++++ b/packages/file_picker_web/lib/src/web_file_system_access.dart
+@@ -79,15 +79,36 @@ JSObject _acceptType(WebFileTypeFilter type) {
+   return entry;
+ }
+ 
+-/// The descriptor both permission methods take.
+-JSObject get _readMode => JSObject()..['mode'] = 'read'.toJS;
++/// What the page asks a handle to allow.
++enum FilePermissionMode {
++  /// Read the file's content, which is what picking gives a handle.
++  read('read'),
+ 
+-/// Whether the page can read [handle] now, without asking the user.
++  /// Read and write the file's content, which a handle the user chose to save
++  /// to needs before it can be replaced.
++  readWrite('readwrite');
++
++  const FilePermissionMode(this.descriptor);
++
++  /// The `mode` of the descriptor the browser's permission methods take.
++  final String descriptor;
++}
++
++/// The descriptor [hasPermission] and [requestPermission] take for [mode].
++JSObject _mode(FilePermissionMode mode) =>
++    JSObject()..['mode'] = mode.descriptor.toJS;
++
++/// Whether the page has [mode] access to [handle] now, without asking the
++/// user.
+ ///
+ /// A handle from `showOpenFilePicker()` or `showSaveFilePicker()` has it. One
+ /// loaded back from a token keeps it only while another tab of the site still
+ /// has it, or when the user chose to allow it on every visit. Otherwise call
+-/// [requestReadPermission] from a button.
++/// [requestPermission] from a button.
++///
++/// [FilePermissionMode.readWrite] is about the file's content: a handle the
++/// user picked to save to reports it as granted only while the page may
++/// replace that content.
+ ///
+ /// Browsers without `queryPermission()`, such as Firefox and Safari, return
+ /// `true`: they have no `showOpenFilePicker()` either, so a handle they give
+@@ -97,16 +118,19 @@ JSObject get _readMode => JSObject()..['mode'] = 'read'.toJS;
+ ///
+ /// It is about permission only: a file that was deleted still returns `true`,
+ /// and reading it throws a `NotFoundError`.
+-Future<bool> hasReadPermission(FileSystemFileHandle handle) async {
++Future<bool> hasPermission(
++  FileSystemFileHandle handle, {
++  FilePermissionMode mode = FilePermissionMode.read,
++}) async {
+   if (!handle.has('queryPermission')) return true;
+   final state = await handle
+-      .callMethod<JSPromise<JSString>>('queryPermission'.toJS, _readMode)
++      .callMethod<JSPromise<JSString>>('queryPermission'.toJS, _mode(mode))
+       .toDart;
+   return state.toDart == 'granted';
+ }
+ 
+-/// Asks the user for read access to [handle] if the page doesn't have it yet,
+-/// and returns whether it has it now.
++/// Asks the user for [mode] access to [handle] if the page doesn't have it
++/// yet, and returns whether it has it now.
+ ///
+ /// The browser only shows the prompt for a user gesture, so call it from a
+ /// click handler with nothing awaited before it. Returns `false` when the user
+@@ -114,11 +138,14 @@ Future<bool> hasReadPermission(FileSystemFileHandle handle) async {
+ /// be shown at all.
+ ///
+ /// Browsers without `requestPermission()` return `true` without a prompt, for
+-/// the same reason as [hasReadPermission].
+-Future<bool> requestReadPermission(FileSystemFileHandle handle) async {
++/// the same reason as [hasPermission].
++Future<bool> requestPermission(
++  FileSystemFileHandle handle, {
++  FilePermissionMode mode = FilePermissionMode.read,
++}) async {
+   if (!handle.has('requestPermission')) return true;
+   final state = await handle
+-      .callMethod<JSPromise<JSString>>('requestPermission'.toJS, _readMode)
++      .callMethod<JSPromise<JSString>>('requestPermission'.toJS, _mode(mode))
+       .toDart;
+   return state.toDart == 'granted';
+ }
+diff --git a/packages/file_picker_web/lib/src/web_platform_file.dart b/packages/file_picker_web/lib/src/web_platform_file.dart
+index f5c30c620d4fbf7b74b24c937dbc34a2782ba8df..b1ddf80b52aebfd8125d4c2e146e21b4d1724f5b 100644
+--- a/packages/file_picker_web/lib/src/web_platform_file.dart
++++ b/packages/file_picker_web/lib/src/web_platform_file.dart
+@@ -88,28 +88,37 @@ base class WebPlatformFile extends PlatformFile {
+   final Uint8List? _bytes;
+   final Stream<Uint8List>? _readStream;
+ 
+-  /// Whether the page can read this file now, without asking the user.
++  /// Whether the page has [mode] access to this file now, without asking the
++  /// user.
+   ///
+   /// A file from `<input type="file">` is always readable, since the browser
+   /// already handed its content over. A persisted file keeps its read access
+   /// only while another tab of the site has it, or when the user chose to allow
+   /// it on every visit, so pass a restored one through this before reading it.
+-  Future<bool> hasAccess() async {
++  ///
++  /// [FilePermissionMode.readWrite] asks whether the file's content can be
++  /// replaced instead, which a file the user picked to save to needs before a
++  /// second save writes over it.
++  Future<bool> hasAccess({
++    FilePermissionMode mode = FilePermissionMode.read,
++  }) async {
+     final handle = _handle;
+     if (handle == null) return true;
+-    return hasReadPermission(handle);
++    return hasPermission(handle, mode: mode);
+   }
+ 
+-  /// Asks the user for read access to this file if the page doesn't have it
++  /// Asks the user for [mode] access to this file if the page doesn't have it
+   /// yet, and returns whether it has it now.
+   ///
+   /// The browser only shows the prompt for a user gesture, so call it from a
+   /// click handler with nothing awaited before it. Returns `false` when the
+   /// user denies access.
+-  Future<bool> requestAccess() async {
++  Future<bool> requestAccess({
++    FilePermissionMode mode = FilePermissionMode.read,
++  }) async {
+     final handle = _handle;
+     if (handle == null) return true;
+-    return requestReadPermission(handle);
++    return requestPermission(handle, mode: mode);
+   }
+ 
+   /// Reads this file through its [handle] and returns the browser's [File].
+diff --git a/packages/file_picker_web/test/web_file_system_access_test.dart b/packages/file_picker_web/test/web_file_system_access_test.dart
+index ce60bfbac61396cd2f92b916e4549c9ab32323aa..402972d1774bd176555023861b2f8518ffa4c918 100644
+--- a/packages/file_picker_web/test/web_file_system_access_test.dart
++++ b/packages/file_picker_web/test/web_file_system_access_test.dart
+@@ -28,30 +28,37 @@ class _FakeFileHandle {
+   _FakeFileHandle({
+     required this.name,
+     required this.contents,
+-    this.permission = 'granted',
+-  });
++    String permission = 'granted',
++    String? writePermission,
++  }) : permissions = {
++         'read': permission,
++         'readwrite': writePermission ?? permission,
++       };
+ 
+   final String name;
+   final String contents;
+ 
+-  /// What `queryPermission()` and `requestPermission()` report.
+-  String permission;
++  /// What `queryPermission()` and `requestPermission()` report, per mode.
++  final Map<String, String> permissions;
+ 
+-  int queryCalls = 0;
+-  int requestCalls = 0;
++  /// The modes each permission method was asked about, in order.
++  final queriedModes = <String?>[];
++  final requestedModes = <String?>[];
+ 
+   JSPromise<File> getFile() =>
+       Future.value(File([utf8.encode(contents).toJS].toJS, name)).toJS;
+ 
+   JSPromise<JSString> queryPermission(JSObject descriptor) {
+-    queryCalls++;
+-    return Future.value(permission.toJS).toJS;
++    final mode = (descriptor.dartify()! as Map)['mode'] as String?;
++    queriedModes.add(mode);
++    return Future.value((permissions[mode] ?? 'denied').toJS).toJS;
+   }
+ 
+   JSPromise<JSString> requestPermission(JSObject descriptor) {
+-    requestCalls++;
+-    permission = 'granted';
+-    return Future.value(permission.toJS).toJS;
++    final mode = (descriptor.dartify()! as Map)['mode'] as String?;
++    requestedModes.add(mode);
++    permissions[mode!] = 'granted';
++    return Future.value(permissions[mode]!.toJS).toJS;
+   }
+ }
+ 
+@@ -418,10 +425,10 @@ void main() {
+       expect(file.uri, Uri());
+       expect(file.lengthSync(), isNull);
+       expect(await file.hasAccess(), isFalse);
+-      expect(fake.queryCalls, 1);
++      expect(fake.queriedModes, ['read']);
+ 
+       expect(await file.requestAccess(), isTrue);
+-      expect(fake.requestCalls, 1);
++      expect(fake.requestedModes, ['read']);
+ 
+       final read = await file.getFile();
+       expect(read.name, 'locked.zip');
+@@ -429,5 +436,49 @@ void main() {
+       expect(file.lengthSync(), 3);
+       expect(utf8.decode(await file.readAsBytes()), 'zip');
+     });
++
++    test('asks for write access with the readWrite mode', () async {
++      final fake = _FakeFileHandle(
++        name: 'save.zip',
++        contents: 'zip',
++        writePermission: 'prompt',
++      );
++      final file = WebPlatformFile(name: fake.name, handle: _fakeHandle(fake));
++
++      // Read access does not imply the content may be replaced.
++      expect(await file.hasAccess(), isTrue);
++      expect(await file.hasAccess(mode: FilePermissionMode.readWrite), isFalse);
++      expect(fake.queriedModes, ['read', 'readwrite']);
++
++      expect(
++        await file.requestAccess(mode: FilePermissionMode.readWrite),
++        isTrue,
++      );
++      expect(fake.requestedModes, ['readwrite']);
++      expect(await file.hasAccess(mode: FilePermissionMode.readWrite), isTrue);
++    });
++
++    test('checks the mode of a handle the page kept itself', () async {
++      final fake = _FakeFileHandle(
++        name: 'saved.zip',
++        contents: 'zip',
++        writePermission: 'prompt',
++      );
++      final handle = _fakeHandle(fake);
++
++      expect(await hasPermission(handle), isTrue);
++      expect(
++        await hasPermission(handle, mode: FilePermissionMode.readWrite),
++        isFalse,
++      );
++      expect(fake.queriedModes, ['read', 'readwrite']);
++
++      expect(
++        await requestPermission(handle, mode: FilePermissionMode.readWrite),
++        isTrue,
++      );
++      expect(fake.requestedModes, ['readwrite']);
++      expect(FilePermissionMode.readWrite.descriptor, 'readwrite');
++    });
+   });
+ }

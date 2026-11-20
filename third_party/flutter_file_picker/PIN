@@ -1,0 +1,8 @@
+# file_picker_web 4.2.1 (file_picker 13.4.0), the latest stable release:
+# tag file_picker-v13.4.0. The web package is unchanged since its own tag
+# (file_picker_web-v4.2.1, 20a4efca), so this commit carries both.
+# `package` is the web implementation the series patches.
+repo=https://github.com/vicajilau/flutter_file_picker
+commit=7b8aec331c177bf6050c72b2ff48518b1e024f39
+tag=file_picker-v13.4.0
+package=packages/file_picker_web

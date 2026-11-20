@@ -1,0 +1,1460 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: 1vivy <1vivy@tutanota.com>
+Date: Mon, 9 Nov 2026 18:50:30 -0600
+Subject: feat(web): pick through the file system access dialog and remember
+ handles
+
+`pickFile()`/`pickFiles()` only ever went through `<input type="file">`, so a
+picked file had no handle: it could not be remembered across a page reload, and
+its content could only be read through a `blob:` URL. The save dialog has
+already been behind `FilePickerWebOptions.saveMode` since 4.2.0, so the open
+dialog was the missing half of the same feature (#770).
+
+Add `FilePickerWebOptions.dialog`, `pickerId` and `types`:
+
+- `input` (default) keeps today's behaviour, so no existing app changes.
+- `auto` uses `showOpenFilePicker()` where the browser has it and the pick can
+  be filtered with `types`, and the input everywhere else, including where
+  `type`/`allowedExtensions` filter the pick, since the dialog has no wildcard
+  support and would otherwise accept every file.
+- `fileSystemAccess` always uses the dialog, throwing `UnsupportedError` or
+  `ArgumentError` when it cannot.
+
+`WebPlatformFile` keeps the browser `File`, so ranged reads go through
+`file.slice()`, and the `FileSystemFileHandle`. `persist()` stores the handle in
+IndexedDB and returns a token, `restore()`/`forget()` read and drop it, and
+`hasAccess()`/`requestAccess()` report and renew the read permission the
+browser drops between sessions. A file restored without access still carries its
+name and handle, so an app can offer to renew instead of picking again.
+
+The token store is adapted from dir_picker's web_tokens.dart (MIT), with its
+notice kept in the file header. All of the interop is `dart:js_interop` and
+`package:web`, so it compiles for Wasm as well.
+
+Rebased from bf434d23 onto 7b8aec33 (file_picker 13.4.0; file_picker_web is
+unchanged since 4.2.1). The first version conflicted in
+lib/src/file_picker_web.dart with the picker-session lifecycle added since
+(`_activeSession`, stale-session cancellation, #2324). The resolution keeps
+that supersede/cancel logic untouched and takes the file system access branch
+before any `<input>` session is created: a dialog pick returns before the
+input session exists.
+
+Checked together with the next commit, which builds on this API; see there.
+
+diff --git a/packages/file_picker/README.md b/packages/file_picker/README.md
+index 54cdbcb6a0c088a5dbc4093d2569915fe40a133f..b60dadf02bcecee39a768ad4882ef276bff18a91 100644
+--- a/packages/file_picker/README.md
++++ b/packages/file_picker/README.md
+@@ -249,6 +249,47 @@ imported when compiling for the web. In an app that also targets other
+ platforms, build the options in a web only file chosen with a conditional
+ import (`if (dart.library.js_interop)`).
+ 
++#### File system access dialog on the web
++
++`pickFile()` and `pickFiles()` use `<input type="file">` by default. Where the
++browser has `showOpenFilePicker()`, they can go through its file system access
++dialog instead, which hands back a handle the app can keep:
++
++```dart
++final file = await FilePicker.pickFile(
++  webOptions: FilePickerWebOptions(
++    dialog: WebFileDialog.fileSystemAccess,
++    pickerId: 'ota',
++    types: [
++      WebFileTypeFilter(
++        description: 'OTA package',
++        accept: {
++          'application/zip': ['.zip'],
++        },
++      ),
++    ],
++  ),
++) as WebPlatformFile?;
++
++final token = await file?.persist();
++final again = await (await WebPlatformFile.restore(token!))?.getFile();
++```
++
++`WebFileDialog.auto` uses the dialog where the browser has it and keeps the
++input elsewhere, including where `type` or `allowedExtensions` filter the pick,
++since the dialog only understands `types`. `FilePickerWebOptions.dialog`
++defaults to `WebFileDialog.input`, which is picking as it was before the option
++existed, so the dialog is only used when it is asked for. Cancelling returns
++`null` like the input does. `supportsShowOpenFilePicker` says whether the API is
++available, and `WebFileDialog.fileSystemAccess` throws an `UnsupportedError`
++without it.
++
++A remembered file keeps its read permission only while another tab of the site
++has it, or when the user allowed it on every visit, so check
++`WebPlatformFile.hasAccess()` and renew it from a click with `requestAccess()`
++before reading. `WebPlatformFile.forget(token)` drops it. Files picked through
++the input have no handle, so `persist()` returns `null` for them.
++
+ #### Recover a pick on Android
+ 
+ When the operating system is low on memory, Android can destroy the app while
+diff --git a/packages/file_picker_web/CHANGELOG.md b/packages/file_picker_web/CHANGELOG.md
+index 21fd365a838878ba2d8f6e92ea70be9f0c0b26e9..6a5a01ba20763431f9ced76f80f307dcdea0531f 100644
+--- a/packages/file_picker_web/CHANGELOG.md
++++ b/packages/file_picker_web/CHANGELOG.md
+@@ -1,3 +1,8 @@
++## 4.3.0
++
++- Added `FilePickerWebOptions.dialog`, `pickerId` and `types`. `WebFileDialog.fileSystemAccess` picks through the browser's file system access dialog, and `supportsShowOpenFilePicker` tells whether the browser supports it. The picked file keeps the browser's `File`, which ranged reads go through, and the handle it came from. [#770](https://github.com/vicajilau/flutter_file_picker/issues/770)
++- Added `WebPlatformFile.persist()`, `restore()`, `forget()`, `hasAccess()` and `requestAccess()`, which remember a picked file across page reloads in IndexedDB and renew the browser's read permission for it.
++
+ ## 4.2.1
+ 
+ - Fixed a pick started while another one was open leaving the first one waiting forever. The first one now completes with an empty list. [#2324](https://github.com/vicajilau/flutter_file_picker/pull/2324)
+diff --git a/packages/file_picker_web/README.md b/packages/file_picker_web/README.md
+index 888f9541988749331a0e4c63346d94b13fbeb006..20e4f97e8630b94e90205f0565819d04a1aca4e2 100644
+--- a/packages/file_picker_web/README.md
++++ b/packages/file_picker_web/README.md
+@@ -7,3 +7,71 @@ The Web implementation of [`file_picker`](https://pub.dev/packages/file_picker).
+ ## Usage
+ 
+ This package is endorsed, which means you can simply use `file_picker` as normal, and the Web implementation will be automatically included.
++
++## File system access dialog
++
++Picking uses `<input type="file">` by default. Where the browser has
++`showOpenFilePicker()` — Chromium based ones, in a secure context, outside a
++cross-origin iframe — `pickFile()` can use the file system access dialog
++instead, which returns a handle next to the browser `File`:
++
++```dart
++final picked = await FilePicker.pickFile(
++  webOptions: const FilePickerWebOptions(
++    dialog: WebFileDialog.fileSystemAccess,
++    pickerId: 'ota',
++    types: [
++      WebFileTypeFilter(
++        description: 'OTA package',
++        accept: {
++          'application/zip': ['.zip'],
++        },
++      ),
++    ],
++  ),
++) as WebPlatformFile?;
++
++// Ranged reads, without loading the whole file.
++final header = await picked!.file!.slice(0, 4).arrayBuffer().toDart;
++final magic = header.toDart.asUint8List();
++```
++
++`WebFileDialog.auto` does the same where the browser has the API and the pick
++can be filtered with `types`, and keeps `<input type="file">` everywhere else,
++including where `type` or `allowedExtensions` filter the pick (the dialog only
++understands `types`). `FilePickerWebOptions.dialog` defaults to
++`WebFileDialog.input`, which is picking as it was before this option existed:
++the dialog is only used when it is asked for. Cancelling the dialog returns
++`null`, like the input does. `WebFileDialog.fileSystemAccess` throws an
++`UnsupportedError` where the browser has no dialog, so check
++`supportsShowOpenFilePicker` first if the input is an acceptable fallback.
++
++## Remembering a picked file
++
++A handle can be stored in the browser's IndexedDB and loaded back after a page
++reload, without asking for the file again:
++
++```dart
++final token = await picked.persist();          // null for an input pick
++
++final restored = await WebPlatformFile.restore(token!);
++if (restored != null) {
++  // Read access is kept only while another tab of the site has it, or when the
++  // user chose to allow it on every visit. Renewing it needs a user gesture.
++  if (!await restored.hasAccess()) await restored.requestAccess();
++  final file = await restored.getFile();
++}
++
++await WebPlatformFile.forget(token);
++```
++
++`restore()` returns `null` for a token it does not know, and a file whose
++content may no longer be read still comes back with its `name` and `handle`, so
++an app can offer to renew the access instead of asking for the file again.
++Persisting the same file twice returns the same token. Files picked through
++`<input type="file">` have no handle, so `persist()` returns `null` for them.
++
++Tokens live in the origin's own storage. A browser that clears site data, or a
++different browser profile, loses them: `restore()` then returns `null`, and the
++app has to ask for the file again.
++
+diff --git a/packages/file_picker_web/lib/file_picker_web.dart b/packages/file_picker_web/lib/file_picker_web.dart
+index 76cf087758f79d2feef5438a50cdeefbb3805c07..367cd44cff8518fa242cdd5ab9f2c642b6527fe7 100644
+--- a/packages/file_picker_web/lib/file_picker_web.dart
++++ b/packages/file_picker_web/lib/file_picker_web.dart
+@@ -4,4 +4,5 @@ library;
+ export 'src/file_picker_web.dart';
+ export 'src/file_picker_web_options.dart';
+ export 'src/save_file_dialog.dart' show supportsShowSaveFileDialog;
++export 'src/web_file_system_access.dart' show supportsShowOpenFilePicker;
+ export 'src/web_platform_file.dart';
+diff --git a/packages/file_picker_web/lib/src/file_picker_web.dart b/packages/file_picker_web/lib/src/file_picker_web.dart
+index 4e25623a67ab1e5e5980c5e3865297d93b0c6a0e..b2e189da56a1386fb13989486d77abd508d91e24 100644
+--- a/packages/file_picker_web/lib/src/file_picker_web.dart
++++ b/packages/file_picker_web/lib/src/file_picker_web.dart
+@@ -13,6 +13,7 @@ import 'platform_file_web_fetch.dart';
+ import 'preload_policy.dart';
+ import 'save_file_dialog.dart';
+ import 'web_file_input_session.dart';
++import 'web_file_system_access.dart';
+ import 'web_platform_file.dart';
+ 
+ /// An implementation of [FilePickerPlatform] for the Web platform.
+@@ -20,6 +21,11 @@ import 'web_platform_file.dart';
+ /// Uses standard HTML5 `<input type="file">` element interop via `package:web`
+ /// to provide single and multiple file picking, as well as file saving capabilities
+ /// in browser environments.
++///
++/// Where the browser has `showOpenFilePicker()`, picking can go through its
++/// file system access dialog instead, see [FilePickerWebOptions.dialog]. The
++/// picked files then keep a handle, which [WebPlatformFile.persist] can store
++/// to remember them across page loads.
+ class FilePickerWeb extends FilePickerPlatform {
+   static const String _kFilePickerInputsDomId = '__file_picker_web-file-input';
+ 
+@@ -130,6 +136,16 @@ class FilePickerWeb extends FilePickerPlatform {
+         ? webOptions
+         : const FilePickerWebOptions();
+ 
++    if (_usesFileSystemAccess(effectiveWebOptions, type)) {
++      final List<PlatformFile>? picked = await _pickWithFileSystemAccess(
++        webOptions: effectiveWebOptions,
++        type: type,
++        onFileLoading: onFileLoading,
++        allowMultiple: allowMultiple,
++      );
++      if (picked != null) return picked;
++    }
++
+     final previous = _activeSession;
+     final session = WebFileInputSession(
+       target: _target,
+@@ -151,6 +167,106 @@ class FilePickerWeb extends FilePickerPlatform {
+     }
+   }
+ 
++  /// Whether this pick opens the browser's file system access dialog.
++  ///
++  /// It is synchronous on purpose: [_pickFiles] decides before its first
++  /// `await`, so a pick that stays on `<input type="file">` still attaches the
++  /// input element in the caller's own task, where the click that opened the
++  /// picker is still recent.
++  static bool _usesFileSystemAccess(
++    FilePickerWebOptions webOptions,
++    FileType type,
++  ) {
++    return switch (webOptions.dialog) {
++      // Asking for the dialog keeps asking, so the pick reports why it cannot
++      // be shown rather than silently picking through the input.
++      WebFileDialog.fileSystemAccess => true,
++      WebFileDialog.input => false,
++      // The dialog can only be filtered with `types`, while every other [type]
++      // has an `accept` the input understands and the dialog has no equivalent
++      // for, so such a pick keeps the input instead of accepting every file.
++      WebFileDialog.auto =>
++        supportsShowOpenFilePicker &&
++            (webOptions.types.isNotEmpty || type == FileType.any),
++    };
++  }
++
++  /// Picks through the browser's file system access dialog, or returns `null`
++  /// when the browser refused to open it and this pick has to go through
++  /// `<input type="file">` instead.
++  ///
++  /// Returns an empty list when the user cancels the dialog.
++  Future<List<PlatformFile>?> _pickWithFileSystemAccess({
++    required FilePickerWebOptions webOptions,
++    required FileType type,
++    required Function(FilePickerStatus)? onFileLoading,
++    required bool allowMultiple,
++  }) async {
++    final dialog = webOptions.dialog;
++    if (!supportsShowOpenFilePicker) {
++      throw UnsupportedError(
++        'This browser does not support the showOpenFilePicker API.',
++      );
++    }
++    if (webOptions.types.isEmpty && type != FileType.any) {
++      throw ArgumentError(
++        'FilePickerWebOptions.types is required to filter the file system '
++        'access dialog. Use WebFileDialog.input to filter with type or '
++        'allowedExtensions instead.',
++      );
++    }
++
++    final List<FileSystemFileHandle>? handles;
++    try {
++      onFileLoading?.call(FilePickerStatus.picking);
++      handles = await showFileSystemAccessPicker(
++        types: webOptions.types,
++        pickerId: webOptions.pickerId,
++        multiple: allowMultiple,
++      );
++    } catch (_) {
++      // The browser refused to open it, typically because there was no recent
++      // user gesture, and the input falls back to its own handling of that.
++      if (dialog == WebFileDialog.fileSystemAccess) rethrow;
++      return null;
++    }
++
++    if (handles == null) return <PlatformFile>[];
++
++    try {
++      return await _processHandles(handles, webOptions);
++    } finally {
++      onFileLoading?.call(FilePickerStatus.done);
++    }
++  }
++
++  /// Converts the picked [handles] to [PlatformFile]s, keeping each handle on
++  /// the file it belongs to.
++  ///
++  /// Reads files one at a time when [FilePickerWebOptions.readSequential] is
++  /// `true`, or concurrently otherwise; either way the result preserves the
++  /// original selection order.
++  Future<List<PlatformFile>> _processHandles(
++    List<FileSystemFileHandle> handles,
++    FilePickerWebOptions webOptions,
++  ) async {
++    Future<PlatformFile?> processHandleAt(int index) async {
++      final handle = handles[index];
++      return _processFile(
++        await handle.getFile().toDart,
++        handle: handle,
++        webOptions: webOptions,
++      );
++    }
++
++    final results = await runIndexedTasks(
++      handles.length,
++      processHandleAt,
++      sequential: webOptions.readSequential,
++    );
++    return results.whereType<PlatformFile>().toList();
++  }
++
+   /// Processes the selected [FileList] according to [webOptions] and returns
+   /// a list of [PlatformFile] instances.
+   ///
+@@ -164,20 +280,7 @@ class FilePickerWeb extends FilePickerPlatform {
+     Future<PlatformFile?> processFileAt(int index) async {
+       final file = files.item(index);
+       if (file == null) return null;
+-
+-      if (webOptions.withReadStream) {
+-        return _createWebPlatformFile(
+-          file: file,
+-          readStream: streamBlobInChunks(file),
+-        );
+-      }
+-
+-      if (!shouldPreloadBytes(file.size, withData: webOptions.withData)) {
+-        return _createWebPlatformFile(file: file);
+-      }
+-
+-      final bytes = await _readSingleFileBytes(file);
+-      return _createWebPlatformFile(file: file, bytes: bytes);
++      return _processFile(file, webOptions: webOptions);
+     }
+ 
+     final results = await runIndexedTasks(
+@@ -188,6 +291,29 @@ class FilePickerWeb extends FilePickerPlatform {
+     return results.whereType<PlatformFile>().toList();
+   }
+ 
++  /// Converts one picked browser [file] to a [PlatformFile] according to
++  /// [webOptions], keeping the [handle] it was picked through, if any.
++  Future<PlatformFile> _processFile(
++    File file, {
++    FileSystemFileHandle? handle,
++    required FilePickerWebOptions webOptions,
++  }) async {
++    if (webOptions.withReadStream) {
++      return _createWebPlatformFile(
++        file: file,
++        handle: handle,
++        readStream: streamBlobInChunks(file),
++      );
++    }
++
++    if (!shouldPreloadBytes(file.size, withData: webOptions.withData)) {
++      return _createWebPlatformFile(file: file, handle: handle);
++    }
++
++    final bytes = await _readSingleFileBytes(file);
++    return _createWebPlatformFile(file: file, handle: handle, bytes: bytes);
++  }
++
+   /// Reads an HTML [File] content into a [Uint8List] using [FileReader].
+   Future<Uint8List?> _readSingleFileBytes(File file) async {
+     final completer = Completer<Uint8List?>();
+@@ -221,12 +347,15 @@ class FilePickerWeb extends FilePickerPlatform {
+   /// The URI always points at the picked [file] itself, which avoids creating a copy.
+   WebPlatformFile _createWebPlatformFile({
+     required File file,
++    FileSystemFileHandle? handle,
+     Uint8List? bytes,
+     Stream<Uint8List>? readStream,
+   }) {
+     return WebPlatformFile(
+       name: file.name,
+       uri: Uri.parse(URL.createObjectURL(file)),
++      file: file,
++      handle: handle,
+       bytesLength: bytes != null ? bytes.length : file.size,
+       bytes: bytes,
+       readStream: readStream,
+diff --git a/packages/file_picker_web/lib/src/file_picker_web_options.dart b/packages/file_picker_web/lib/src/file_picker_web_options.dart
+index 6ab692ac0c816925eb49b914656126028ad36bc1..ffff39208dfe61a2aba85a33e02d519f5608e2b4 100644
+--- a/packages/file_picker_web/lib/src/file_picker_web_options.dart
++++ b/packages/file_picker_web/lib/src/file_picker_web_options.dart
+@@ -1,8 +1,55 @@
+ /// @docImport 'file_picker_web.dart';
++/// @docImport 'web_platform_file.dart';
+ library;
+ 
+ import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
+ 
++/// How [FilePickerWeb.pickFile] and [FilePickerWeb.pickFiles] open the
++/// browser's open dialog on the web.
++enum WebFileDialog {
++  /// Uses `<input type="file">`, which is what picking did before
++  /// [FilePickerWebOptions.dialog] existed: the file system access dialog is
++  /// only used when it is asked for.
++  ///
++  /// Picked files have no [WebPlatformFile.handle], so they can't be
++  /// persisted, and only exist for as long as the page does.
++  input,
++
++  /// Uses the file system access dialog where the browser has one and the pick
++  /// can be filtered with [FilePickerWebOptions.types], and `<input
++  /// type="file">` everywhere else.
++  ///
++  /// The picked file then carries a handle, which [WebPlatformFile.persist]
++  /// can store, and both [WebPlatformFile.hasAccess] and
++  /// [WebPlatformFile.requestAccess] work on its content. It falls back to the
++  /// input when the browser refuses to open the dialog, typically because
++  /// there was no recent user gesture.
++  auto,
++
++  /// Always uses the file system access dialog, and throws an
++  /// [UnsupportedError] where the browser has none, or an [ArgumentError] when
++  /// the pick has no [FilePickerWebOptions.types] to filter it with.
++  fileSystemAccess,
++}
++
++/// A file type the file system access dialog accepts, as a
++/// [FilePickerWebOptions.types] entry.
++final class WebFileTypeFilter {
++  /// Creates a filter for the given [accept] map and optional [description].
++  const WebFileTypeFilter({required this.accept, this.description = ''});
++
++  /// The MIME types this filter accepts, mapped to the file extensions each
++  /// one covers, such as `{'application/zip': ['.zip']}`.
++  ///
++  /// The dialog checks every listed extension against its MIME type, so a
++  /// mismatched pair leaves the filter empty. Extensions include the leading
++  /// dot, unlike `allowedExtensions`.
++  final Map<String, List<String>> accept;
++
++  /// The label the dialog shows for this filter.
++  final String description;
++}
++
+ /// How [FilePickerWeb.saveFile] saves the file on the web.
+ enum WebSaveFileMode {
+   /// Downloads the file, which most browsers drop into the Downloads folder
+@@ -51,6 +98,26 @@ final class FilePickerWebOptions extends WebOptions {
+   /// [WebSaveFileMode.download].
+   final WebSaveFileMode saveMode;
+ 
++  /// How [FilePickerWeb.pickFile] and [FilePickerWeb.pickFiles] open the
++  /// browser's open dialog. Defaults to [WebFileDialog.input], the behaviour
++  /// before this option existed.
++  final WebFileDialog dialog;
++
++  /// The `id` the browser keys the remembered folder of the file system access
++  /// dialog on. Two picks with the same id reopen where the last one left off.
++  ///
++  /// Ignored by [WebFileDialog.input].
++  final String? pickerId;
++
++  /// The file types the file system access dialog accepts.
++  ///
++  /// It is the only way to filter that dialog: `type` and `allowedExtensions`
++  /// only apply to the `<input type="file">` fallback, so [WebFileDialog.auto]
++  /// keeps using the input for a pick they filter and this leaves empty.
++  ///
++  /// Ignored by [WebFileDialog.input].
++  final List<WebFileTypeFilter> types;
++
+   /// Creates an instance of [FilePickerWebOptions].
+   const FilePickerWebOptions({
+     @Deprecated(
+@@ -70,5 +137,8 @@ final class FilePickerWebOptions extends WebOptions {
+     this.readSequential = false,
+     this.cancelUploadOnWindowBlur = true,
+     this.saveMode = WebSaveFileMode.download,
++    this.dialog = WebFileDialog.input,
++    this.pickerId,
++    this.types = const <WebFileTypeFilter>[],
+   });
+ }
+diff --git a/packages/file_picker_web/lib/src/web_file_system_access.dart b/packages/file_picker_web/lib/src/web_file_system_access.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..86039d0761dcc9c00ed1fbea3b1d2f02670ffd96
+--- /dev/null
++++ b/packages/file_picker_web/lib/src/web_file_system_access.dart
+@@ -0,0 +1,124 @@
++/// @docImport 'file_picker_web.dart';
++/// @docImport 'web_platform_file.dart';
++library;
++
++import 'dart:js_interop';
++import 'dart:js_interop_unsafe';
++
++import 'package:web/web.dart';
++
++import 'file_picker_web_options.dart';
++
++// `showOpenFilePicker()`, and the `queryPermission()`/`requestPermission()`
++// methods of the handles it returns, are not part of package:web, since they
++// are experimental APIs.
++//
++// See https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker#browser_compatibility
++@JS('showOpenFilePicker')
++external JSFunction? get _showOpenFilePickerFunction;
++
++/// Whether the browser supports the `showOpenFilePicker` API.
++///
++/// Only Chromium based browsers do, and only in a secure context and outside a
++/// cross-origin iframe. This is the same check [FilePickerWeb.pickFile] and
++/// [FilePickerWeb.pickFiles] make for `WebFileDialog.auto`; use it to decide
++/// whether to offer [WebFileDialog.fileSystemAccess], which throws an
++/// [UnsupportedError] where the API is missing.
++bool get supportsShowOpenFilePicker => _showOpenFilePickerFunction != null;
++
++@JS('showOpenFilePicker')
++external JSPromise<JSArray<FileSystemFileHandle>> _showOpenFilePicker(
++  JSObject options,
++);
++
++/// Opens the browser's open dialog and returns the picked handles, or `null`
++/// when the user cancels it.
++///
++/// [types] filters the dialog, [pickerId] is the `id` the browser keys its
++/// remembered folder on, and [multiple] allows picking more than one file.
++///
++/// Browsers restrict this to a user gesture, so it must be called from an
++/// event handler with nothing awaited before it, or Chrome throws a
++/// `SecurityError`. That, and every other failure, is thrown as the browser
++/// reports it.
++Future<List<FileSystemFileHandle>?> showFileSystemAccessPicker({
++  List<WebFileTypeFilter> types = const <WebFileTypeFilter>[],
++  String? pickerId,
++  bool multiple = false,
++}) async {
++  if (!supportsShowOpenFilePicker) {
++    throw UnsupportedError(
++      'This browser does not support the showOpenFilePicker API.',
++    );
++  }
++
++  final options = JSObject()..['multiple'] = multiple.toJS;
++  if (pickerId != null) options['id'] = pickerId.toJS;
++  if (types.isNotEmpty) {
++    options['types'] = [for (final type in types) _acceptType(type)].toJS;
++  }
++
++  try {
++    final handles = await _showOpenFilePicker(options).toDart;
++    return handles.toDart;
++  } catch (e) {
++    if (e case DOMException(name: 'AbortError')) return null;
++    rethrow;
++  }
++}
++
++/// The `types` entry of the dialog options, built from [type].
++///
++/// `description` is left out when empty, so the browser labels the type itself
++/// instead of showing an empty line.
++JSObject _acceptType(WebFileTypeFilter type) {
++  final entry = JSObject()..['accept'] = type.accept.jsify()!;
++  if (type.description.isNotEmpty) {
++    entry['description'] = type.description.toJS;
++  }
++  return entry;
++}
++
++/// The descriptor both permission methods take.
++JSObject get _readMode => JSObject()..['mode'] = 'read'.toJS;
++
++/// Whether the page can read [handle] now, without asking the user.
++///
++/// A handle from `showOpenFilePicker()` or `showSaveFilePicker()` has it. One
++/// loaded back from a token keeps it only while another tab of the site still
++/// has it, or when the user chose to allow it on every visit. Otherwise call
++/// [requestReadPermission] from a button.
++///
++/// Browsers without `queryPermission()`, such as Firefox and Safari, return
++/// `true`: they have no `showOpenFilePicker()` either, so a handle they give
++/// out can only come from the origin private file system, which is the site's
++/// own storage and needs no permission. `false` there would make an app show
++/// an "allow access" button that can never succeed.
++///
++/// It is about permission only: a file that was deleted still returns `true`,
++/// and reading it throws a `NotFoundError`.
++Future<bool> hasReadPermission(FileSystemFileHandle handle) async {
++  if (!handle.has('queryPermission')) return true;
++  final state = await handle
++      .callMethod<JSPromise<JSString>>('queryPermission'.toJS, _readMode)
++      .toDart;
++  return state.toDart == 'granted';
++}
++
++/// Asks the user for read access to [handle] if the page doesn't have it yet,
++/// and returns whether it has it now.
++///
++/// The browser only shows the prompt for a user gesture, so call it from a
++/// click handler with nothing awaited before it. Returns `false` when the user
++/// denies access, and throws the browser's own error when the prompt could not
++/// be shown at all.
++///
++/// Browsers without `requestPermission()` return `true` without a prompt, for
++/// the same reason as [hasReadPermission].
++Future<bool> requestReadPermission(FileSystemFileHandle handle) async {
++  if (!handle.has('requestPermission')) return true;
++  final state = await handle
++      .callMethod<JSPromise<JSString>>('requestPermission'.toJS, _readMode)
++      .toDart;
++  return state.toDart == 'granted';
++}
+diff --git a/packages/file_picker_web/lib/src/web_handle_store.dart b/packages/file_picker_web/lib/src/web_handle_store.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..e42dfa89dccb61184a300fae5ec463db6467ad5d
+--- /dev/null
++++ b/packages/file_picker_web/lib/src/web_handle_store.dart
+@@ -0,0 +1,142 @@
++import 'dart:async';
++import 'dart:js_interop';
++import 'dart:math';
++
++import 'package:web/web.dart';
++
++// A FileSystemFileHandle can't be turned into a string, but it can be stored
++// in IndexedDB, so the plugin keeps the handles in its own object store and
++// the token is the record key.
++//
++// Adapted from dir_picker's web_tokens.dart, which uses the same design for
++// directory handles:
++// https://github.com/iamv4g/dir_picker.flutter/blob/main/lib/src/platforms/web/web_tokens.dart
++//
++// MIT License, Copyright (c) 2024 iamv4g:
++//
++// Permission is hereby granted, free of charge, to any person obtaining a copy
++// of this software and associated documentation files (the "Software"), to
++// deal in the Software without restriction, including without limitation the
++// rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
++// sell copies of the Software, and to permit persons to whom the Software is
++// furnished to do so, subject to the following conditions: the above
++// copyright notice and this permission notice shall be included in all copies
++// or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS",
++// WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
++// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
++// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
++// CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++
++/// The database and object store holding the handles a token refers to.
++///
++/// Private to the origin, like the rest of IndexedDB, and not tied to the
++/// `id` a picker was opened with.
++const String _databaseName = 'file_picker';
++const String _storeName = 'files';
++
++/// Stores [handle] and returns its token.
++///
++/// A handle for the same file as one already stored gets that record's token,
++/// so a file the user picks again does not pile up records.
++Future<String> storeHandle(FileSystemFileHandle handle) async {
++  final (keys, handles) = await _transact('readonly', (store) async {
++    final keys = store.getAllKeys();
++    final handles = store.getAll();
++    return (await _result(keys), await _result(handles));
++  });
++  final keyList = (keys as JSArray<JSString>).toDart;
++  final handleList = (handles as JSArray<FileSystemHandle>).toDart;
++  for (var i = 0; i < keyList.length; i++) {
++    final stored = await handleList[i].isSameEntry(handle).toDart;
++    if (stored.toDart) return keyList[i].toDart;
++  }
++
++  final token = _newToken();
++  await _transact(
++    'readwrite',
++    (store) => _result(store.put(handle, token.toJS)),
++  );
++  return token;
++}
++
++/// The handle stored under [token], or `null` when there is none.
++Future<FileSystemFileHandle?> loadHandle(String token) async {
++  final value = await _transact(
++    'readonly',
++    (store) => _result(store.get(token.toJS)),
++  );
++  return value != null && value.isA<FileSystemFileHandle>()
++      ? value as FileSystemFileHandle
++      : null;
++}
++
++/// Deletes the record stored under [token], if any.
++Future<void> deleteHandle(String token) =>
++    _transact('readwrite', (store) => _result(store.delete(token.toJS)));
++
++/// 128 random bits as hex, so a token can't be guessed or collide.
++String _newToken() {
++  final random = Random.secure();
++  return [
++    for (var i = 0; i < 16; i++)
++      random.nextInt(256).toRadixString(16).padLeft(2, '0'),
++  ].join();
++}
++
++/// Runs [body] in a transaction on the store and returns its result once the
++/// transaction has committed.
++Future<T> _transact<T>(
++  String mode,
++  Future<T> Function(IDBObjectStore store) body,
++) async {
++  final database = await _open();
++  try {
++    final transaction = database.transaction(_storeName.toJS, mode);
++    final done = Completer<void>();
++    // A failed request fires both error and abort on the transaction.
++    void fail(Event _) {
++      if (!done.isCompleted) done.completeError(_error(transaction.error));
++    }
++
++    transaction
++      ..oncomplete = ((Event _) => done.complete()).toJS
++      ..onerror = fail.toJS
++      ..onabort = fail.toJS;
++    final T result;
++    try {
++      result = await body(transaction.objectStore(_storeName));
++    } catch (_) {
++      // The failed request aborts the transaction, which fails [done] too.
++      done.future.ignore();
++      rethrow;
++    }
++    await done.future;
++    return result;
++  } finally {
++    database.close();
++  }
++}
++
++Future<IDBDatabase> _open() async {
++  final request = window.indexedDB.open(_databaseName, 1);
++  request.onupgradeneeded = ((Event _) {
++    (request.result as IDBDatabase).createObjectStore(_storeName);
++  }).toJS;
++  return await _result(request) as IDBDatabase;
++}
++
++/// The result of [request], or its error.
++Future<JSAny?> _result(IDBRequest request) {
++  final completer = Completer<JSAny?>();
++  request
++    ..onsuccess = ((Event _) => completer.complete(request.result)).toJS
++    ..onerror = ((Event _) => completer.completeError(
++      _error(request.error),
++    )).toJS;
++  return completer.future;
++}
++
++Object _error(DOMException? error) =>
++    error ?? Exception('IndexedDB request failed without an error');
+diff --git a/packages/file_picker_web/lib/src/web_platform_file.dart b/packages/file_picker_web/lib/src/web_platform_file.dart
+index 7432823bed5fb22441888c2fd9a1ad06ce951e61..f5c30c620d4fbf7b74b24c937dbc34a2782ba8df 100644
+--- a/packages/file_picker_web/lib/src/web_platform_file.dart
++++ b/packages/file_picker_web/lib/src/web_platform_file.dart
+@@ -1,10 +1,14 @@
+ import 'dart:async';
++import 'dart:js_interop';
+ import 'dart:typed_data';
+ 
+ import 'package:cross_file/cross_file.dart';
+ import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
++import 'package:web/web.dart';
+ 
+ import 'platform_file_web_fetch.dart';
++import 'web_file_system_access.dart';
++import 'web_handle_store.dart';
+ 
+ /// A Web-specific implementation of [PlatformFile].
+ ///
+@@ -14,16 +18,23 @@ import 'platform_file_web_fetch.dart';
+ base class WebPlatformFile extends PlatformFile {
+   /// Creates a new [WebPlatformFile] instance.
+   ///
+-  /// Requires a file [name] and [uri]. Optional parameters include preloaded
+-  /// [bytes], a custom [readStream], file size in [bytesLength], or an underlying [xFile].
++  /// Requires a file [name]. Optional parameters include the browser [file]
++  /// behind it, the [handle] it was picked through, a [uri], preloaded
++  /// [bytes], a custom [readStream], file size in [bytesLength], or an
++  /// underlying [xFile].
+   WebPlatformFile({
+     required this.name,
+-    required this.uri,
++    Uri? uri,
+     XFile? xFile,
+     int? bytesLength,
+     Uint8List? bytes,
+     Stream<Uint8List>? readStream,
+-  }) : _xFile = xFile,
++    File? file,
++    FileSystemFileHandle? handle,
++  }) : _uri = uri,
++       _file = file,
++       _handle = handle,
++       _xFile = xFile,
+        _bytesLength = bytesLength,
+        _bytes = bytes,
+        _readStream = readStream {
+@@ -37,17 +48,137 @@ base class WebPlatformFile extends PlatformFile {
+   final String name;
+ 
+   /// The web URI representing this file (typically a `blob:` or `data:` URL).
++  ///
++  /// It is created from [file] on first use, so it is empty for a file
++  /// restored from a token that the page has not been granted access to yet;
++  /// call [requestAccess] and [getFile] first.
+   @override
+-  final Uri uri;
++  Uri get uri {
++    final cached = _uri;
++    if (cached != null) return cached;
++
++    final file = _file;
++    if (file == null) return Uri();
++    return _uri = Uri.parse(URL.createObjectURL(file));
++  }
+ 
+   @override
+   String? get path => null;
+ 
++  /// The browser's [File] behind this pick, the object `slice()` reads ranges
++  /// from without loading the whole file.
++  ///
++  /// It is set for every file picked through the file system access dialog,
++  /// and for a file restored from a token once the page has access to it.
++  /// It is `null` before [getFile] for a restored file whose access still has
++  /// to be granted with [requestAccess].
++  File? get file => _file;
++
++  /// The file system access handle this file was picked or restored through,
++  /// or `null` when it came from `<input type="file">`.
++  ///
++  /// Only a handle can be persisted, see [persist].
++  FileSystemFileHandle? get handle => _handle;
++
++  Uri? _uri;
++  File? _file;
++  final FileSystemFileHandle? _handle;
+   final XFile? _xFile;
+-  final int? _bytesLength;
++  int? _bytesLength;
+   final Uint8List? _bytes;
+   final Stream<Uint8List>? _readStream;
+ 
++  /// Whether the page can read this file now, without asking the user.
++  ///
++  /// A file from `<input type="file">` is always readable, since the browser
++  /// already handed its content over. A persisted file keeps its read access
++  /// only while another tab of the site has it, or when the user chose to allow
++  /// it on every visit, so pass a restored one through this before reading it.
++  Future<bool> hasAccess() async {
++    final handle = _handle;
++    if (handle == null) return true;
++    return hasReadPermission(handle);
++  }
++
++  /// Asks the user for read access to this file if the page doesn't have it
++  /// yet, and returns whether it has it now.
++  ///
++  /// The browser only shows the prompt for a user gesture, so call it from a
++  /// click handler with nothing awaited before it. Returns `false` when the
++  /// user denies access.
++  Future<bool> requestAccess() async {
++    final handle = _handle;
++    if (handle == null) return true;
++    return requestReadPermission(handle);
++  }
++
++  /// Reads this file through its [handle] and returns the browser's [File].
++  ///
++  /// Returns the file already held when there is one, and otherwise the current
++  /// content on disk, which needs read access. Throws the browser's error when
++  /// the page has none, or when the file was deleted or moved.
++  Future<File> getFile() async {
++    final file = _file;
++    if (file != null) return file;
++
++    final handle = _handle;
++    if (handle == null) {
++      throw StateError('This file was not picked through a handle.');
++    }
++
++    final read = await handle.getFile().toDart;
++    _file = read;
++    _bytesLength = read.size;
++    return read;
++  }
++
++  /// Stores this file's [handle] and returns a token for [restore].
++  ///
++  /// Returns `null` for a file picked through `<input type="file">`, which
++  /// cannot be remembered. Picking the same file again returns the same token.
++  Future<String?> persist() async {
++    final handle = _handle;
++    if (handle == null) return null;
++    return persistHandle(handle);
++  }
++
++  /// Stores [handle] and returns a token for [restore].
++  ///
++  /// For a handle that did not come from a pick, such as one the page received
++  /// from a drag and drop or from the installed app's file handler. A file that
++  /// is already stored keeps its token instead of adding a record.
++  static Future<String> persistHandle(FileSystemFileHandle handle) =>
++      storeHandle(handle);
++
++  /// The file stored under [token], or `null` when there is none.
++  ///
++  /// A file the page may no longer read still comes back, with its [name] and
++  /// [handle] but no [file], so an app can offer to renew the access with
++  /// [requestAccess] from a click instead of asking for the file again.
++  static Future<WebPlatformFile?> restore(String token) async {
++    final handle = await loadHandle(token);
++    if (handle == null) return null;
++
++    final file = WebPlatformFile(name: handle.name, handle: handle);
++    if (!await file.hasAccess()) return file;
++
++    // Read it now, so a restored file is as usable as a picked one. A record
++    // whose file was deleted or moved since it was stored is reported as gone,
++    // and left for the app to forget.
++    try {
++      await file.getFile();
++    } catch (_) {
++      return null;
++    }
++    return file;
++  }
++
++  /// Drops the file stored under [token], if any.
++  ///
++  /// A [WebPlatformFile] already restored from it keeps its [handle] and stays
++  /// readable for as long as the page has access to it.
++  static Future<void> forget(String token) => deleteHandle(token);
++
+   /// Returns an [XFile] instance representing this web file.
+   @override
+   XFile get xFile {
+@@ -80,11 +211,16 @@ base class WebPlatformFile extends PlatformFile {
+   ///
+   /// If bytes are cached or readable from a `blob:`/`data:` URL, they will be
+   /// retrieved directly; otherwise falls back to [xFile].
++  ///
++  /// A file restored from a token is read through its [handle], which needs
++  /// read access, and throws the browser's error when the page has none.
+   @override
+   Future<Uint8List> readAsBytes() async {
+     final bytes = _bytes;
+     if (bytes != null) return bytes;
+ 
++    await _resolveFile();
++
+     // Try fetching from blob or data URL
+     final fetched = await fetchBytesFromWebPath(uri.toString());
+     if (fetched != null) return fetched;
+@@ -107,6 +243,8 @@ base class WebPlatformFile extends PlatformFile {
+       return;
+     }
+ 
++    await _resolveFile();
++
+     final webStream = fetchStreamFromWebPath(uri.toString());
+     if (webStream != null) {
+       yield* webStream;
+@@ -116,6 +254,11 @@ base class WebPlatformFile extends PlatformFile {
+     yield* xFile.openRead();
+   }
+ 
++  /// Reads the content through [_handle] the first time it is needed.
++  Future<void> _resolveFile() async {
++    if (_file == null && _handle != null) await getFile();
++  }
++
+   @override
+   bool operator ==(Object other) {
+     if (identical(this, other)) return true;
+diff --git a/packages/file_picker_web/pubspec.yaml b/packages/file_picker_web/pubspec.yaml
+index f08173c39aa74957974ec1aa2c9f3dab6d8e6eab..dce448fdb2ffca3c2ab38e725138792c55c5bad8 100644
+--- a/packages/file_picker_web/pubspec.yaml
++++ b/packages/file_picker_web/pubspec.yaml
+@@ -1,6 +1,6 @@
+ name: file_picker_web
+ description: Web platform implementation of the file_picker plugin, providing browser file selection, file streaming, and file loading.
+-version: 4.2.1
++version: 4.3.0
+ homepage: https://github.com/vicajilau/flutter_file_picker/tree/main/packages/file_picker_web
+ repository: https://github.com/vicajilau/flutter_file_picker/tree/main/packages/file_picker_web
+ topics:
+diff --git a/packages/file_picker_web/test/web_file_system_access_test.dart b/packages/file_picker_web/test/web_file_system_access_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..ce60bfbac61396cd2f92b916e4549c9ab32323aa
+--- /dev/null
++++ b/packages/file_picker_web/test/web_file_system_access_test.dart
+@@ -0,0 +1,433 @@
++@TestOn('browser')
++library;
++
++import 'dart:convert';
++import 'dart:js_interop';
++import 'dart:typed_data';
++
++import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
++import 'package:file_picker_web/file_picker_web.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:flutter_web_plugins/flutter_web_plugins.dart';
++import 'package:web/web.dart';
++
++extension on Window {
++  @JS('showOpenFilePicker')
++  external JSFunction? get showOpenFilePicker;
++
++  @JS('showOpenFilePicker')
++  external set showOpenFilePicker(JSFunction? value);
++}
++
++@JS('Promise.reject')
++external JSPromise<JSObject> _rejectedPromise(JSAny reason);
++
++/// The file handle `showOpenFilePicker()` resolves with when the user picks.
++@JSExport()
++class _FakeFileHandle {
++  _FakeFileHandle({
++    required this.name,
++    required this.contents,
++    this.permission = 'granted',
++  });
++
++  final String name;
++  final String contents;
++
++  /// What `queryPermission()` and `requestPermission()` report.
++  String permission;
++
++  int queryCalls = 0;
++  int requestCalls = 0;
++
++  JSPromise<File> getFile() =>
++      Future.value(File([utf8.encode(contents).toJS].toJS, name)).toJS;
++
++  JSPromise<JSString> queryPermission(JSObject descriptor) {
++    queryCalls++;
++    return Future.value(permission.toJS).toJS;
++  }
++
++  JSPromise<JSString> requestPermission(JSObject descriptor) {
++    requestCalls++;
++    permission = 'granted';
++    return Future.value(permission.toJS).toJS;
++  }
++}
++
++/// A [_FakeFileHandle] as the handle type the package works with.
++FileSystemFileHandle _fakeHandle(_FakeFileHandle fake) =>
++    createJSInteropWrapper(fake) as FileSystemFileHandle;
++
++const String _inputsSelector = 'flt-file-picker-inputs input';
++
++void main() {
++  late final FilePickerWeb picker;
++  late final JSFunction? originalOpenFilePicker;
++
++  final pickerCalls = <Map<Object?, Object?>>[];
++
++  setUpAll(() {
++    FilePickerWeb.registerWith(webPluginRegistrar);
++    picker = FilePickerPlatform.instance as FilePickerWeb;
++    originalOpenFilePicker = window.showOpenFilePicker;
++  });
++
++  setUp(() {
++    pickerCalls.clear();
++    for (
++      var input = document.querySelector(_inputsSelector);
++      input != null;
++      input = document.querySelector(_inputsSelector)
++    ) {
++      input.remove();
++    }
++  });
++
++  tearDown(() {
++    window.showOpenFilePicker = originalOpenFilePicker;
++  });
++
++  /// Replaces `showOpenFilePicker` with one that records its options and
++  /// completes with [respond].
++  void stubPicker(JSPromise<JSObject> Function() respond) {
++    window.showOpenFilePicker = ((JSObject options) {
++      pickerCalls.add(options.dartify()! as Map<Object?, Object?>);
++      return respond();
++    }).toJS;
++  }
++
++  /// Makes `showOpenFilePicker` resolve with [handles].
++  void stubPickedHandles(List<_FakeFileHandle> handles) {
++    stubPicker(
++      () => Future.value(
++        [for (final handle in handles) createJSInteropWrapper(handle)].toJS,
++      ).toJS,
++    );
++  }
++
++  /// Makes `showOpenFilePicker` reject with a `DOMException` named [name].
++  void stubPickerError(String name) {
++    stubPicker(() => _rejectedPromise(DOMException('', name)));
++  }
++
++  /// The `<input type="file">` the fallback path attaches, once it does.
++  Future<HTMLInputElement> waitForInput() async {
++    for (var i = 0; i < 100; i++) {
++      final input = document.querySelector(_inputsSelector);
++      if (input != null) return input as HTMLInputElement;
++      await Future<void>.delayed(const Duration(milliseconds: 10));
++    }
++    fail('No file input was attached.');
++  }
++
++  /// Completes the pending input pick with a file holding [contents].
++  Future<void> selectThroughInput(
++    Future<Object?> pick, {
++    String name = 'picked.txt',
++    String contents = 'picked',
++  }) async {
++    final input = await waitForInput();
++    final transfer = DataTransfer()
++      ..items.add(File([utf8.encode(contents).toJS].toJS, name));
++    input.files = transfer.files;
++    input.dispatchEvent(Event('change'));
++    await pick;
++  }
++
++  const otaTypes = [
++    WebFileTypeFilter(
++      description: 'OTA package',
++      accept: {
++        'application/zip': ['.zip'],
++      },
++    ),
++  ];
++
++  test('picks through the file system access dialog', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'ota.zip', contents: 'zipdata')]);
++
++    final picked = await picker.pickFile(
++      webOptions: const FilePickerWebOptions(
++        dialog: WebFileDialog.fileSystemAccess,
++        pickerId: 'ota',
++        types: otaTypes,
++      ),
++    );
++
++    expect(picked, isA<WebPlatformFile>());
++    final file = picked! as WebPlatformFile;
++    expect(file.name, 'ota.zip');
++    expect(file.lengthSync(), 7);
++    expect(file.handle, isNotNull);
++    expect(file.file, isNotNull);
++    expect(file.uri.scheme, 'blob');
++    expect(utf8.decode(await file.readAsBytes()), 'zipdata');
++
++    // The browser File is what ranged reads go through.
++    final range = await file.file!.slice(0, 3).arrayBuffer().toDart;
++    expect(utf8.decode(range.toDart.asUint8List()), 'zip');
++
++    expect(pickerCalls.single, {
++      'id': 'ota',
++      'multiple': false,
++      'types': [
++        {
++          'description': 'OTA package',
++          'accept': {
++            'application/zip': ['.zip'],
++          },
++        },
++      ],
++    });
++    expect(document.querySelector(_inputsSelector), isNull);
++  });
++
++  test('picks several files through the file system access dialog', () async {
++    stubPickedHandles([
++      _FakeFileHandle(name: 'a.txt', contents: 'a'),
++      _FakeFileHandle(name: 'b.txt', contents: 'b'),
++    ]);
++
++    final picked = await picker.pickFiles(
++      webOptions: const FilePickerWebOptions(
++        dialog: WebFileDialog.fileSystemAccess,
++        types: otaTypes,
++      ),
++    );
++
++    expect(picked.map((file) => file.name), ['a.txt', 'b.txt']);
++    expect(pickerCalls.single['multiple'], isTrue);
++    for (final file in picked) {
++      expect((file as WebPlatformFile).handle, isNotNull);
++      expect(utf8.decode(await file.readAsBytes()), file.name.substring(0, 1));
++    }
++  });
++
++  test('returns null when the user cancels the dialog', () async {
++    stubPickerError('AbortError');
++
++    expect(
++      await picker.pickFile(
++        webOptions: const FilePickerWebOptions(
++          dialog: WebFileDialog.fileSystemAccess,
++          types: otaTypes,
++        ),
++      ),
++      isNull,
++    );
++    expect(pickerCalls, hasLength(1));
++    // A cancel is not a refused dialog: nothing falls back to the input.
++    expect(document.querySelector(_inputsSelector), isNull);
++  });
++
++  test('falls back to the input when the browser refuses the dialog', () async {
++    stubPickerError('SecurityError');
++
++    final pick = picker.pickFile(
++      webOptions: const FilePickerWebOptions(
++        dialog: WebFileDialog.auto,
++        types: otaTypes,
++      ),
++    );
++    await selectThroughInput(pick);
++
++    final picked = (await pick)! as WebPlatformFile;
++    expect(picked.name, 'picked.txt');
++    expect(picked.handle, isNull);
++    expect(pickerCalls, hasLength(1));
++  });
++
++  test('keeps the input filter when no types are given', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'ota.zip', contents: 'zip')]);
++
++    // `type`/`allowedExtensions` only filter the input, so `auto` keeps it
++    // rather than opening a dialog that accepts every file.
++    final pick = picker.pickFile(
++      type: FileType.custom,
++      allowedExtensions: ['zip'],
++      webOptions: const FilePickerWebOptions(dialog: WebFileDialog.auto),
++    );
++    await selectThroughInput(pick, name: 'ota.zip', contents: 'zip');
++
++    expect(((await pick)! as WebPlatformFile).handle, isNull);
++    expect(pickerCalls, isEmpty);
++  });
++
++  test('accepts every file through the dialog without a filter', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'any.bin', contents: 'x')]);
++
++    final picked = await picker.pickFile(
++      webOptions: const FilePickerWebOptions(dialog: WebFileDialog.auto),
++    );
++
++    expect(picked!.name, 'any.bin');
++    expect(pickerCalls.single, {'multiple': false});
++  });
++
++  test('uses the input without asking for the dialog', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'ota.zip', contents: 'zip')]);
++
++    // The dialog has to be asked for, so a plain pick keeps what every
++    // browser has.
++    final pick = picker.pickFile(
++      webOptions: const FilePickerWebOptions(types: otaTypes),
++    );
++    await selectThroughInput(pick);
++
++    expect(((await pick)! as WebPlatformFile).handle, isNull);
++    expect(pickerCalls, isEmpty);
++  });
++
++  test('uses the input when WebFileDialog.input is asked for', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'ota.zip', contents: 'zip')]);
++
++    final pick = picker.pickFile(
++      webOptions: const FilePickerWebOptions(dialog: WebFileDialog.input),
++    );
++    await selectThroughInput(pick);
++
++    expect(((await pick)! as WebPlatformFile).handle, isNull);
++    expect(pickerCalls, isEmpty);
++  });
++
++  test('uses the input when the browser has no dialog', () async {
++    window.showOpenFilePicker = null;
++
++    expect(supportsShowOpenFilePicker, isFalse);
++    final pick = picker.pickFile(
++      webOptions: const FilePickerWebOptions(
++        dialog: WebFileDialog.auto,
++        types: otaTypes,
++      ),
++    );
++    await selectThroughInput(pick);
++
++    expect(((await pick)! as WebPlatformFile).handle, isNull);
++  });
++
++  test('throws without a dialog to use when it is required', () async {
++    window.showOpenFilePicker = null;
++
++    await expectLater(
++      picker.pickFile(
++        webOptions: const FilePickerWebOptions(
++          dialog: WebFileDialog.fileSystemAccess,
++          types: otaTypes,
++        ),
++      ),
++      throwsUnsupportedError,
++    );
++    expect(document.querySelector(_inputsSelector), isNull);
++  });
++
++  test('throws without types when the dialog is required', () async {
++    stubPickedHandles([_FakeFileHandle(name: 'ota.zip', contents: 'zip')]);
++
++    await expectLater(
++      picker.pickFile(
++        type: FileType.custom,
++        allowedExtensions: ['zip'],
++        webOptions: const FilePickerWebOptions(
++          dialog: WebFileDialog.fileSystemAccess,
++        ),
++      ),
++      throwsArgumentError,
++    );
++    expect(pickerCalls, isEmpty);
++  });
++
++  test('reports support when the dialog is available', () {
++    stubPickerError('AbortError');
++
++    expect(supportsShowOpenFilePicker, isTrue);
++  });
++
++  group('WebPlatformFile', () {
++    /// A real handle, from the origin private file system, so IndexedDB can
++    /// store it and `getFile()` reads actual content.
++    Future<FileSystemFileHandle> storedHandle(
++      String name, {
++      required String contents,
++    }) async {
++      final root = await window.navigator.storage.getDirectory().toDart;
++      final handle = await root
++          .getFileHandle(name, FileSystemGetFileOptions(create: true))
++          .toDart;
++      final writable = await handle.createWritable().toDart;
++      await writable
++          .write(Uint8List.fromList(utf8.encode(contents)).toJS)
++          .toDart;
++      await writable.close().toDart;
++      return handle;
++    }
++
++    test('keeps a picked file readable without a handle', () async {
++      final file = WebPlatformFile(
++        name: 'picked.txt',
++        file: File([utf8.encode('picked').toJS].toJS, 'picked.txt'),
++      );
++
++      expect(await file.hasAccess(), isTrue);
++      expect(await file.requestAccess(), isTrue);
++      expect(utf8.decode(await file.readAsBytes()), 'picked');
++      expect(await file.persist(), isNull);
++      expect(file.uri.scheme, 'blob');
++    });
++
++    test('persists, restores and forgets a handle', () async {
++      final handle = await storedHandle('remembered.zip', contents: 'hello');
++      final file = WebPlatformFile(name: handle.name, handle: handle);
++
++      final token = await file.persist();
++      expect(token, isNotNull);
++      expect(token, hasLength(32));
++
++      // The same file gets the same token instead of piling up records.
++      expect(await file.persist(), token);
++      expect(await WebPlatformFile.persistHandle(handle), token);
++
++      final restored = await WebPlatformFile.restore(token!);
++      expect(restored, isNotNull);
++      expect(restored!.name, 'remembered.zip');
++      expect(restored.handle, isNotNull);
++      expect(restored.file, isNotNull);
++      expect(restored.lengthSync(), 5);
++      expect(utf8.decode(await restored.readAsBytes()), 'hello');
++
++      await WebPlatformFile.forget(token);
++      expect(await WebPlatformFile.restore(token), isNull);
++
++      // Forgetting an unknown token is not an error.
++      await WebPlatformFile.forget(token);
++    });
++
++    test('restores nothing for an unknown token', () async {
++      expect(await WebPlatformFile.restore('0' * 32), isNull);
++    });
++
++    test('reads a file restored without access once it is granted', () async {
++      final fake = _FakeFileHandle(
++        name: 'locked.zip',
++        contents: 'zip',
++        permission: 'prompt',
++      );
++      final file = WebPlatformFile(name: fake.name, handle: _fakeHandle(fake));
++
++      expect(file.file, isNull);
++      expect(file.uri, Uri());
++      expect(file.lengthSync(), isNull);
++      expect(await file.hasAccess(), isFalse);
++      expect(fake.queryCalls, 1);
++
++      expect(await file.requestAccess(), isTrue);
++      expect(fake.requestCalls, 1);
++
++      final read = await file.getFile();
++      expect(read.name, 'locked.zip');
++      expect(file.file, isNotNull);
++      expect(file.lengthSync(), 3);
++      expect(utf8.decode(await file.readAsBytes()), 'zip');
++    });
++  });
++}
