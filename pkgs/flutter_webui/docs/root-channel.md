@@ -1,6 +1,6 @@
 # Root channel: contract (v1)
 
-The root channel is `flutter_webui_root` (`packages/flutter_webui_root`), a
+The root channel is `flutter_webui_root` (`pkgs/flutter_webui_root`), a
 Dart program started once by the page through the manager's bridge. It runs as
 root, serves one WebSocket on 127.0.0.1, and does three things: launch root
 processes and stream their output, carry stdin to them, and read small files
@@ -24,7 +24,7 @@ already launched through the channel, not a new WebSocket operation.
 
 ```
 <moddir>/flutter_webui/
-  root                       POSIX sh launcher (packages/flutter_webui_root/module/root)
+  root                       POSIX sh launcher (pkgs/flutter_webui_root/module/root)
   <abi>/flutter_webui_root.aot   AOT snapshot of bin/flutter_webui_root.dart
   <abi>/dartaotruntime       Dart AOT runtime that runs on Android
   <abi>/ld-linux-*.so.*, lib*.so.*   only for a linux (glibc) runtime: its loader and libc

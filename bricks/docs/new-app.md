@@ -8,9 +8,9 @@ named `notes`. Each step says what it produces and how to check it.
 
 | Tool | Version | Why |
 |---|---|---|
-| Flutter | 3.47.9 (Dart 3.13.7) | everything is pinned to it |
+| Flutter | the release in p0g's `.fvmrc` (Dart `dart --version` must match it) | everything is pinned to it |
 | mason_cli | 0.1.4 | the bricks (`dart pub global activate mason_cli 0.1.4`) |
-| flutter_p0g | main | `create`, `build webui`, `install` (`dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g`) |
+| flutter_p0g | the p0g tag you generate from | `create`, `build webui`, `install` (`dart pub global activate --source git https://github.com/p0g-stack/p0g --git-path pkgs/flutter_p0g --git-ref p0g-v<x.y.z>`) |
 | cargo, cargo-expand | stable | only with `rust: true` |
 
 `~/.pub-cache/bin` must be on `PATH`.
@@ -18,9 +18,9 @@ named `notes`. Each step says what it produces and how to check it.
 ## 1. Generate the workspace
 
 ```sh
-mason add -g p0g_app --git-url https://github.com/p0g-stack/bricks --git-path bricks/p0g_app
-mason add -g service --git-url https://github.com/p0g-stack/bricks --git-path bricks/service
-mason add -g strategy --git-url https://github.com/p0g-stack/bricks --git-path bricks/strategy
+mason add -g p0g_app --git-url https://github.com/p0g-stack/p0g --git-path bricks/p0g_app --git-ref p0g-v<x.y.z>
+mason add -g service --git-url https://github.com/p0g-stack/p0g --git-path bricks/service --git-ref p0g-v<x.y.z>
+mason add -g strategy --git-url https://github.com/p0g-stack/p0g --git-path bricks/strategy --git-ref p0g-v<x.y.z>
 mason make p0g_app        # name: notes, org: dev.example, rust: false
 cd notes
 bash tool/bootstrap.sh
@@ -92,7 +92,7 @@ Install the kit the CLI needs, once:
 
 ```sh
 flutter_p0g precache --dart-android    # dartaotruntime + gen_snapshot per ABI
-flutter_p0g precache --frb             # only with rust: true
+flutter_p0g precache --frb --no-webui  # only with rust: true; bootstrap needs just the codegen
 ```
 
 ## 5. Build the module
@@ -155,11 +155,12 @@ instead of `BRICKS_REF`.
 ## Where things stand
 
 - `flutter_p0g run` (hot reload on WebUI) works in Chromium; its device path
-  (adb reverse, page swap) has not been run on a device. See flutter_p0g's
-  README for its current state.
-- The Android Dart kit that step 4 installs is flutter_p0g's release
-  `dart-android-<Dart version>`. It is fetched by tag; its sha256 is checked
-  only when passed to `precache` (flutter_p0g `PINS.md`).
-- Rust on the page needs flutter_p0g's patched frb (`precache --frb`). Without
-  it, `tool/rust.sh` builds only the native library, and on the web the
-  Dart strategies run.
+  (adb reverse, page swap) has not been run on a device. See
+  [pkgs/flutter_p0g_tool/doc/run.md](../../pkgs/flutter_p0g_tool/doc/run.md).
+- The Android Dart kit that step 4 installs is a release of this repository
+  (`dart-android-<Dart>-<producer>`). Its url, sha256 and size are in
+  `artifacts.lock.json`, and `precache` verifies every download against them;
+  a kit passed by hand always needs `--dart-android-sha256`.
+- Rust on the page needs the patched frb (`precache --frb --no-webui`). A
+  missing or stale cache fails `tool/rust.sh`; it never silently builds
+  without the crate or falls back to the Dart strategy.

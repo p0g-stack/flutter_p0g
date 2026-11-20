@@ -21,15 +21,19 @@ The `p0g_app` brick turns it on. By hand, in the workspace root's
 plugins:
   p0g_lints:
     git:
-      url: https://github.com/p0g-stack/bricks
-      path: packages/p0g_lints
-      ref: <commit>
+      url: https://github.com/p0g-stack/p0g
+      path: pkgs/p0g_lints
+      ref: p0g-v<x.y.z>
 ```
+
+`ref:` rather than `tag_pattern:`: the analysis server resolves the plugin in a
+synthetic package whose SDK floor is below what `tag_pattern` needs.
 
 A member package with its own `analysis_options.yaml` includes the root one
 (`include: [package:flutter_lints/flutter.yaml, ../analysis_options.yaml]`),
 or the plugin does not run there. The first `dart analyze` builds the plugin
 (about a minute); later runs reuse it.
 
-Built on `analysis_server_plugin` 0.3 (analyzer 14), the Dart 3.13 plugin
-API. `tool/ci.sh` checks both rules against a generated workspace.
+Built on `analysis_server_plugin` 0.3 (analyzer 14), the workspace Dart's
+plugin API. `bricks/tool/ci.sh` checks both rules against a generated
+workspace.

@@ -20,10 +20,10 @@ Don't call `XFile.saveTo` on WebUI. That method belongs to `cross_file`, so
 no plugin can redirect it. On web it starts a download, and no manager
 handles downloads, so nothing happens.
 
-The bricks don't depend on webui-packages. An app that saves files adds
-`webui_app_plane` itself, at the commit flutter_p0g builds with. Big files
-should never pass through the page: make and write them in the process
-place.
+The bricks don't depend on the `*_webui` packages. An app that saves files
+adds `webui_app_plane` itself, at the version the generated workspace already
+pins. Big files should never pass through the page: make and write them in the
+process place.
 
 ## Pickers on embedded hosts
 

@@ -12,7 +12,7 @@ cd <name> && bash tool/bootstrap.sh
 | `name` | `my_app` | package prefix (`<name>_core`, `<name>_cli`), the app package and the CLI executable |
 | `description` | `A p0g-stack app.` | one line for READMEs and `--help` |
 | `org` | `com.example` | passed to `flutter create` for the stock platform folders |
-| `rust` | `false` | adds `rust/` and `flutter_rust_bridge.yaml` (frb `=2.14.0-beta.2`, the base of flutter_p0g's patch series) |
+| `rust` | `false` | adds `rust/` and `flutter_rust_bridge.yaml` (frb, the base of the CLI's patch series) |
 | `sample` | `true` | includes hello UI/service/commands and, with Rust, the digest CLI demonstration |
 
 What it stamps:
@@ -33,12 +33,14 @@ What it stamps:
   app patch series, Pub again, Rust/codegen and worker builds),
   `third_party.dart`, `build_workers.sh` and the read-only regeneration checker.
 
-squadron_process and flutter_webui_client are git dependencies pinned by commit.
-squadron_process needs Squadron with its channel-factory patch: bootstrap
-runs `dart run squadron_process:squadron_patch`, which fetches the patched
-copy into `.dart_tool/` and writes `pubspec_overrides.yaml` (gitignored),
-until it is upstream or flutter_p0g handles it. squadron_process's API is used
-only in `cli/.../serve_command.dart`, `app/lib/places/`,
+squadron_process and flutter_webui_client are git dependencies on the p0g
+repository, resolved by the `p0g-v<x.y.z>` tag (`tag_pattern`) with a `^`
+version constraint. squadron_process needs Squadron with its channel-factory
+patch: bootstrap runs `dart run squadron_process:squadron_patch`, which
+materializes the patched copy under `.dart_tool/` and writes
+`pubspec_overrides.yaml` (gitignored); `flutter_p0g`'s build and run commands
+do the same step. squadron_process's API is used only in
+`cli/.../serve_command.dart`, `app/lib/places/`,
 `core/lib/src/places/` and `core/lib/src/facts/facts.dart`.
 
 The WebUI launcher (`core/lib/src/places/webui_launcher.dart`) starts the CLI

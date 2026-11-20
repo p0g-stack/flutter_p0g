@@ -6,7 +6,7 @@ Self-contained; no external base file.
   other embedders handle it, and scope ours to that.
 - Parity means a Flutter web app in a browser tab, not Android.
 - If Flutter has a concept for it on web, it is this repo's job. If it doesn't,
-  it belongs in a plugin (`webui-packages`) or in the app.
+  it belongs in a plugin (`pkgs/webui`) or in the app.
 - Detection probes optional host methods. A manager's name or version never
   selects behaviour. A new manager is a detection change plus a row in
   `docs/hosts.md`.
@@ -22,12 +22,12 @@ Self-contained; no external base file.
   `killShellWhenBackground: false`; never rely on page timers while hidden.
 - Host claims and numbers (freeze times, latency) come from devicelab runs,
   with the device and manager named. Tests are unit tests against fakes.
-- `web_ui/patches` is a `git format-patch` series against the Flutter release
-  tag in `web_ui/VERSION`. Edit it as commits on that tag, never by hand, and
-  rebuild with `web_ui/tool/build_web_sdk.dart` to check it compiles.
+- `web_sdk/patches` is a `git format-patch` series against the Flutter release
+  tag in `web_sdk/VERSION`. Edit it as commits on that tag, never by hand, and
+  rebuild with `dart run web_sdk/tool/build_web_sdk.dart` to check it compiles.
 - Never pause a `dart:io` process stdout/stderr subscription in the root
-  channel: on Dart 3.13.4 a resumed pipe can miss its wake-up and stall the
-  child for good.
+  channel: a resumed pipe can miss its wake-up and stall the child for good
+  (seen on Dart 3.13.4).
 - The root channel runs on Android under a glibc runtime, where resolving
   outside hostnames fails. Use IP literals only (it binds `127.0.0.1`), and
   ship `dartaotruntime` plus a `.aot` snapshot, never a `dart compile exe`

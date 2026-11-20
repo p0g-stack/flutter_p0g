@@ -1,10 +1,13 @@
 # WebUI launcher contract
 
-What the `p0g_app` brick's WebUI launcher (`core/lib/src/places/webui_launcher.dart`:
-`WebUiLauncher` + `WebUiSessionStore`) needs from flutter-webui's root channel
-(`flutter_webui_client` talking to `flutter_webui_root`, contract v1 in flutter-webui's `docs/root-channel.md`)
-to start and find an app's root process. bricks owns this contract; the
-generic launcher rules are squadron_process's `doc/launchers.md`.
+What the `p0g_app` brick's WebUI launcher
+(`core/lib/src/places/webui_launcher.dart`: `WebUiLauncher` +
+`WebUiSessionStore`) needs from the root channel (`flutter_webui_client`
+talking to `flutter_webui_root`, contract v1 in
+[pkgs/flutter_webui/docs/root-channel.md](../../pkgs/flutter_webui/docs/root-channel.md))
+to start and find an app's root process. The bricks own this contract; the
+generic launcher rules are squadron_process's
+[doc/launchers.md](../../pkgs/squadron_process/doc/launchers.md).
 
 ## What the page does
 
