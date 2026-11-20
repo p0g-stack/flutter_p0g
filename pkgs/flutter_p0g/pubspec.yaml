@@ -1,6 +1,6 @@
 name: flutter_p0g
 description: Builds a stock Flutter app for the WebUI (KernelSU-style module) and AERA targets. Like flutterpi_tool, it is flutter_tools plus a packing step.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 repository: https://github.com/p0g-stack/flutter_p0g
 

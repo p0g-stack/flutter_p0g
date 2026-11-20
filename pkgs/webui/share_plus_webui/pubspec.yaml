@@ -1,6 +1,6 @@
 name: share_plus_webui
 description: WebUI implementation of share_plus. Shares text, links and a file through the Android share sheet via webui-termux-api's Share method, since the manager WebView has no Web Share API.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 

@@ -3,7 +3,7 @@ description: >-
   Unofficial Squadron extension: run a Squadron service in another,
   optionally elevated, process over a loopback socket, and report what each
   place can do.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 repository: https://github.com/p0g-stack/squadron_process

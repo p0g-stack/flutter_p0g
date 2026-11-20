@@ -1,6 +1,6 @@
 name: url_launcher_webui
 description: WebUI implementation of url_launcher. Opens URLs in their Android app with `am start` as root, since a manager WebView would navigate the module page away.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 

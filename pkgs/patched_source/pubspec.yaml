@@ -1,6 +1,6 @@
 name: patched_source
 description: Reproducible, owner-safe Git patch materialization and managed Pub overrides.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 repository: https://github.com/p0g-stack/flutter_p0g
