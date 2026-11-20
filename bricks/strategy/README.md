@@ -29,7 +29,7 @@ Conventions it stamps:
   from `available`. It isn't chosen, `Selection.waiting` offers it, and
   `Selection.why` logs it. A write to a device outside this place names
   that device in its input and refuses if another is connected. See
-  [docs/patterns/devices.md](../../docs/patterns/devices.md).
+  [docs/patterns/devices.md](../docs/patterns/devices.md).
 - **Accounting.** Every run logs a `StrategyRun` on `objective.<name>`: which
   strategy, in which place, with which facts, what was skipped and why.
 

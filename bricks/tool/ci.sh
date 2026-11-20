@@ -4,9 +4,10 @@
 # the Rust variants also need cargo, cargo-expand, wasm-pack and the verified
 # patched FRB cache (`flutter_p0g precache --frb --no-webui`).
 set -euo pipefail
-root="$(cd "$(dirname "$0")/.." && pwd)"
+root="$(cd "$(dirname "$0")/.." && pwd)" # bricks/ in the p0g repository
 out="${1:-$(mktemp -d)}"
 mkdir -p "$out"
+lints="$(cd "$root/../pkgs/p0g_lints" && pwd)"
 cd "$root"
 mason get
 
@@ -17,7 +18,7 @@ make_app() { # name rust sample [parent-dir]
     "$1" "$2" "$3" > "$out/$1.json"
   mason make p0g_app -c "$out/$1.json" -o "$dir" --on-conflict overwrite
   # Lint with this checkout's p0g_lints, not the commit the brick pins.
-  python3 - "$dir/$1/analysis_options.yaml" "$root/packages/p0g_lints" <<'PY'
+  python3 - "$dir/$1/analysis_options.yaml" "$lints" <<'PY'
 import re, sys
 f, path = sys.argv[1], sys.argv[2]
 s = open(f).read()
@@ -96,9 +97,7 @@ DART
   [ "$(echo "$report" | grep -c "strategy_reads_platform")" = 2 ]
 }
 
-echo "::group::p0g_lints"
-(cd packages/p0g_lints && dart pub get && dart format --output=none --set-exit-if-changed . && dart analyze --fatal-infos)
-echo "::endgroup::"
+# p0g_lints is a workspace member now; the workspace job formats and analyzes it.
 
 echo "::group::p0g_app (defaults) + service + strategy"
 make_app ci_app false true

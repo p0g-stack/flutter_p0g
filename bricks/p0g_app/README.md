@@ -47,7 +47,7 @@ that builds on a stock SDK. The app never depends on the `flutter_webui` web
 plugin (engine handlers only); flutter_p0g adds it when it builds for WebUI.
 `cli/test/webui_launch_test.dart` runs the launch against the real
 `flutter_webui_root` on the VM. Its contract with the root channel is
-[docs/webui-launch.md](../../docs/webui-launch.md). In a plain browser there is
+[docs/webui-launch.md](../docs/webui-launch.md). In a plain browser there is
 no process place, and services run in Web Workers.
 
 One app, one CLI: `cli/` is the app's only command line, compiled per OS

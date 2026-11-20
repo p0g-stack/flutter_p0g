@@ -64,7 +64,7 @@ Code links below are pinned to the revisions inspected. Official documentation/s
 
 These are working-tree observations, not upstream or hardware verification. Files were being edited by other work, so symbol names are more durable than line numbers.
 
-- L1: [`webusb.rs`](../../../flasher-web/rust/crates/fastboot-link/src/webusb.rs), notably `open`, `devices`, `bounded`, `BulkTransport`, and the claim-only comment. Repository-relative path from the bricks checkout is `../flasher-web/rust/crates/fastboot-link/src/webusb.rs`.
+- L1: [`webusb.rs`](../../../../flasher-web/rust/crates/fastboot-link/src/webusb.rs), notably `open`, `devices`, `bounded`, `BulkTransport`, and the claim-only comment. Repository-relative path from the checkout root is `../flasher-web/rust/crates/fastboot-link/src/webusb.rs`.
 - L2: `flasher-web/rust/crates/fastboot-link/src/native.rs`: `open`, `SessionGuard`, `BulkTransport`.
 - L3: `flasher-web/rust/crates/fastboot-link/src/session.rs`: `Session::command`, `command_inner`, `write_download`, `end_download`, `send`, `read_response`, `retire`.
 - L4: `flasher-web/rust/crates/fastboot-link/src/error.rs`: `LinkError::from_transport`, `device`, `protocol`, `session_retired`.

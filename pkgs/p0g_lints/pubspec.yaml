@@ -2,6 +2,7 @@ name: p0g_lints
 description: Analyzer plugin with the conventions p0g_app workspaces follow. core/ never imports Flutter; strategies never read kIsWeb or Platform.
 version: 0.1.0
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.0

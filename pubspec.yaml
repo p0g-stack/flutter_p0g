@@ -23,6 +23,7 @@ workspace:
   - pkgs/webui/shared_preferences_webui
   - pkgs/webui/url_launcher_webui
   - pkgs/webui/webui_app_plane
+  - pkgs/p0g_lints
 
 dev_dependencies:
   lints: ^6.0.0
