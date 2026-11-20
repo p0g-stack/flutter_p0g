@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "flutter": {
+    "version": "3.50.0",
+    "engine": "371f77202a73e8dff57a8b3bff75bca55c090aee",
+    "dart": "3.14.0"
+  },
+  "artifacts": {
+    "webSdk": {
+      "repo": "p0g-stack/flutter-webui",
+      "tag": "web-sdk-3.50.0-371f772-56caf05",
+      "commit": "56caf052d6a7d4aa52d5d1f775ee63552bacd0cc",
+      "webUiTree": "ae61e71d66a6d63cd791ccca6ed83947801e80b5",
+      "patchSet": "d70eb6097296198741d718c2f0cb41120a7833710a74529f6cf3f1867af4f4ae",
+      "assets": {
+        "sdk": {
+          "url": "https://github.com/p0g-stack/flutter-webui/releases/download/web-sdk-3.50.0-371f772-56caf05/flutter-webui-web-sdk.tar.xz",
+          "sha256": "f7f561b94956e7923d78e0cf57dbc023e1f2e2258049cf8396e5064d2b4a99d7",
+          "size": 14297512
+        }
+      }
+    },
+    "aeraEngine": {
+      "repo": "p0g-stack/flutter-aera",
+      "tag": "engine-371f772-0d7f3ed2",
+      "commit": "dba6fa7c817311efc315a881105762551dbf1fe0",
+      "assets": {
+        "linux-arm64-debug": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/engine-371f772-0d7f3ed2/linux-arm64-debug-embedder.zip",
+          "sha256": "77abf5a14a97cd9e1a084cf8bfe8f532de2ba6020a994e69b4ea968648496b4b",
+          "size": 20149380
+        },
+        "linux-arm64-profile": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/engine-371f772-0d7f3ed2/linux-arm64-profile-embedder.zip",
+          "sha256": "b4306275a327c5aeb4216cbffa6688ce4a9cb0d17f5aba53888ca4591890463d",
+          "size": 14386226
+        },
+        "linux-arm64-release": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/engine-371f772-0d7f3ed2/linux-arm64-release-embedder.zip",
+          "sha256": "b96d1248ce56fb8c5ac154901934710072cad79e642279e67bc746a36208419e",
+          "size": 13527645
+        },
+        "linux-x64-debug": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/engine-371f772-0d7f3ed2/linux-x64-debug-embedder.zip",
+          "sha256": "df9099fc821e9b138a2536ff7ac9fdfcd6612eaecd301166ca9bad7de8374664",
+          "size": 20745478
+        }
+      }
+    },
+    "aeraKit": {
+      "repo": "p0g-stack/flutter-aera",
+      "tag": "kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e",
+      "commit": "b90bec61e31d10554fe7fdcc394b70c5df22cf5e",
+      "run": 44132241882,
+      "assets": {
+        "linux-arm64-debug": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e/flutter-aera-kit-linux-arm64-debug-3.50.0.tar.xz",
+          "sha256": "24689ad78bc83f325c6247e2614d8a8eb270f7ed9a80821c58b3549c3706d721",
+          "size": 23381648
+        },
+        "linux-x64-debug": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e/flutter-aera-kit-linux-x64-debug-3.50.0.tar.xz",
+          "sha256": "120edae6fd95202847dc81c0d345b1e769b3447fd034ab754cad8b9c614ec31f",
+          "size": 23585956
+        }
+      }
+    },
+    "aeraHostSim": {
+      "repo": "p0g-stack/flutter-aera",
+      "tag": "kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e",
+      "commit": "b90bec61e31d10554fe7fdcc394b70c5df22cf5e",
+      "run": 44132241882,
+      "assets": {
+        "linux-arm64": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e/aera-host-sim-linux-arm64",
+          "sha256": "03985774517e11da787fbf3aff213694060881a7010381410f49bdc86245c775",
+          "size": 1195976
+        },
+        "linux-x64": {
+          "url": "https://github.com/p0g-stack/flutter-aera/releases/download/kit-3.50.0-b90bec61e31d10554fe7fdcc394b70c5df22cf5e/aera-host-sim-linux-x64",
+          "sha256": "db321d27b2d336f20c405d5cc75b0c3ea7dd974fd3353312eaa9ebe394d5d2cd",
+          "size": 1415680
+        }
+      }
+    },
+    "dartAndroidKit": {
+      "repo": "p0g-stack/p0g",
+      "tag": "dart-android-3.14.0-65cbf9115b1508b84f862152511c447447653e86",
+      "commit": "65cbf9115b1508b84f862152511c447447653e86",
+      "run": 44124001948,
+      "assets": {
+        "arm64-v8a": {
+          "url": "https://github.com/p0g-stack/p0g/releases/download/dart-android-3.14.0-65cbf9115b1508b84f862152511c447447653e86/dart-android-arm64-v8a-3.14.0.tar.gz",
+          "sha256": "2114934893d11217fcd8919d126f998117a3def2a96682097dd83c0a59c9c4c2",
+          "size": 4018587
+        },
+        "x86_64": {
+          "url": "https://github.com/p0g-stack/p0g/releases/download/dart-android-3.14.0-65cbf9115b1508b84f862152511c447447653e86/dart-android-x86_64-3.14.0.tar.gz",
+          "sha256": "a25c7a1181844d31ef5c7861f23de1e4cddc4133d6ca5b4ad291fe09decd7d33",
+          "size": 4117438
+        }
+      }
+    },
+    "webuiTermuxApi": {
+      "repo": "p0g-stack/webui-termux-api",
+      "tag": "webui-v0.53.0-webui.10",
+      "commit": "7cab1c4624822ef261c61b9d068a7c07cfa3f32e",
+      "package": "com.webui.termux.api",
+      "certificateSha256": "e8a8d8cb90e3cc1e03cd26e98b05abb4f29f1b9ac8502447d4bd627df12bcb84",
+      "assets": {
+        "apk": {
+          "url": "https://github.com/p0g-stack/webui-termux-api/releases/download/webui-v0.53.0-webui.10/webui-termux-api_v0.53.0-webui.10.apk",
+          "sha256": "f1557e14eedb14bc37a9ee3eb3a60bac233fddf5bd6648f4b1e7654b98e7f7b5",
+          "size": 4050838
+        }
+      }
+    }
+  }
+}

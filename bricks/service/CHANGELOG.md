@@ -1,3 +1,8 @@
+# 0.5.1
+
+- The panel imports `package:material_ui/material_ui.dart`: Flutter 3.50
+  deprecates `package:flutter/material.dart`.
+
 # 0.5.0
 
 - `panel` (default true): with `panel: false` the brick adds no app panel

@@ -1,6 +1,6 @@
 name: shared_preferences_webui
 description: WebUI implementation of shared_preferences. A module's preferences as one JSON value in KernelSU's module config (persist.config), kept until the module is uninstalled.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 

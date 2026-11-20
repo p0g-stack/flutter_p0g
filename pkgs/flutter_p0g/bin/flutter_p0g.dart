@@ -1,3 +1,7 @@
-import 'package:flutter_p0g/src/executable.dart' as executable;
+import 'dart:io';
 
-Future<void> main(List<String> arguments) => executable.main(arguments);
+import 'package:flutter_p0g/src/launcher.dart';
+
+Future<void> main(List<String> args) async {
+  exitCode = await launch(args);
+}

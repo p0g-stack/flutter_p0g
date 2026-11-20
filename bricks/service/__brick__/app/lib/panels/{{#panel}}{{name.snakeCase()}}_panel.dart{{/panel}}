@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:squadron/squadron.dart';
 import 'package:{{app}}_core/{{app}}_core.dart';
 

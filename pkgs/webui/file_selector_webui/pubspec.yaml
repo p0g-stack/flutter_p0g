@@ -1,6 +1,6 @@
 name: file_selector_webui
 description: WebUI implementation of file_selector. Files open through the manager WebView's chooser (the stock web route); directories and save locations are picked from a root listing.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 

@@ -1,6 +1,6 @@
 name: path_provider_webui
 description: WebUI implementation of path_provider. Root-side paths for a module (state under /data/adb/<id>, shared storage for documents and downloads), for the app's root process to use.
-version: 0.1.0
+version: 0.9.0
 publish_to: none
 resolution: workspace
 

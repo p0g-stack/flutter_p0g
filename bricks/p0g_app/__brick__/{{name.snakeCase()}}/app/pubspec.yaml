@@ -13,15 +13,8 @@ dependencies:
   dynamic_color: ^2.1.0
   material_ui: ^1.0.0
   squadron: ^7.4.5
-  squadron_process:
-    git:
-      url: https://github.com/p0g-stack/squadron_process
-      ref: 8f639eb8d2e200866ace17cca03c9d7c4705f5f9
-  flutter_webui_client:
-    git:
-      url: https://github.com/p0g-stack/flutter-webui
-      path: packages/flutter_webui_client
-      ref: 72df180304562037fbc720153967fbb70a362eb1
+{{{squadron_process_dep}}}
+{{{flutter_webui_client_dep}}}
   {{name.snakeCase()}}_core: any
 
 dev_dependencies:

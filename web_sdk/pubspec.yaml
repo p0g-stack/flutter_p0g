@@ -1,4 +1,5 @@
 name: flutter_webui_web_sdk
+version: 0.9.0
 description: Builds the patched Flutter web SDK (web_ui patch series against the pinned Flutter release).
 publish_to: none
 resolution: workspace
