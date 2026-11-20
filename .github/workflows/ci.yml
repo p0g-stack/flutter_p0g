@@ -132,10 +132,13 @@ jobs:
         run: |
           git ls-files -z -- 'pkgs/flutter_p0g*/*.dart' |
             xargs -0 -r dart format --output=none --set-exit-if-changed
-      - run: dart analyze --fatal-infos pkgs/flutter_p0g pkgs/flutter_p0g_tool
+      - run: dart analyze --fatal-infos
+        working-directory: pkgs/flutter_p0g
+      - run: dart analyze --fatal-infos
+        working-directory: pkgs/flutter_p0g_tool
       - run: dart test
         working-directory: pkgs/flutter_p0g
-      - run: flutter test --no-pub
+      - run: dart test
         working-directory: pkgs/flutter_p0g_tool
 
   patches:
