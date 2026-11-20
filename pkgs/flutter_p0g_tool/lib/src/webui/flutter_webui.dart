@@ -39,7 +39,7 @@ String webSdkPatchSet(Directory patches) {
   if (files.isEmpty) throwToolExit('${patches.path} holds no patches.');
   final bytes = <int>[];
   for (final file in files) {
-    final lines = file.readAsStringSync().split('\n');
+    final lines = const LineSplitter().convert(file.readAsStringSync());
     final start = lines.indexWhere((l) => l.startsWith('diff --git '));
     if (start < 0) throwToolExit('${file.path} holds no diff.');
     final body = <String>[];

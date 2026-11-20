@@ -12,18 +12,8 @@ dependencies:
   logging: ^1.3.0
   squadron: ^7.4.5
   web: ^1.1.0
-  squadron_process:
-    git:
-      url: https://github.com/p0g-stack/p0g
-      path: pkgs/squadron_process
-      tag_pattern: p0g-v{{=<% %>=}}{{version}}<%={{ }}=%>
-    version: ^0.9.0
-  flutter_webui_client:
-    git:
-      url: https://github.com/p0g-stack/p0g
-      path: pkgs/flutter_webui_client
-      tag_pattern: p0g-v{{=<% %>=}}{{version}}<%={{ }}=%>
-    version: ^0.9.0
+{{{squadron_process_dep}}}
+{{{flutter_webui_client_dep}}}
 {{#rust}}  crypto: ^3.0.6
   # Pinned with flutter_p0g; tool/rust.sh requires its verified patched cache.
   flutter_rust_bridge:
