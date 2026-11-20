@@ -5,6 +5,7 @@ description: >-
   place can do.
 version: 0.1.0
 publish_to: none
+resolution: workspace
 repository: https://github.com/p0g-stack/squadron_process
 
 environment:
@@ -21,10 +22,7 @@ dependencies:
   meta: ^1.11.0
   web: ^1.1.0
   patched_source:
-    git:
-      url: https://github.com/p0g-stack/flutter_p0g
-      ref: d3b6de00bd5e88910b9b42036a819b06159085f5
-      path: packages/patched_source
+    path: ../patched_source
   path: ^1.9.0
   yaml: ^3.1.3
 
