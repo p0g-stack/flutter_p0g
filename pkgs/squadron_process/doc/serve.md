@@ -92,17 +92,19 @@ Until the Squadron patch is upstream, the app needs the patched Squadron.
 From the package or pub workspace root that owns `pubspec_overrides.yaml`:
 
 ```sh
-dart pub get                                  # resolves against stock Squadron 7.4.4
-dart run squadron_process:squadron_patch      # patched tree in .dart_tool + override
+dart pub get                                  # resolves against stock Squadron
+dart run squadron_process:squadron_patch      # patched tree under .dart_tool + override
 dart pub get
 ```
 
-As a git dependency, pin a full commit SHA:
+Outside this repository, take the package from the lockstep tag:
 
 ```yaml
 dependencies:
   squadron_process:
     git:
-      url: https://github.com/p0g-stack/squadron_process
-      ref: <full sha>
+      url: https://github.com/p0g-stack/p0g
+      path: pkgs/squadron_process
+      tag_pattern: p0g-v{{version}}
+    version: ^0.9.0
 ```

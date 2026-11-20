@@ -6,12 +6,12 @@ devices, deployment credentials, COOP/COEP, JSPI or threaded Rust wasm.
 
 Prerequisites: the repository's pinned Flutter SDK on PATH, Node 24, Rust stable
 with `wasm32-unknown-unknown`, cargo-expand, wasm-pack and wasm-bindgen-cli.
-From the flutter_p0g root:
+From the repository root:
 
 ```sh
 flutter pub get
-(cd tool/web_runtime_proof && npm ci && PLAYWRIGHT_SKIP_BROWSER_GC=1 npx playwright install chromium)
-bash tool/web_runtime_proof/run.sh all
+(cd pkgs/flutter_p0g_tool/tool/web_runtime_proof && npm ci && PLAYWRIGHT_SKIP_BROWSER_GC=1 npx playwright install chromium)
+bash pkgs/flutter_p0g_tool/tool/web_runtime_proof/run.sh all
 ```
 
 Use `frb` or `defines` instead of `all` to run just one proof. Each run prints a

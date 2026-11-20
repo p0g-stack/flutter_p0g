@@ -51,12 +51,13 @@ returns `{"error":"WifiEnable needs root","code":"needs_root"}`.
 ## Nest
 
 ```
-packages/<plugin>_webui/   one package per plugin, tests against flutter-webui fakes
-packages/webui_app_plane/  the app-plane client the others share
-docs/plugins.md            route per plugin per host
+pkgs/webui/<plugin>_webui/   one package per plugin, tests against flutter-webui fakes
+pkgs/webui/webui_app_plane/  the app-plane client the others share
+pkgs/webui/docs/plugins.md   route per plugin per host
 ```
 
-A pub workspace; each package is versioned and published on its own.
+Members of the p0g workspace: one version for all of them, released under the
+`p0g-v<x.y.z>` tag.
 
 ## Registration
 
@@ -69,7 +70,7 @@ dependencies; no registrant ordering is involved. Details in
 
 ## Tests
 
-`dart test` in `packages/webui_app_plane`, `flutter test` in each plugin.
+`dart test` in `pkgs/webui/webui_app_plane`, `flutter test` in each plugin.
 Unit tests only, against `webui_app_plane/testing.dart` (a fake root channel
 speaking the real protocol) and a fake Termux:API app on real abstract
 sockets; host claims come from devicelab.

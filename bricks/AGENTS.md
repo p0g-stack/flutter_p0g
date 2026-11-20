@@ -11,12 +11,13 @@ Self-contained; no external base file.
   interface is ours everywhere. The `rust/` template stays a library crate.
 - Strategies decide with `available(facts)`, never `kIsWeb` / `Platform`.
   `../pkgs/p0g_lints` enforces this and the core rule; a new convention
-  that a machine can check becomes a rule there. The brick pins p0g_lints by
-  commit in the root `analysis_options.yaml`; CI swaps in this checkout's
-  copy, so bump the pin after a p0g_lints change lands.
+  that a machine can check becomes a rule there. The brick names the
+  `p0g-v*` tag in the root `analysis_options.yaml`; it moves with the
+  workspace version, and CI checks the generated manifest against the
+  candidate tag.
 - Every call logs which strategy ran, in which place, with which facts.
-- `demo` is generated from `p0g_app`; CI regenerates it and diffs, so a brick
-  change and its demo change land together.
+- The separate `demo` repository is generated from `p0g_app`; take a new
+  brick version there when the generated shell changes.
 - Use existing tools before writing our own (Mason, Squadron, frb).
 - Run `tool/ci.sh` before pushing a brick change; it is what CI runs.
 - Templates stay `dart format`-clean for a short name; `tool/bootstrap.sh`
@@ -29,7 +30,8 @@ Self-contained; no external base file.
 - squadron_process is generic: the fact keys and checks, the WebUI launcher
   and its contract (`docs/webui-launch.md`) are ours. Its API is used only in
   `cli/.../serve_command.dart`, `app/lib/places/`, `core/lib/src/places/` and
-  `core/lib/src/facts/facts.dart`; keep that seam that small. Bump its pinned
-  commit in all three pubspecs together. The same goes for flutter-webui's
-  commit (core, app and cli pubspecs). Never depend on the `flutter_webui`
-  web plugin from the app: flutter_p0g adds it at build time.
+  `core/lib/src/facts/facts.dart`; keep that seam that small. All the p0g
+  packages resolve from one `p0g-v<x.y.z>` tag in every member pubspec, so a
+  bump moves that tag and the `^` constraint, not a commit per package. Never
+  depend on the `flutter_webui` web plugin from the app: flutter_p0g adds it
+  at build time.

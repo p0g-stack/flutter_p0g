@@ -39,5 +39,5 @@ never reaches the app's `logTo` on its own. The bricks wire two halves:
 A service made with `mason make service` gets both. Records reach the app's
 log from every place, with their logger names and levels intact. That
 includes the process place, whose host relays them over the link
-(squadron_process 28c37ce). Records from services hosted by `serve` also
-reach the CLI's own log.
+(squadron_process, the version the generated pubspec pins). Records from
+services hosted by `serve` also reach the CLI's own log.

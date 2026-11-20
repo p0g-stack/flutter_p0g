@@ -3,14 +3,15 @@
 
 # Dev loop
 
-How `flutter_p0g run webui` runs an app on a phone with hot restart, what its
-dev server must do, and the fake host (`tool/fake_host/`) that runs a module
-page in headless Chromium for checks and CI.
+How `flutter_p0g run` serves an app to a manager page with hot reload, what
+its dev server must do, and the fake host (`tool/fake_host/`) that runs a
+module page in headless Chromium for checks and CI.
 
 Verified here means: Playwright 1.56.1, Chromium 141.0.7390.37 (headless),
-Flutter 3.47.5 with the patched web SDK, the counter app, the page served at
-`https://mui.kernelsu.org/` by route interception. **Nothing on this page is
-device-verified**; device items are listed at the end.
+Flutter 3.47.5 with the patched web SDK (the check predates the 3.50.0 move),
+the counter app, the page served at `https://mui.kernelsu.org/` by route
+interception. **Nothing on this page is device-verified**; device items are
+listed at the end.
 
 ## Shape
 
@@ -27,26 +28,28 @@ The page never leaves the manager's origin, so the bridge (`ksu`, `webui`,
 `$<id>`), `insets.css`, the `WX_*` messages and the root channel behave as in
 a release build. Only the app's files come from the dev machine.
 
-## What `run webui` does
+## What `run` does
 
-1. Builds and installs the module once as for release (`build webui`), so the
-   module directory holds the root channel and anything else the app's root
-   side needs, then replaces `webroot/index.html` with `bootstrap/dev.html`
-   with both metas filled: `webui-module-id` (the module id) and
-   `webui-dev-server` (`http://127.0.0.1:P/`). A manager opens `index.html` and
-   cannot pass `?dev=`; `dev.html?dev=http://127.0.0.1:P/` is for browsers and
-   the fake host.
-2. For WebUI X, ships `webroot/config.json` as in docs/hosts.md and a CSP that
-   allows the dev server (below).
-3. Starts `flutter run -d web-server --web-hostname 127.0.0.1 --web-port U
-   --no-web-resources-cdn` in the app (the app's `web/` carries the bootstrap,
-   the build depends on `flutter_webui`, the SDK is the patched one), and a dev
-   server on `127.0.0.1:P` in front of it. `tool/fake_host/dev_server.mjs
+1. Needs the module already installed (`build webui`, then `install`): the
+   installed module holds the root channel and anything else the app's root
+   side needs. On the device, `run` replaces its `webroot/index.html` with
+   `bootstrap/dev.html` with both metas filled: `webui-module-id` (the module
+   id) and `webui-dev-server` (`http://127.0.0.1:P/`), keeping the release
+   page as `index.release.html` and putting it back on exit
+   (`--no-device-swap` skips the swap). A manager opens `index.html` and cannot
+   pass `?dev=`; `dev.html?dev=http://127.0.0.1:P/` is for browsers and the
+   fake host.
+2. For WebUI X, the module's `webroot/config.json` as in docs/hosts.md and a
+   CSP that allows the dev server (below).
+3. flutter_tools' `web-server` device on a free loopback port (`U`), in the
+   app with the patched SDK, `flutter_webui` in the build and
+   `--no-web-resources-cdn`, then a dev server on `127.0.0.1:P`
+   (`--dev-port`, 8800) in front of it. `tool/fake_host/dev_server.mjs
    --proxy http://127.0.0.1:U --port P` is the reference implementation of
-   everything in the next section; `flutter_p0g` may embed its own.
-4. `adb reverse tcp:P tcp:P`. One port is enough: the debug service's
-   WebSocket goes through the dev server too (see Host below).
-5. Forwards `r` / `R` to `flutter run`.
+   everything in the next section.
+4. `adb reverse tcp:8800`. One port is enough: the debug service's WebSocket
+   goes through the dev server too (see Host below).
+5. Forwards `r` / `R` to the app (reload, restart).
 
 ## What the dev server must do
 
@@ -75,7 +78,7 @@ host; the failing case is quoted where there is one.
   `entrypointBaseUrl`, `assetBase` and `canvasKitBaseUrl` under it to the
   loader, and `fontFallbackBaseUrl` as `<dev server>/fonts/`: a dev module is
   only `dev.html`, so the dev server serves the fallback fonts too
-  (`web_ui/tool/fallback_fonts.dart --out <dir>`, `dev_server.mjs --fonts
+  (`web_sdk/tool/fallback_fonts.dart --out <dir>`, `dev_server.mjs --fonts
   <dir>`). Tools add no loader shim of their own.
 - Loads `/internal/insets.css` from the manager and `flutter_webui.css` / `.js`
   and `flutter_bootstrap.js` from the dev server, and shows an error with the
@@ -166,7 +169,7 @@ a machine that has one, nothing needs installing; point
 | Option | Meaning |
 |---|---|
 | `--webroot <dir>` | a `flutter build web` output with the bootstrap (a module's `webroot`) |
-| `--host` | `kernelsu`, `next`, `apatch`, `webuix` (current v660), `browser` (the `FakeBridge` profiles in `packages/flutter_webui_client/lib/testing.dart`) |
+| `--host` | `kernelsu`, `next`, `apatch`, `webuix` (current v660), `browser` (the `FakeBridge` profiles in `pkgs/flutter_webui_client/lib/testing.dart`) |
 | `--entry <path>` | page to open; `'dev.html?dev=http://127.0.0.1:8080/'` for the dev loop |
 | `--dark` | `prefers-color-scheme: dark`, and `$<id>.isDarkMode()` true on `webuix` |
 | `--insets T,B` or `T,R,B,L` | safe-area insets in px (default: the profile's) |

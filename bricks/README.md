@@ -32,40 +32,50 @@ In short:
 
 ```sh
 dart pub global activate mason_cli
-mason add p0g_app --git-url https://github.com/p0g-stack/bricks --git-path bricks/p0g_app
+mason add -g p0g_app --git-url https://github.com/p0g-stack/p0g --git-path bricks/p0g_app --git-ref p0g-v<x.y.z>
 mason make p0g_app
 cd <name> && bash tool/bootstrap.sh
-flutter_p0g create .     # webui/ and aera/
+cd app && flutter_p0g create .     # webui/ and aera/
 ```
+
+`flutter_p0g create .` belongs in `app/`: that is the Flutter app; the
+workspace root only holds `core/`, `app/` and `cli/`.
 
 Then add to it from the workspace root:
 
 ```sh
-mason add service --git-url https://github.com/p0g-stack/bricks --git-path bricks/service
-mason add strategy --git-url https://github.com/p0g-stack/bricks --git-path bricks/strategy
+mason add -g service --git-url https://github.com/p0g-stack/p0g --git-path bricks/service --git-ref p0g-v<x.y.z>
+mason add -g strategy --git-url https://github.com/p0g-stack/p0g --git-path bricks/strategy --git-ref p0g-v<x.y.z>
 mason make service --name partitions
 mason make strategy --name fetch_partition --strategies '["dd", "fastboot fetch"]'
 ```
 
-and build with `flutter_p0g build webui` / `aera`. Each brick's
-README lists its variables; `bricks/<brick>/CHANGELOG.md` its versions.
+Build the module from `app/` with `flutter_p0g build webui`, and the recovery
+plugin with `flutter_p0g build aera`. Each brick's README lists its
+variables; `bricks/<brick>/CHANGELOG.md` its versions.
 
-## Pins
+## Versions
 
-Flutter 3.47.9 (Dart 3.13.7), Squadron 7.4.5 (patched, via squadron_process)
-with squadron_builder 9.3.2, squadron_process and flutter-webui (`flutter_webui_client`) by commit,
-flutter_rust_bridge 2.14.0-beta.2 (the base of flutter_p0g's frb patches),
-mason_cli 0.1.4.
+Bricks have their own versions, independent of the packages: a brick change
+bumps the brick and appends a `CHANGELOG.md` line. The generated workspace
+pins the packages it uses by the `p0g-v<x.y.z>` tag and names the Flutter
+release in `.fvmrc`; there is no separate list to keep in step. A new tag
+makes the bricks at that tag available — pass it as `--git-ref` when adding
+one later.
 
 ## CI
 
 `tool/ci.sh` generates `p0g_app`, adds a service and two objectives (read and
-write) to it, bootstraps it, and
-runs the generated workspace's analyzer, unit and widget tests (including a
-service running in the CLI as a process place), the CLI executable, and the
-web and Linux builds; the `rust` variant does the same plus `cargo test`,
-and checks that the CLI executable loads the library beside it and hashes
-with Rust. No e2e. `.github/workflows/ci.yaml` runs it on every push.
+write) to it, bootstraps it, and runs the generated workspace's analyzer, unit
+and widget tests (including a service running in the CLI as a process place),
+the CLI executable, and the web and Linux builds; the `rust` variant does the
+same plus `cargo test`, and checks that the CLI executable loads the library
+beside it and hashes with Rust. No e2e.
+
+The generated app resolves the packages as an outside consumer does: from
+`https://github.com/p0g-stack/p0g` at the candidate tag, through a local
+mirror of `HEAD`, with `pub`, the analyzer, Mason and the `flutter_p0g`
+launcher kept in scratch caches. CI runs it on every pull request.
 
 ## License
 

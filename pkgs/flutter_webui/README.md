@@ -37,23 +37,24 @@ app in a browser tab, and the staple plugins work (through `webui-packages`).
 In: the patched `web_ui` and its handlers, host detection, the bootstrap and
 shims, the root channel, host fakes for tests, per-host notes.
 
-Out: plugins (`webui-packages`), the build/packaging tool (`flutter_p0g`,
-which also adds the `webui/` platform folder to an app), app code, work that
-must outlive the page (the app's own root process).
+Out: plugins (`pkgs/webui`), the build/packaging tool (`flutter_p0g`, which
+also adds the `webui/` platform folder to an app), app code, work that must
+outlive the page (the app's own root process).
 
 ## Layout
 
 ```
-packages/flutter_webui_client/ what apps import: host detection (WebUi.host), root-channel client
-                              (WebUi.connectRootChannel), test fakes. Plain Dart, stock SDK.
-packages/flutter_webui/       web plugin: handlers on the patched web_ui hooks. Needs the patched SDK.
-packages/flutter_webui_root/  the root channel (Dart, AOT snapshot) and its launcher (module/root)
-web_ui/                       VERSION (Flutter pin), patches/, tool/build_web_sdk.dart,
-                              tool/fallback_fonts.dart (offline fonts for webroot/fonts/)
-bootstrap/                    index.html, flutter_bootstrap.js, flutter_webui.js/.css, dev.html
-tool/fake_host/               fake manager in headless Chromium (fake_host.mjs), reference dev server (dev_server.mjs)
-docs/                         hosts.md (behaviour per manager), parity.md (embedder comparison per
-                              topic), root-channel.md (contract v1), dev.md (dev loop, fake host)
+pkgs/flutter_webui_client/ what apps import: host detection (WebUi.host), root-channel client
+                            (WebUi.connectRootChannel), test fakes. Plain Dart, stock SDK.
+pkgs/flutter_webui/        web plugin: handlers on the patched web_ui hooks. Needs the patched SDK.
+pkgs/flutter_webui_root/   the root channel (Dart, AOT snapshot) and its launcher (module/root)
+web_sdk/                   VERSION (the Flutter release the patches are made against), patches/,
+                           tool/build_web_sdk.dart, tool/fallback_fonts.dart (offline fonts)
+bootstrap/                 index.html, flutter_bootstrap.js, flutter_webui.js/.css, dev.html
+tool/fake_host/            fake manager in headless Chromium (fake_host.mjs), reference dev server
+                           (dev_server.mjs)
+docs/                      hosts.md (behaviour per manager), parity.md (embedder comparison per
+                           topic), root-channel.md (contract v1), dev.md (dev loop, fake host)
 ```
 
 ## Using it
@@ -61,34 +62,37 @@ docs/                         hosts.md (behaviour per manager), parity.md (embed
 An app needs four things, which `flutter_p0g` provides (`create .` adds the
 `webui/` platform folder, `precache` the SDK, `build webui` the module):
 
-1. **The patched web SDK.** `dart run web_ui/tool/build_web_sdk.dart --flutter
-   <flutter 3.50.0> --out <dir>` applies `web_ui/patches` to the release's
+1. **The patched web SDK.** `dart run web_sdk/tool/build_web_sdk.dart
+   --flutter <flutter> --out <dir>` applies `web_sdk/patches` to the release's
    `web_ui` sources and rebuilds the platform kernels and DDC modules with the
    Dart SDK's own tools (about 20 s, no engine build). Overlay `<dir>` on
    `<flutter>/bin/cache`.
-   CI publishes the same build for every commit that changes `web_ui/`, as a
-   release tagged `web-sdk-<flutter>-<engine 7>-<flutter-webui 7>` with
+   `flutter_p0g precache --webui` takes the release in `artifacts.lock.json`
+   when its patch set and engine match, else runs that build. A release is
+   tagged `web-sdk-<flutter>-<engine 7>-<flutter-webui 7>` with
    `flutter-webui-web-sdk.tar.xz` (unpack over `bin/cache`), its `.sha256` and
-   a `manifest.json` of the pins (`.github/workflows/web-sdk-release.yaml`).
-   The tarball is reproducible, so a local build gives the same sha256.
+   a `manifest.json` of the pins. The tarball is reproducible, so a local
+   build gives the same sha256. The release the lock names was published from
+   `p0g-stack/flutter-webui`; later ones come from this repository.
 2. **`flutter_webui` as a dependency of the WebUI build.** Its web plugin
    registrant installs the handlers before `main()`; app code stays stock. It
    compiles only against the patched SDK, so apps never depend on it
    themselves: the build adds it. App code that wants the host or root
    processes depends on `flutter_webui_client`, which builds anywhere (in a
    browser or off the web, `WebUi.host` is a browser and the channel fails).
-3. **The bootstrap** laid over `web/`, built with
-   `flutter build web --release --no-web-resources-cdn --pwa-strategy=none`.
+3. **The bootstrap** laid over `web/`. `build webui` defaults to
+   `--no-web-resources-cdn` and no service worker; a stock `flutter build web`
+   keeps whatever the app asks for.
 4. **Offline fonts.** A manager WebView exposes no system fonts and may be
-   offline, so `dart run web_ui/tool/fallback_fonts.dart --flutter <flutter>
+   offline, so `dart run web_sdk/tool/fallback_fonts.dart --flutter <flutter>
    --out <webroot>/fonts [--locales ja,...] [--all]` copies the emoji, symbol
    and (per locale) CJK fallbacks `web_ui` asks for into the module.
 
-**Dev loop** (`flutter_p0g run webui`, docs/dev.md): the module's page stays
-on the manager's origin and loads the app from `flutter run -d web-server` on
-the dev machine through `adb reverse`, with hot restart. To check a build
-without a phone: `node tool/fake_host/fake_host.mjs --webroot build/web --host
-kernelsu|next|apatch|webuix|browser`.
+**Dev loop** (`flutter_p0g run`, docs/dev.md): the module's page stays on the
+manager's origin and loads the app from flutter_tools' `web-server` device on
+the dev machine, through `adb reverse`, with hot reload and hot restart. To
+check a build without a phone: `node tool/fake_host/fake_host.mjs --webroot
+build/web --host kernelsu|next|apatch|webuix|browser`.
 
 The patches add `dart:ui_web` hooks (`setHostViewPadding`,
 `setHostAppLifecycleState`, `setHostPlatformBrightness`, `setHostExitHandler`,

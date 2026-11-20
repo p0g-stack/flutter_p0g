@@ -31,7 +31,7 @@ Features:
 - Client library runs on the Dart VM, dart2js and dart2wasm; the host needs
   `dart:io`.
 
-Status: 0.1.0, unpublished. A service runs in a separate CLI process end to
+Status: 0.9.0, unpublished (no pub.dev release). A service runs in a separate CLI process end to
 end, including through stand-in `su` / `pkexec` / `osascript` front-ends (VM
 tests). The client library compiles for dart2js and dart2wasm; its codec and
 facts tests pass in Chromium. The real elevation prompts have not been run
@@ -43,17 +43,24 @@ here.
 dependencies:
   squadron_process:
     git:
-      url: https://github.com/p0g-stack/squadron_process
-      ref: <commit sha>
+      url: https://github.com/p0g-stack/p0g
+      path: pkgs/squadron_process
+      tag_pattern: p0g-v{{version}}
+    version: ^0.9.0
 ```
 
 Then, from the package or pub workspace root:
 
 ```sh
 dart pub get
-dart run squadron_process:squadron_patch   # patched Squadron + dependency_overrides
+dart run squadron_process:squadron_patch   # patched Squadron + managed override
 dart pub get
 ```
+
+`squadron_patch` takes this package's `third_party/squadron/{PIN,patches}`,
+materializes the series at `.dart_tool/third_party/squadron-<commit>`, and
+updates only a `dependency_overrides` entry it wrote before. Run it again
+after the pin moves.
 
 A runnable example is in [example/](example/squadron_process_example.dart).
 
@@ -162,19 +169,27 @@ through `--launch-id` and the session file, and security notes:
 `Worker.start()` only opens Squadron's own channels. The patch adds
 `Worker.channelFactory` (constructor parameter and settable field) and exports
 `SquadronCancelationToken` and `StreamId`, which a `Channel` implementation
-needs. It lives in `third_party/squadron/patches/` against the release pinned
-in `third_party/squadron/PIN` (7.4.4, 4ab7f15) and is meant to go upstream once
-it has been used standalone; Squadron's own VM suite passes with it applied.
+needs. It is the series in `third_party/squadron/patches/`, against the release
+pinned in `third_party/squadron/PIN`, and is meant to go upstream once it has
+been used standalone; Squadron's own VM suite passes with it applied.
+
+In this repository:
 
 ```sh
-tool/squadron.sh    # patched tree in third_party/squadron/src + pubspec_overrides.yaml
-dart test           # VM
+pkgs/squadron_process/tool/squadron.sh   # .upstream/squadron + pubspec_overrides.yaml
+dart test -p vm
 dart test -p chrome test/codec_test.dart test/facts_test.dart
 ```
 
-Until the patch is upstream, an app depending on squadron_process needs the
-same patched Squadron: `dart run squadron_process:squadron_patch` from its
-package or workspace root fetches it into `.dart_tool` and adds the
+The script checks the series out into `.upstream/squadron` (branch
+`p0g/squadron`) and points pub at it; a dependency on `squadron_process` from
+this workspace needs the `pubspec_overrides.yaml` it writes. Edit the series
+there and export it with `tool/patches.sh squadron export`; never edit a
+`.patch` file.
+
+Until the patch is upstream, an app outside this repository needs the same
+patched Squadron: `dart run squadron_process:squadron_patch` from its package
+or workspace root materializes it under `.dart_tool` and writes the managed
 `dependency_overrides` entry. How a CLI wires `serve`, its options and its
 output: [doc/serve.md](doc/serve.md).
 

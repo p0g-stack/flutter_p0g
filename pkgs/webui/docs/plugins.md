@@ -2,9 +2,9 @@
 
 Each `*_webui` package takes the first route that works on every manager
 (README, "How a plugin is closed"). Host behaviour comes from
-`WebUiHost.detect` in `flutter_webui_client` (pinned at flutter-webui
-`72df180`, current WebUI X v660), never a manager name. In a browser tab every package hands
-everything to the stock web implementation, so one web build serves both.
+`WebUiHost.detect` in the workspace's `flutter_webui_client` (current WebUI X
+v660), never a manager name. In a browser tab every package hands everything
+to the stock web implementation, so one web build serves both.
 
 **Nothing below is device-verified.** Routes are chosen from source reads;
 "works" claims come from devicelab runs, named by device and manager, when
@@ -13,7 +13,7 @@ they exist. Open device checks are listed per plugin.
 ## Registration (resolved)
 
 Flutter registers **one** web implementation per app-facing plugin, not all of
-them in some order. flutter_tools 3.47.9 runs web plugins through
+them in some order. flutter_tools runs web plugins through
 `_resolvePluginImplementationsByPlatform` and
 `_resolveImplementationOfPlugin` (`packages/flutter_tools/lib/src/flutter_plugins.dart`)
 before writing `web_plugin_registrant.dart`. The rules there, checked by
@@ -107,7 +107,7 @@ call log and telephony).
 When an app depends on `webui_app_plane` (directly or through a plugin):
 
 ```
-<moddir>/webui_app_plane/termux-api                     packages/webui_app_plane/module/termux-api
+<moddir>/webui_app_plane/termux-api                     pkgs/webui/webui_app_plane/module/termux-api
 <moddir>/webui_app_plane/<abi>/webui_termux_api.aot     AOT snapshot of bin/webui_termux_api.dart
 <moddir>/webui_app_plane/app.apk                        the release APK above, renamed to the module's package and re-signed
 ```

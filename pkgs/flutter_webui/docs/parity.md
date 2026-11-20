@@ -134,7 +134,7 @@ resize path already sees the keyboard.
 | Paste in text fields | On web the framework uses the browser context menu (`BrowserContextMenu.enabled` defaults to true: packages/flutter/lib/src/services/browser_context_menu.dart:39; editable_text.dart:2541). Native paste lands in the DOM input with no permission needed | framework toolbar | n/a | WebView's own selection action mode on the hidden input (inferred). A user paste works. Only **programmatic** `Clipboard.getData` fails |
 
 Our code: `BrowserClipboard`
-(`packages/flutter_webui/lib/src/web/engine_hooks.dart:67-95`). Write tries
+(`pkgs/flutter_webui/lib/src/web/engine_hooks.dart:67-95`). Write tries
 `writeText` and falls back to `execCommand('copy')`. Read tries `readText` and
 throws `StateError`. That surfaces as a `paste_fail`/`has_strings_fail` error
 envelope (E/clipboard.dart:49-54, 67-72). If `BrowserContextMenu` is disabled,
@@ -227,7 +227,7 @@ Font handling does not depend on the renderer.
 unless it is bundled and no emoji or other scripts. A browser tab online
 downloads them on demand.
 
-**Done here.** `web_ui/tool/fallback_fonts.dart` reads the list from the
+**Done here.** `web_sdk/tool/fallback_fonts.dart` reads the list from the
 pinned sources and copies the files into `<webroot>/fonts/` through a download
 cache: default set (Noto Sans, emoji, Symbols, Symbols 2, Math, Roboto; 2.9
 MiB), `--locales` for CJK, `--all` for everything. Checked in Chromium with
@@ -241,7 +241,7 @@ this only affects test harnesses.
 
 **Recommendation (smallest)**
 
-- **flutter_p0g build step** `fonts` (runs `web_ui/tool/fallback_fonts.dart`): generate the list from the pinned
+- **flutter_p0g build step** `fonts` (runs `web_sdk/tool/fallback_fonts.dart`): generate the list from the pinned
   `font_fallback_data.dart` plus the Roboto URL, fetch from gstatic into a
   cache (`precache`), and copy into `webroot/fonts/`. Default set: Roboto, emoji
   and symbols (about 2.5 MiB). CJK by the app's `supportedLocales`, using the
