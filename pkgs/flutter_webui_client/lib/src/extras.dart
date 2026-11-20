@@ -1,0 +1,185 @@
+// Copyright 2026 The p0g-stack authors.
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
+import 'dart:convert';
+
+import 'bridge.dart';
+
+/// A home-screen shortcut to the module's page, where the host can pin one
+/// (WebUI X `webui.createShortcut()`). KernelSU-family managers offer the same
+/// from their own module menu, so elsewhere [isSupported] is false and
+/// [create] throws [UnsupportedError].
+///
+/// WebUI X draws the shortcut from the module's icon: `webuiIcon=<path>` (or
+/// `icon=`) in `module.prop`, a PNG found first under `webroot/`, then under
+/// the module directory. Without one the host shows an "invalid icon" toast
+/// and pins nothing. Shortcuts open a new-process activity and a new page.
+///
+/// WebUI X v660 still looks up `shortcut_<id>_<engine>` but pins
+/// `shortcut_<id>`, so [exists] can report false after a successful pin.
+final class ModuleShortcut {
+  ModuleShortcut(this._bridge);
+
+  final HostBridge _bridge;
+
+  /// Whether the host can pin a shortcut from the page.
+  bool get isSupported => _bridge.webuiHas('createShortcut');
+
+  /// Whether the module's shortcut is already pinned, as the host saw it when
+  /// the page loaded; null where unknown. WebUI X v660 can report false even
+  /// after a pin (see the class comment), so read false as "unknown".
+  bool? get exists {
+    if (!isSupported) return null;
+    return switch (_bridge.webuiProperty('hasShortcut')) {
+      final bool value => value,
+      _ => null,
+    };
+  }
+
+  /// Asks the launcher to pin the shortcut; the launcher confirms with the
+  /// user, and the host says in a toast when it cannot (no launcher support,
+  /// already pinned, no icon). Returns the host's answer when it gives a
+  /// boolean (true: requested, false: refused), else null: requested, with
+  /// the result shown to the user only.
+  bool? create() {
+    if (!isSupported) {
+      throw UnsupportedError(
+        'This host cannot pin a shortcut from the page; KernelSU managers '
+        'offer it in their module menu.',
+      );
+    }
+    final Object? answer;
+    try {
+      answer = _bridge.callWebui('createShortcut');
+    } on Object {
+      // The call threw; whether the host asked the launcher is unknown.
+      return null;
+    }
+    return answer is bool ? answer : null;
+  }
+}
+
+/// Which installed packages [HostPackages.list] returns.
+enum PackageFilter { user, system, all }
+
+/// One package from [HostPackages.info].
+final class HostPackageInfo {
+  const HostPackageInfo({
+    required this.packageName,
+    this.appLabel,
+    this.versionName,
+    this.versionCode,
+    this.uid,
+    this.isSystem,
+    this.error,
+    this.raw = const {},
+  });
+
+  factory HostPackageInfo.fromJson(Map<String, Object?> json) =>
+      HostPackageInfo(
+        packageName: '${json['packageName'] ?? ''}',
+        appLabel: _string(json['appLabel']),
+        versionName: _string(json['versionName']),
+        versionCode: (json['versionCode'] as num?)?.toInt(),
+        uid: (json['uid'] as num?)?.toInt(),
+        isSystem: json['isSystem'] is bool ? json['isSystem']! as bool : null,
+        error: _string(json['error']),
+        raw: json,
+      );
+
+  final String packageName;
+  final String? appLabel;
+  final String? versionName;
+  final int? versionCode;
+  final int? uid;
+  final bool? isSystem;
+
+  /// Set when the host could not read the package (WebUI X: "Package not
+  /// found or inaccessible").
+  final String? error;
+
+  /// Whether the host knew the package ([error] unset).
+  bool get found => error == null;
+
+  /// Every field the host returned.
+  final Map<String, Object?> raw;
+
+  @override
+  String toString() => 'HostPackageInfo($packageName, $appLabel, $versionName)';
+}
+
+String? _string(Object? v) => v is String ? v : null;
+
+/// The manager's package list, read without a root shell.
+///
+/// Uses `ksu.pm()` where present, otherwise KernelSU's `ksu.listPackages`
+/// and `ksu.getPackagesInfo`. This is a fast path only: each host answers
+/// from its own view, so the root channel stays the way to see every package.
+///
+/// - KernelSU answers from its Superuser screen's app list (loaded by the
+///   manager, without special apps), so a package outside it, such as
+///   `android`, comes back with [HostPackageInfo.error] and no icon.
+/// - WebUI X v660 answers from Android's package manager and requires
+///   `kernelsu.permission.PM` in `webroot/config.json` permissions.
+///
+/// A package the host did not find is data, not a failure: check
+/// [HostPackageInfo.found] and fall back to the root channel. Where the host
+/// has no list, [isSupported] is false and the methods throw
+/// [UnsupportedError].
+final class HostPackages {
+  HostPackages(this._bridge);
+
+  final HostBridge _bridge;
+
+  bool get isSupported =>
+      _bridge.ksuHas('pm') ||
+      (_bridge.ksuHas('listPackages') && _bridge.ksuHas('getPackagesInfo'));
+
+  void _check() {
+    if (!isSupported) {
+      throw UnsupportedError('This host has no package list for the page.');
+    }
+  }
+
+  /// Package names of [filter]'s packages.
+  List<String> list([PackageFilter filter = PackageFilter.all]) {
+    _check();
+    final decoded = _decode(
+      _bridge.ksuHas('pm')
+          ? _bridge.callKsuPm('listPackages', [filter.name])
+          : _bridge.callKsu('listPackages', [filter.name]),
+    );
+    return decoded is List ? [for (final p in decoded) '$p'] : const [];
+  }
+
+  /// Details for [packageNames], in order.
+  List<HostPackageInfo> info(List<String> packageNames) {
+    _check();
+    final decoded = _decode(
+      _bridge.ksuHas('pm')
+          ? _bridge.callKsuPm('getPackagesInfo', [packageNames])
+          : _bridge.callKsu('getPackagesInfo', [jsonEncode(packageNames)]),
+    );
+    if (decoded is! List) return const [];
+    return [
+      for (final p in decoded)
+        if (p is Map) HostPackageInfo.fromJson(p.cast<String, Object?>()),
+    ];
+  }
+
+  /// The package's launcher icon as the host serves it to the WebView
+  /// (`ksu://icon/<package>`, a PNG; `Image.network` with
+  /// `WebHtmlElementStrategy.prefer` loads it as an `<img>`). The host serves
+  /// only packages its own list has: one from [list], or [info] with
+  /// [HostPackageInfo.found]; any other answers 404.
+  Uri iconUri(String packageName) => Uri.parse('ksu://icon/$packageName');
+
+  static Object? _decode(Object? raw) {
+    if (raw is! String) return raw;
+    try {
+      return jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+  }
+}

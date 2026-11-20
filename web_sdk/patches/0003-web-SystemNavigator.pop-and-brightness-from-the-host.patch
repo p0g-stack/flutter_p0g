@@ -1,0 +1,84 @@
+From 1e718f4e1613cb2c5c167ca66d445b794e485e5f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 05:35:35 +0000
+Subject: [PATCH 3/5] [web] SystemNavigator.pop and brightness from the host
+
+After browser history is unwound, SystemNavigator.pop calls the host's exit
+handler, as closing a tab would. platformBrightness follows the host's mode
+when it reports one, else prefers-color-scheme.
+---
+ .../lib/src/engine/platform_dispatcher.dart   | 35 +++++++++++++++----
+ 1 file changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
+index 20ec52067d2..7f3639dd13e 100644
+--- a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
++++ b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
+@@ -105,6 +105,7 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
+ 
+   void dispose() {
+     mediaQueries.detachAll();
++    _hostBrightnessSubscription?.cancel();
+     _disconnectTypographySettingsObserver();
+     _removeLocaleChangedListener();
+     _appLifecycleState.removeListener(_setAppLifecycleState);
+@@ -537,13 +538,21 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
+             //
+             // TODO(mdebbar): What should we do in multi-view mode?
+             //                https://github.com/flutter/flutter/issues/139174
+-            if (implicitView != null) {
+-              implicitView!.browserHistory.exit().then((_) {
+-                replyToPlatformMessage(callback, jsonCodec.encodeSuccessEnvelope(true));
+-              });
++            final Future<void> Function()? hostExit = HostEmbedding.instance.exitHandler;
++            final Future<void> done;
++            if (hostExit != null) {
++              // Start restoring the history the page started with (a host
++              // without an exit leaves the next Back to it), but do not wait
++              // for it: when the page has no entry to go back to, the popstate
++              // never comes.
++              implicitView?.browserHistory.tearDown();
++              done = hostExit();
+             } else {
+-              replyToPlatformMessage(callback, jsonCodec.encodeSuccessEnvelope(true));
++              done = implicitView?.browserHistory.exit() ?? Future<void>.value();
+             }
++            done.then((_) {
++              replyToPlatformMessage(callback, jsonCodec.encodeSuccessEnvelope(true));
++            });
+             return;
+           case 'HapticFeedback.vibrate':
+             final type = decoded.arguments as String?;
+@@ -1319,7 +1328,18 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
+   /// Updates [_platformBrightness] and invokes [onPlatformBrightnessChanged]
+   /// callback if [_platformBrightness] changed.
+   void _updatePlatformBrightness(bool prefersDark) {
+-    final ui.Brightness brightness = prefersDark ? ui.Brightness.dark : ui.Brightness.light;
++    _browserBrightness = prefersDark ? ui.Brightness.dark : ui.Brightness.light;
++    _publishPlatformBrightness();
++  }
++
++  /// The brightness `prefers-color-scheme` reports, before
++  /// [HostEmbedding.platformBrightness] overrides it.
++  ui.Brightness _browserBrightness = ui.Brightness.light;
++  StreamSubscription<void>? _hostBrightnessSubscription;
++
++  void _publishPlatformBrightness() {
++    final ui.Brightness brightness =
++        HostEmbedding.instance.platformBrightness ?? _browserBrightness;
+     if (configuration.platformBrightness != brightness) {
+       configuration = configuration.copyWith(platformBrightness: brightness);
+       invokeOnPlatformConfigurationChanged();
+@@ -1375,6 +1395,9 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
+   // Configures the [_mediaQueries] object.
+   void _registerMediaQueryListeners() {
+     mediaQueries.addListener(MediaQueryManager.DARK_MODE, onMatch: _updatePlatformBrightness);
++    _hostBrightnessSubscription = HostEmbedding.instance.onPlatformBrightnessChanged.listen(
++      (_) => _publishPlatformBrightness(),
++    );
+     mediaQueries.addListener(MediaQueryManager.REDUCED_MOTION, onMatch: _updateReducedMotion);
+     mediaQueries.addListener(MediaQueryManager.FORCED_COLORS, onMatch: _updateHighContrast);
+   }
+-- 
+2.56.0
+

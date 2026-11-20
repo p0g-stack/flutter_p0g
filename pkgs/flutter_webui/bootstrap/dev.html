@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!-- flutter-webui dev entry (docs/dev.md): the page stays on the manager's
+     origin, so the ksu bridge, insets.css and history keep working, while the
+     app's files come from a dev server on 127.0.0.1, given as
+     ?dev=http://127.0.0.1:<port>/ or in the webui-dev-server meta tag. There
+     is no <base>: web_ui resolves history URLs against it, and a cross-origin
+     base makes replaceState throw. flutter_bootstrap.js points the loader and
+     the engine at the dev server instead (window.flutterWebUiDevServer).
+     The dev server must allow the manager's origin (CORS); a WebUI X dev
+     module's config.json CSP must allow http://127.0.0.1:<port>.
+     SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception -->
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="webui-module-id" content="">
+  <meta name="webui-dev-server" content="">
+  <title>Flutter (dev)</title>
+  <!-- From the manager, as in index.html. -->
+  <link id="flutter-webui-insets" rel="stylesheet" href="/internal/insets.css">
+  <!-- KernelSU-family hosts: the manager's theme colours (Monet), from which
+       flutter_webui takes light or dark. Elsewhere empty or a harmless miss. -->
+  <link id="flutter-webui-colors" rel="stylesheet" href="/internal/colors.css">
+  <script>
+    (function () {
+      var meta = document.querySelector('meta[name="webui-dev-server"]');
+      var dev = new URLSearchParams(location.search).get('dev') || (meta && meta.content);
+      if (!dev) return;
+      if (dev.charAt(dev.length - 1) !== '/') dev += '/';
+      window.flutterWebUiDevServer = dev;
+      // flutter run's debug client fetches this relative path on hot restart;
+      // resolve it against the dev server, not the manager's origin.
+      var reloaded;
+      Object.defineProperty(window, '$reloadedSourcesPath', {
+        configurable: true,
+        get: function () { return reloaded; },
+        set: function (value) { reloaded = value == null ? value : new URL(value, dev).href; },
+      });
+      var css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = dev + 'flutter_webui.css';
+      document.head.appendChild(css);
+    })();
+  </script>
+</head>
+<body>
+  <div id="flutter-webui-splash" aria-hidden="true"></div>
+  <script>
+    (function () {
+      var dev = window.flutterWebUiDevServer;
+      function fail(text) {
+        var box = document.createElement('pre');
+        box.id = 'flutter-webui-error';
+        box.textContent = text;
+        document.body.appendChild(box);
+      }
+      if (!dev) {
+        fail('No dev server: open dev.html?dev=http://127.0.0.1:PORT/');
+        return;
+      }
+      var glue = document.createElement('script');
+      glue.src = dev + 'flutter_webui.js';
+      glue.onerror = function () {
+        fail('Cannot load ' + glue.src + '\nIs the dev server running, and is the port forwarded (adb reverse tcp:PORT tcp:PORT)?');
+      };
+      glue.onload = function () {
+        var boot = document.createElement('script');
+        boot.src = dev + 'flutter_bootstrap.js';
+        boot.onerror = function () { window.flutterWebUiFail('Cannot load ' + boot.src); };
+        document.body.appendChild(boot);
+      };
+      document.body.appendChild(glue);
+    })();
+  </script>
+</body>
+</html>
