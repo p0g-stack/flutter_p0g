@@ -12,15 +12,9 @@ executables:
 
 dependencies:
   flutter_webui_client:
-    git:
-      url: https://github.com/p0g-stack/flutter-webui
-      ref: 72df180304562037fbc720153967fbb70a362eb1
-      path: packages/flutter_webui_client
+    path: ../../flutter_webui_client
   flutter_webui_root:
-    git:
-      url: https://github.com/p0g-stack/flutter-webui
-      ref: 72df180304562037fbc720153967fbb70a362eb1
-      path: packages/flutter_webui_root
+    path: ../../flutter_webui_root
 
 dev_dependencies:
   test: ^1.25.0

@@ -13,6 +13,16 @@ workspace:
   - pkgs/flutter_webui_client
   - pkgs/flutter_webui_root
   - web_sdk
+  - pkgs/webui/clipboard_webui
+  - pkgs/webui/dynamic_color_webui
+  - pkgs/webui/file_selector_webui
+  - pkgs/webui/flutter_local_notifications_webui
+  - pkgs/webui/path_provider_webui
+  - pkgs/webui/permission_handler_webui
+  - pkgs/webui/share_plus_webui
+  - pkgs/webui/shared_preferences_webui
+  - pkgs/webui/url_launcher_webui
+  - pkgs/webui/webui_app_plane
 
 dev_dependencies:
   lints: ^6.0.0
