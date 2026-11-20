@@ -1,24 +1,16 @@
-From fce410f16b5b31538113d2b4f19fe854d9c54136 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 1 Oct 2026 05:35:35 +0000
-Subject: [PATCH 1/5] [web] ui_web: host embedding hooks
+Subject: [web] ui_web: host embedding hooks
 
 A page embedded in an app's WebView (for example a root manager's module
 WebUI) cannot learn some platform state from the browser: safe-area
 padding, the host's pause/resume, its dark mode, how to close. These hooks
 let the embedding supply them. Every value is null in a browser tab, and
 null keeps today's behaviour.
----
- .../flutter/lib/web_ui/lib/src/engine.dart    |  1 +
- .../web_ui/lib/src/engine/host_embedding.dart | 86 +++++++++++++++++++
- .../lib/web_ui/lib/ui_web/src/ui_web.dart     |  1 +
- .../lib/ui_web/src/ui_web/host_embedding.dart | 78 +++++++++++++++++
- 4 files changed, 166 insertions(+)
- create mode 100644 engine/src/flutter/lib/web_ui/lib/src/engine/host_embedding.dart
- create mode 100644 engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web/host_embedding.dart
 
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine.dart b/engine/src/flutter/lib/web_ui/lib/src/engine.dart
-index 850ee2a8565..fee4fb09e27 100644
+index 850ee2a8565bd77668cf3478ed9410c477a1f92f..fee4fb09e27c3f1d4ab8d0ffbb63aab88d4a7829 100644
 --- a/engine/src/flutter/lib/web_ui/lib/src/engine.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine.dart
 @@ -66,6 +66,7 @@ export 'engine/font_fallbacks.dart';
@@ -31,7 +23,7 @@ index 850ee2a8565..fee4fb09e27 100644
  export 'engine/initialization.dart';
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/host_embedding.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/host_embedding.dart
 new file mode 100644
-index 00000000000..ce0e113abc7
+index 0000000000000000000000000000000000000000..ce0e113abc74ab3cbda9009e767ed02020a73902
 --- /dev/null
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine/host_embedding.dart
 @@ -0,0 +1,86 @@
@@ -122,7 +114,7 @@ index 00000000000..ce0e113abc7
 +  ui_web.HostClipboard? clipboard;
 +}
 diff --git a/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web.dart b/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web.dart
-index c5e4907e5c6..bcac7f66b34 100644
+index c5e4907e5c6b91bd08b160e6a34719c6bd9146ea..bcac7f66b343be0f0d386afa65ee4e7937d8cffa 100644
 --- a/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web.dart
 @@ -12,6 +12,7 @@ export 'ui_web/asset_manager.dart';
@@ -135,7 +127,7 @@ index c5e4907e5c6..bcac7f66b34 100644
  export 'ui_web/navigation/platform_location.dart';
 diff --git a/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web/host_embedding.dart b/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web/host_embedding.dart
 new file mode 100644
-index 00000000000..bc2d2dec16a
+index 0000000000000000000000000000000000000000..bc2d2dec16a6f942fb97b9e74c566dbf0c8db07c
 --- /dev/null
 +++ b/engine/src/flutter/lib/web_ui/lib/ui_web/src/ui_web/host_embedding.dart
 @@ -0,0 +1,78 @@
@@ -217,6 +209,3 @@ index 00000000000..bc2d2dec16a
 +void setHostClipboard(HostClipboard? clipboard) {
 +  HostEmbedding.instance.clipboard = clipboard;
 +}
--- 
-2.56.0
-

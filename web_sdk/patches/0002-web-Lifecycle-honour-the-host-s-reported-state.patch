@@ -1,17 +1,14 @@
-From 14adcb9ce67c9d8c47039eb1998b1dd6c234e081 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 1 Oct 2026 05:35:35 +0000
-Subject: [PATCH 2/5] [web] Lifecycle: honour the host's reported state
+Subject: [web] Lifecycle: honour the host's reported state
 
 When the embedding host reports a lifecycle state (paused while the page
 stays visible), it overrides visibility and focus until cleared. Detached
 still wins.
----
- .../app_lifecycle_state.dart                  | 22 +++++++++++++++++++
- 1 file changed, 22 insertions(+)
 
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher/app_lifecycle_state.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher/app_lifecycle_state.dart
-index da5808c2f78..0c59512afe4 100644
+index da5808c2f782ce878de6ce731356a9f63c2e48b1..0c59512afe44fa91daec73fc067c26939337bd97 100644
 --- a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher/app_lifecycle_state.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher/app_lifecycle_state.dart
 @@ -21,11 +21,21 @@ abstract class AppLifecycleState {
@@ -62,6 +59,3 @@ index da5808c2f78..0c59512afe4 100644
      if (newState != _appLifecycleState) {
        _appLifecycleState = newState;
        for (final AppLifecycleStateListener listener in _listeners) {
--- 
-2.56.0
-

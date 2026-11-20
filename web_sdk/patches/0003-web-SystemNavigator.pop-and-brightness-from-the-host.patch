@@ -1,17 +1,14 @@
-From 1e718f4e1613cb2c5c167ca66d445b794e485e5f Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 1 Oct 2026 05:35:35 +0000
-Subject: [PATCH 3/5] [web] SystemNavigator.pop and brightness from the host
+Subject: [web] SystemNavigator.pop and brightness from the host
 
 After browser history is unwound, SystemNavigator.pop calls the host's exit
 handler, as closing a tab would. platformBrightness follows the host's mode
 when it reports one, else prefers-color-scheme.
----
- .../lib/src/engine/platform_dispatcher.dart   | 35 +++++++++++++++----
- 1 file changed, 29 insertions(+), 6 deletions(-)
 
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
-index 20ec52067d2..7f3639dd13e 100644
+index 20ec52067d2f5ef7ef3e6201c84863d0be97057f..7f3639dd13e41cb3ab88a2a4ee1fa88f3980799d 100644
 --- a/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine/platform_dispatcher.dart
 @@ -105,6 +105,7 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
@@ -79,6 +76,3 @@ index 20ec52067d2..7f3639dd13e 100644
      mediaQueries.addListener(MediaQueryManager.REDUCED_MOTION, onMatch: _updateReducedMotion);
      mediaQueries.addListener(MediaQueryManager.FORCED_COLORS, onMatch: _updateHighContrast);
    }
--- 
-2.56.0
-

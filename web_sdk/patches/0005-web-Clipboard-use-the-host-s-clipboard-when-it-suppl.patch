@@ -1,15 +1,11 @@
-From 394d7e106b313b40b08209d107ad8fd3052ee6ad Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 1 Oct 2026 05:35:35 +0000
-Subject: [PATCH 5/5] [web] Clipboard: use the host's clipboard when it
- supplies one
+Subject: [web] Clipboard: use the host's clipboard when it supplies one
 
----
- .../lib/web_ui/lib/src/engine/clipboard.dart  | 26 +++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
 
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/clipboard.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/clipboard.dart
-index 58e816545ba..1b5098b58f1 100644
+index 58e816545badf5370a34517322d6777d48f0a674..1b5098b58f1f0cf3a4130dc28a77c92fb921ee15 100644
 --- a/engine/src/flutter/lib/web_ui/lib/src/engine/clipboard.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine/clipboard.dart
 @@ -5,7 +5,10 @@
@@ -64,6 +60,3 @@ index 58e816545ba..1b5098b58f1 100644
 +  @override
 +  Future<String> getData() async => await _host.getText() ?? '';
 +}
--- 
-2.56.0
-

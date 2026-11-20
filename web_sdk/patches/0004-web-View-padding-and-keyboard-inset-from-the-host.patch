@@ -1,18 +1,15 @@
-From 82bd735a61194c0487809517b415da3550686b83 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 1 Oct 2026 05:35:35 +0000
-Subject: [PATCH 4/5] [web] View padding and keyboard inset from the host
+Subject: [web] View padding and keyboard inset from the host
 
 viewPadding comes from the host's safe-area insets (logical pixels times
 devicePixelRatio); padding is viewPadding less viewInsets, as on mobile
 embedders. A host-reported keyboard height replaces the visual-viewport
 measurement.
----
- .../lib/web_ui/lib/src/engine/window.dart     | 39 ++++++++++++++++---
- 1 file changed, 34 insertions(+), 5 deletions(-)
 
 diff --git a/engine/src/flutter/lib/web_ui/lib/src/engine/window.dart b/engine/src/flutter/lib/web_ui/lib/src/engine/window.dart
-index 73f8460e799..e7290b8e63e 100644
+index 73f8460e799c5f5b0095cf8c922287a999fdb6de..e7290b8e63ed362e6c76389f044c0031dc020dad 100644
 --- a/engine/src/flutter/lib/web_ui/lib/src/engine/window.dart
 +++ b/engine/src/flutter/lib/web_ui/lib/src/engine/window.dart
 @@ -14,6 +14,7 @@ import '../engine.dart' show DimensionsProvider, registerHotRestartListener, ren
@@ -110,6 +107,3 @@ index 73f8460e799..e7290b8e63e 100644
  
      // Ensure that viewInsets are never negative. If it's not caught here, it will be caught later
      // in the framework, and will be hard to debug since the root cause is here.
--- 
-2.56.0
-
