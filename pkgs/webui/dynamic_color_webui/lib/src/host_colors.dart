@@ -17,10 +17,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webui_client/flutter_webui_client.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Reads `/internal/colors.css`; null when it cannot be fetched.
 typedef ColorsCssFetcher = Future<String?> Function();

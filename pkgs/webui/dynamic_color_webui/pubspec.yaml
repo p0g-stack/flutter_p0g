@@ -24,6 +24,7 @@ dependencies:
   flutter_webui_client:
     path: ../../flutter_webui_client
   material_color_utilities: ^0.13.0
+  material_ui: ^1.0.0
   web: ^1.1.0
 
 dev_dependencies:
