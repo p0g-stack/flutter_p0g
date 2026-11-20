@@ -1,0 +1,42 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+# A newer push to the same ref supersedes a running check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.7
+      - name: Patched Squadron
+        run: tool/squadron.sh
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed lib test bin example benchmark
+      - run: dart analyze --fatal-infos
+      - name: VM
+        run: dart test -p vm
+      - name: Example
+        run: dart run example/squadron_process_example.dart
+      - name: Browser (dart2js, dart2wasm)
+        run: |
+          dart test -p chrome test/codec_test.dart test/facts_test.dart
+          dart test -p chrome -c dart2wasm test/codec_test.dart test/facts_test.dart
+      - name: Squadron suite with the patch
+        working-directory: third_party/squadron/src
+        run: |
+          dart pub get
+          dart test -p vm test/squadron_vm_test.dart
+      - name: Upstream patch matches the applied one
+        run: |
+          for patch in third_party/squadron/patches/*.patch; do
+            cmp "$patch" "third_party/squadron/patches/upstream/$(basename "$patch")"
+          done
