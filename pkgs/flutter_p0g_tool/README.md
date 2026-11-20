@@ -101,8 +101,9 @@ commit this tool runs from; nothing here keeps its own table.
   [.github/docs](https://github.com/p0g-stack/.github/tree/main/docs)
   (`bump.md`).
 
-The web SDK release the lock names is still published by
-`p0g-stack/flutter-webui`; future ones come from this repository.
+The web SDK release the lock names was published by
+`p0g-stack/flutter-webui`; later ones are built and published by
+`.github/workflows/web-sdk-release.yml` in this repository (dispatch only).
 
 ## Patched sources
 

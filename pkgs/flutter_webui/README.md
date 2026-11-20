@@ -69,11 +69,12 @@ An app needs four things, which `flutter_p0g` provides (`create .` adds the
    `<flutter>/bin/cache`.
    `flutter_p0g precache --webui` takes the release in `artifacts.lock.json`
    when its patch set and engine match, else runs that build. A release is
-   tagged `web-sdk-<flutter>-<engine 7>-<flutter-webui 7>` with
+   tagged `web-sdk-<Flutter>-<engine 7>-<commit 7>` with
    `flutter-webui-web-sdk.tar.xz` (unpack over `bin/cache`), its `.sha256` and
    a `manifest.json` of the pins. The tarball is reproducible, so a local
    build gives the same sha256. The release the lock names was published from
-   `p0g-stack/flutter-webui`; later ones come from this repository.
+   `p0g-stack/flutter-webui`; later ones are built and published here by
+   `.github/workflows/web-sdk-release.yml` (dispatch only).
 2. **`flutter_webui` as a dependency of the WebUI build.** Its web plugin
    registrant installs the handlers before `main()`; app code stays stock. It
    compiles only against the patched SDK, so apps never depend on it

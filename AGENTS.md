@@ -71,7 +71,11 @@ rebase. The full policy is in
 - **Expensive workflows are dispatch-only** (lab runs, engine and kit builds,
   releases, promotion). The integrator dispatches them; a pull request does
   not trigger them.
-- Every commit is signed with the agent key; `main` is protected.
+- CI classifies a pull request first: a diff that touches only `*.md` and
+  `docs/` skips the workspace, CLI, patch and bricks jobs, and `p0g CI` (the
+  required check) passes with them skipped.
+- Every commit is signed with the agent key; `main` takes PRs only, with
+  `p0g CI` green and the branch up to date.
 
 ## Conventions
 
