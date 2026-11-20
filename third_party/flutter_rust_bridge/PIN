@@ -1,0 +1,7 @@
+# flutter_rust_bridge 2.13.0, the latest stable release (pub.dev and
+# crates.io; 2.14.0-beta.* are prereleases). No `package`: consumers use
+# the whole tree (frb_dart for the Dart side, frb_codegen for the codegen,
+# frb_rust and frb_macros for the crates).
+repo=https://github.com/fzyzcjy/flutter_rust_bridge
+commit=8631db91a90c699439c9ce2a1fb4164ae8661da9
+tag=v2.13.0

@@ -1,6 +1,7 @@
 import 'dart:io' as io;
 
 import 'package:file/local.dart';
+import 'package:flutter_p0g/patched_source.dart';
 import 'package:flutter_p0g/src/frb/frb.dart';
 import 'package:package_config/package_config.dart';
 import 'package:test/test.dart';
@@ -10,27 +11,30 @@ PackageConfig configWithFrbAt(String root) => PackageConfig([
 ]);
 
 void main() {
-  test('the repo carries the frb series in order', () {
+  test('the repo carries the frb series in order, with its PIN', () async {
     final root = const LocalFileSystem().directory(io.Directory.current.path);
     final names = frbPatches(root).map((f) => f.basename).toList();
     expect(names, isNotEmpty);
     expect(names.first, startsWith('0001-'));
     expect(names, orderedEquals([...names]..sort()));
+    final pin = await readPatchPin(io.File(frbSeriesDir(root).childFile('PIN').path));
+    expect(pin['repo'], 'https://github.com/fzyzcjy/flutter_rust_bridge');
   });
 
   test('stamp changes with the commit and with any patch byte', () {
-    final a = frbStamp(kFrbCommit, [
+    final commit = 'a' * 40;
+    final a = frbStamp(commit, [
       [1, 2],
     ]);
-    expect(a, startsWith('$kFrbCommit '));
+    expect(a, startsWith('$commit '));
     expect(
-      frbStamp(kFrbCommit, [
+      frbStamp(commit, [
         [1, 2],
       ]),
       a,
     );
     expect(
-      frbStamp(kFrbCommit, [
+      frbStamp(commit, [
         [1, 3],
       ]),
       isNot(a),

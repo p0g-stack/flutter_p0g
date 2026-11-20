@@ -24,11 +24,11 @@ the runner checks its pinned HEAD and reverse-applicability of both patches.
 Without these overrides it fetches the pinned upstream source, applies the
 series and builds codegen itself.
 
-## Standalone FRB 0003
+## Standalone FRB worker initialization
 
 A five-line real Rust API computes `rust:5050`. The runner generates the Dart
 bindings with the patched codegen, builds Rust with `build-web --no-threads
---skip-tool-install --release`, then compiles the Dart caller to JavaScript.
+--release`, then compiles the Dart caller to JavaScript.
 Playwright launches a **dedicated classic worker**, not a page or a module
 worker. That worker must initialize FRB and return the exact Rust result,
 `hasDocument: false`, and `isolated: false`. Browser errors and serialized

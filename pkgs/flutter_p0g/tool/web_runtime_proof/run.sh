@@ -18,18 +18,19 @@ copy_fixture() {
 }
 
 if [[ "$mode" != defines ]]; then
-  pin=$(awk -F "'" '/^const kFrbCommit = / {print $2}' "$repo/lib/src/frb/frb.dart")
+  series="$repo/../../third_party/flutter_rust_bridge"
+  pin=$(sed -n 's/^commit=//p' "$series/PIN")
   test "${#pin}" = 40
   source=${FRB_SOURCE:-$work/frb-source}
   if [[ -z "${FRB_SOURCE:-}" ]]; then
     git init -q "$source"
-    git -C "$source" remote add origin https://github.com/fzyzcjy/flutter_rust_bridge
+    git -C "$source" remote add origin "$(sed -n 's/^repo=//p' "$series/PIN")"
     git -C "$source" fetch -q --depth 1 origin "$pin"
     git -C "$source" checkout -q FETCH_HEAD
-    for patch in "$repo"/patches/frb/*.patch; do git -C "$source" apply "$patch"; done
+    for patch in "$series"/patches/*.patch; do git -C "$source" apply "$patch"; done
   else
     test "$(git -C "$source" rev-parse HEAD)" = "$pin"
-    for patch in "$repo"/patches/frb/*.patch; do git -C "$source" apply --reverse --check "$patch"; done
+    for patch in "$series"/patches/*.patch; do git -C "$source" apply --reverse --check "$patch"; done
   fi
   codegen=${FRB_CODEGEN:-$source/target/release/flutter_rust_bridge_codegen}
   if [[ -z "${FRB_CODEGEN:-}" ]]; then
@@ -42,7 +43,7 @@ if [[ "$mode" != defines ]]; then
   printf '[patch.crates-io]\nflutter_rust_bridge = { path = "%s/frb_rust" }\nflutter_rust_bridge_macros = { path = "%s/frb_macros" }\n' "$source" "$source" > rust/.cargo/config.toml
   dart pub get
   "$codegen" generate --config-file flutter_rust_bridge.yaml
-  "$codegen" build-web --no-threads --skip-tool-install --release
+  "$codegen" build-web --no-threads --release
   dart compile js -O2 --no-source-maps lib/worker.dart -o web/worker.js
   node "$here/browser.mjs" frb "$work/frb/web" | tee "$work/frb-browser.json"
 fi

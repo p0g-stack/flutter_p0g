@@ -27,7 +27,7 @@ dependencies:
     git:
       url: https://github.com/fzyzcjy/flutter_rust_bridge
       path: frb_dart
-      ref: 1e4df906b6d0e96aefbfa40dde5fa2833d417c1a
+      ref: 8631db91a90c699439c9ce2a1fb4164ae8661da9
 {{/rust}}
 dev_dependencies:
   build_runner: ^2.16.1

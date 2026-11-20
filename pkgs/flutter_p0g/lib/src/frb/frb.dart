@@ -13,11 +13,12 @@ import '../p0g_cache.dart';
 import '../squadron.dart' show workspaceRoot;
 import '../../patched_source.dart';
 
-/// flutter_rust_bridge, pinned. The patch series in `patches/frb/` is made
-/// against this commit (master after v2.14.0-beta.2; the patches do not
-/// apply to the tag itself).
-const kFrbRepo = 'https://github.com/fzyzcjy/flutter_rust_bridge';
-const kFrbCommit = '1e4df906b6d0e96aefbfa40dde5fa2833d417c1a';
+/// The carried flutter_rust_bridge series, `third_party/flutter_rust_bridge/`
+/// at the repository root: `PIN` (repo=, commit=) and `patches/`, in apply
+/// order. Git and path activation both keep the whole repository beside
+/// this package.
+Directory frbSeriesDir(Directory toolRoot) =>
+    toolRoot.parent.parent.childDirectory('third_party').childDirectory('flutter_rust_bridge');
 
 /// frb's own marker for an app that uses it.
 const kFrbConfigFile = 'flutter_rust_bridge.yaml';
@@ -55,7 +56,7 @@ File frbCodegenBinary() =>
 
 /// Patch files in apply order.
 List<File> frbPatches(Directory toolRoot) {
-  final dir = toolRoot.childDirectory('patches').childDirectory('frb');
+  final dir = frbSeriesDir(toolRoot).childDirectory('patches');
   final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.patch')).toList()
     ..sort((a, b) => a.basename.compareTo(b.basename));
   return files;
@@ -92,15 +93,17 @@ String? checkPatchedDartSide(PackageConfig config, String patchedFrbDart) {
       '    path: $patchedFrbDart';
 }
 
-/// Fetches frb at [kFrbCommit], applies the series and builds the codegen
+/// Fetches frb at the series' PIN, applies the series and builds the codegen
 /// into the cache. Skips work whose stamp already matches.
 Future<void> precacheFrb() async {
   final toolRoot = await toolPackageRoot();
+  final pin = await readPatchPin(io.File(frbSeriesDir(toolRoot).childFile('PIN').path));
+  final commit = pin['commit']!;
   final patches = frbPatches(toolRoot);
   final src = await materializePatchedSource(
     destination: io.Directory(frbSourceDir().path),
-    repository: kFrbRepo,
-    commit: kFrbCommit,
+    repository: pin['repo']!,
+    commit: commit,
     patches: [for (final patch in patches) io.File(patch.path)],
   );
   for (final required in ['frb_dart/pubspec.yaml', 'frb_codegen/Cargo.toml']) {
@@ -108,16 +111,14 @@ Future<void> precacheFrb() async {
       throwToolExit('Incomplete patched FRB source: ${p.join(src.path, required)}');
     }
   }
-  final stamp = frbStamp(kFrbCommit, [
+  final stamp = frbStamp(commit, [
     io.File(p.join(src.path, '.patched_source.json')).readAsBytesSync(),
   ]);
   final stampFile = frbCacheDir().childFile('stamp');
   if (stampFile.existsSync() &&
       stampFile.readAsStringSync() == stamp &&
       frbCodegenBinary().existsSync()) {
-    globals.printStatus(
-      'frb ${kFrbCommit.substring(0, 7)} + ${patches.length} patch(es): up to date.',
-    );
+    globals.printStatus('frb ${commit.substring(0, 7)} + ${patches.length} patch(es): up to date.');
     return;
   }
   globals.printStatus('Building flutter_rust_bridge_codegen (cargo)...');

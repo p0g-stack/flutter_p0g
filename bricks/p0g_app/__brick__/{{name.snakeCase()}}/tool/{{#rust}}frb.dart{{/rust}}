@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:patched_source/patched_source.dart';
 import 'package:path/path.dart' as p;
 
-const _commit = '1e4df906b6d0e96aefbfa40dde5fa2833d417c1a';
+const _commit = '8631db91a90c699439c9ce2a1fb4164ae8661da9';
 const _repository = 'https://github.com/fzyzcjy/flutter_rust_bridge';
 
 Future<String> _git(Directory dir, List<String> args) async {

@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-flutter_rust_bridge = { version = "=2.14.0-beta.2", default-features = false, features = ["anyhow", "dart-opaque", "log", "portable-atomic", "rust-async", "user-utils", "wasm-start"] }
+flutter_rust_bridge = { version = "=2.13.0", default-features = false, features = ["anyhow", "dart-opaque", "log", "portable-atomic", "rust-async", "user-utils", "wasm-start"] }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
