@@ -4,7 +4,15 @@ publish_to: none
 environment:
   sdk: ^3.13.0
 
+# The CLI wraps flutter_tools from Flutter 3.47.9; flutter_webui needs
+# Flutter >=3.50.0. Resolve pkgs/flutter_p0g separately on its pinned SDK.
 workspace:
-  - pkgs/flutter_p0g
   - pkgs/patched_source
   - pkgs/squadron_process
+  - pkgs/flutter_webui
+  - pkgs/flutter_webui_client
+  - pkgs/flutter_webui_root
+  - web_sdk
+
+dev_dependencies:
+  lints: ^6.0.0
