@@ -21,7 +21,7 @@ const USAGE = `usage: node tool/fake_host/dev_server.mjs (--dir <dir> | --proxy 
   --proxy <url>      forward to this server (flutter run -d web-server), adding the headers
   --port <n>         listen on 127.0.0.1:<n> (default 8080)
   --origin <origin>  allowed page origin (default https://mui.kernelsu.org)
-  --fonts <dir>      serve /fonts/ from this directory (web_ui/tool/fallback_fonts.dart --out)
+  --fonts <dir>      serve /fonts/ from this directory (web_sdk/tool/fallback_fonts.dart --out)
   --flutter <root>   Flutter SDK root, for the Roboto fallback in --proxy mode
                      (default: $FLUTTER_ROOT, else the flutter on PATH)
   --no-cors          send no CORS headers (to see what breaks)

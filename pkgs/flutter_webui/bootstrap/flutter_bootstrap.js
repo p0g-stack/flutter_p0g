@@ -11,7 +11,7 @@ if (!window.flutterWebUiNoFlutter) {
     // No COOP/COEP on any manager: Skwasm can only run single-threaded.
     forceSingleThreadedSkwasm: true,
     // Never reach for gstatic (WebUI X's CSP blocks it; pages may be offline):
-    // the module's fonts/ (web_ui/tool/fallback_fonts.dart).
+    // the module's fonts/ (web_sdk/tool/fallback_fonts.dart).
     fontFallbackBaseUrl: 'fonts/',
   };
   if (flutterWebUiBase) {

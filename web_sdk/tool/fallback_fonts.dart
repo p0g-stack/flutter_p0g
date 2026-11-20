@@ -17,7 +17,7 @@
 /// - `--all`: every file (about 21 MiB).
 ///
 /// ```
-/// dart run web_ui/tool/fallback_fonts.dart --flutter <flutter root> \
+/// dart run web_sdk/tool/fallback_fonts.dart --flutter <flutter root> \
 ///     --out <webroot>/fonts [--locales ja] [--all] [--list]
 /// ```
 library;

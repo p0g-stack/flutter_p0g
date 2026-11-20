@@ -39,10 +39,10 @@ if [ -n "$brick_path" ]; then
 else
   ref="${BRICKS_REF:-}"
   [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || {
-    echo "BRICKS_REF must be a full 40-hex bricks commit, got '$ref'" >&2; usage
+    echo "BRICKS_REF must be a full 40-hex p0g commit, got '$ref'" >&2; usage
   }
   source="    git:
-      url: https://github.com/p0g-stack/bricks
+      url: https://github.com/p0g-stack/p0g
       path: bricks/p0g_app
       ref: $ref"
   label="p0g_app @ ${ref:0:12}"
