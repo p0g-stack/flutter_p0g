@@ -51,16 +51,17 @@ jobs:
           dart test -p chrome test/codec_test.dart test/facts_test.dart
           dart test -p chrome -c dart2wasm test/codec_test.dart test/facts_test.dart
       - name: Squadron suite with the patch
-        working-directory: pkgs/squadron_process/third_party/squadron/src
+        working-directory: .upstream/squadron
         run: |
           dart pub get
           dart test -p vm test/squadron_vm_test.dart
-      - name: Upstream Squadron patch matches the applied one
-        working-directory: pkgs/squadron_process
+      - name: Carried patch series round-trip
         run: |
-          for patch in third_party/squadron/patches/*.patch; do
-            cmp "$patch" "third_party/squadron/patches/upstream/$(basename "$patch")"
+          for u in squadron flutter_file_picker web_sdk; do
+            tool/patches.sh "$u" checkout
+            tool/patches.sh "$u" export
           done
+          test -z "$(git status --porcelain -- third_party web_sdk/patches)"
       - name: flutter_webui_root tests
         run: dart test
         working-directory: pkgs/flutter_webui_root
@@ -113,23 +114,17 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: dart analyze --fatal-infos
       - run: flutter test
-      - name: frb series applies to the pinned commit
+      - name: FRB patch series round-trip
+        working-directory: .
         run: |
-          FRB_COMMIT=$(awk -F "'" '/^const kFrbCommit = / {print $2}' lib/src/frb/frb.dart)
-          test "${#FRB_COMMIT}" = 40
-          patches="$PWD/patches/frb"
-          git init -q /tmp/frb && cd /tmp/frb
-          git remote add origin https://github.com/fzyzcjy/flutter_rust_bridge
-          git fetch -q --depth 1 origin "$FRB_COMMIT"
-          git checkout -q FETCH_HEAD
-          for p in "$patches"/*.patch; do git apply --check "$p" && git apply "$p"; done
+          tool/patches.sh flutter_rust_bridge checkout
+          tool/patches.sh flutter_rust_bridge export
+          test -z "$(git status --porcelain -- third_party/flutter_rust_bridge)"
 
   # Generates apps from the bricks and resolves them as outside consumers
   # (Flutter 3.47.9, the pinned flutter_p0g and patched FRB).
   bricks:
     runs-on: ubuntu-latest
-    env:
-      FLUTTER_P0G_REF: 2612b4d73a4f643d49f30d0940917b15f4ae09a3
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -146,9 +141,9 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-expand,wasm-pack
-      - name: Install pinned flutter_p0g and patched FRB
+      - name: Install this checkout's flutter_p0g and patched FRB
         run: |
-          dart pub global activate --source git https://github.com/p0g-stack/flutter_p0g --git-ref "$FLUTTER_P0G_REF"
+          dart pub global activate --source path pkgs/flutter_p0g
           "$HOME/.pub-cache/bin/flutter_p0g" precache --frb --no-webui
       - name: Install mason
         run: |
